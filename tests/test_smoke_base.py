@@ -18,7 +18,7 @@ import allure
 import pytest
 
 from clients.websocket_client import WebSocketClient
-from constants.test_constants import TestConstants as C
+from constants.test_constants import TestConstants as Const
 from constants.test_dataclasses import TestDataConfig
 from constants.test_enums import LdsStatus, ReplyStatus, StationaryStatus
 from utils.helpers import ws_test_utils as t_utils
@@ -147,7 +147,7 @@ async def test_journal_info(ws_client: WebSocketClient, cfg: TestDataConfig):
             {
                 "pagination": {"limit": 50, "direction": 3},
                 "sorting": {"sortingParam": 1, "sortingType": 2},
-                "columnsSelection": C.COLUMN_SELECTION,
+                "columnsSelection": Const.COLUMN_SELECTION,
             },
         )
         parsed_payload = parser.parse_journal_msg(payload)
@@ -376,6 +376,51 @@ async def test_main_page_info(ws_client: WebSocketClient, cfg: TestDataConfig):
         ).equal_to()
 
 
+@allure.tag("subscribeMainPageInfoRequest")
+async def test_main_page_info_unstationary(ws_client: WebSocketClient, cfg: TestDataConfig):
+    """
+    [MainPageInfo] Проверка перехода в нестационарный режим
+
+    Тест для проверки перехода ТУ в режим UNSTATIONARY (нестационар).
+    Используется для Select_19_20 где происходит переход из стационара в нестационар.
+    """
+    expected_status = StationaryStatus.UNSTATIONARY
+
+    allure.dynamic.title(
+        f"[MainPageInfo] Проверка установки Нестационар на данных {cfg.suite_name}"
+    )
+    allure.dynamic.description(
+        f"Проверка сообщения MainPageInfo\n"
+        f"об установке режима Нестационар на данных {cfg.suite_name}\n"
+        f"на технологическом участке {cfg.tu_name}\n"
+        f"Ожидаемое время установки режима: ~{cfg.offsets.main_page_info_unstationary}:00"
+    )
+
+    with allure.step(
+        "Подключение по ws, получение и обработка сообщения типа: MainPageInfoContent"
+    ):
+        payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "MainPageInfoContent",
+            "subscribeMainPageInfoRequest",
+            {"tuIds": [cfg.tu_id], "additionalProperties": None},
+        )
+        parsed_payload = parser.parse_main_page_msg(payload)
+
+    with SoftAssertions() as soft:
+        StepCheck("Проверка id полученного ТУ", "tu_id", soft).actual(
+            parsed_payload.replyContent.tuId
+        ).expected(cfg.tu_id).equal_to()
+
+        StepCheck(
+            f"Проверка установки Нестационар для ТУ {cfg.tu_name}",
+            "stationary_status",
+            soft,
+        ).actual(parsed_payload.replyContent.tuInfo.stationaryStatus).expected(
+            expected_status.value
+        ).equal_to()
+
+
 # ============================================================================
 #                    ТЕСТЫ МАСКИРОВАНИЯ ДАТЧИКОВ
 # ============================================================================
@@ -415,14 +460,14 @@ async def test_mask_signal_msg(ws_client: WebSocketClient, cfg: TestDataConfig):
         pressure_sensor_list = [
             sensor
             for sensor in parsed_payload.replyContent
-            if sensor.signalType == C.PRESSURE_SIGNAL_TYPE
-            and sensor.objectType == C.PRESSURE_SENSOR_OBJECT_TYPE
+            if sensor.signalType == Const.PRESSURE_SIGNAL_TYPE
+            and sensor.objectType == Const.PRESSURE_SENSOR_OBJECT_TYPE
         ]
         flowmeter_list = [
             sensor
             for sensor in parsed_payload.replyContent
-            if sensor.signalType == C.FLOW_SIGNAL_TYPE
-            and sensor.objectType == C.FLOWMETER_OBJECT_TYPE
+            if sensor.signalType == Const.FLOW_SIGNAL_TYPE
+            and sensor.objectType == Const.FLOWMETER_OBJECT_TYPE
         ]
         pressure_sensor = t_utils.get_random_item(pressure_sensor_list)
         flowmeter = t_utils.get_random_item(flowmeter_list)
@@ -461,7 +506,7 @@ async def test_mask_signal_msg(ws_client: WebSocketClient, cfg: TestDataConfig):
             ).equal_to()
 
     with allure.step("Проверка статуса маскирования"):
-        time.sleep(C.BASIC_MESSAGE_TIMEOUT)
+        time.sleep(Const.BASIC_MESSAGE_TIMEOUT)
         payload = await t_utils.connect_and_subscribe_msg(
             ws_client,
             "InputSignalsContent",
@@ -517,7 +562,7 @@ async def test_mask_signal_msg(ws_client: WebSocketClient, cfg: TestDataConfig):
             ).equal_to()
 
     with allure.step("Проверка статуса снятия маскирования"):
-        time.sleep(C.BASIC_MESSAGE_TIMEOUT)
+        time.sleep(Const.BASIC_MESSAGE_TIMEOUT)
         payload = await t_utils.connect_and_subscribe_msg(
             ws_client,
             "InputSignalsContent",
@@ -566,6 +611,95 @@ async def test_mask_signal_msg(ws_client: WebSocketClient, cfg: TestDataConfig):
 # ============================================================================
 #                    ТЕСТЫ ИНФОРМАЦИИ ОБ УТЕЧКАХ
 # ============================================================================
+
+
+@allure.tag("SubscribeLeaksRequest")
+async def test_leaks_content(ws_client: WebSocketClient, cfg: TestDataConfig):
+    """
+    [LeaksContent] Проверка сообщения об утечке типа LeaksContent
+    """
+    allure.dynamic.title(f"[LeaksContent] Проверка утечки на данных {cfg.suite_name}")
+    allure.dynamic.description(
+        f"Проверка сообщения LeaksContent об утечке для набора данных {cfg.suite_name}\n"
+        f"на технологическом участке {cfg.tu_name}\n"
+        f"Ожидаемая координата утечки: {cfg.leak.coordinate_m} м\n"
+        f"Ожидаемый объем утечки: {cfg.leak.volume_m3} м³/ч"
+    )
+
+    with allure.step("Подключение по ws и получение сообщения об утечке типа: LeaksContent"):
+        payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "LeaksContent",
+            "SubscribeLeaksRequest",
+            {"tuId": cfg.tu_id},
+        )
+        parsed_payload = parser.parse_leaks_info_msg(payload)
+        leaks_list_info = parsed_payload.replyContent.leaksListInfo
+
+        if cfg.leak.diagnostic_area_name:
+            leak_info = t_utils.find_object_by_field(
+                leaks_list_info, "diagnosticAreaName", cfg.leak.diagnostic_area_name
+            )
+        else:
+            leak_info = leaks_list_info[0] if leaks_list_info else None
+
+        if not leak_info:
+            pytest.fail(f"Не найдена утечка для {cfg.suite_name}")
+
+        leak_detected_at = leak_info.detectedAt
+        leak_wait_end_time, leak_wait_start_time = get_leak_time_window(
+            leak_detected_at, cfg.leak.time_tolerance_s
+        )
+        leak_volume_m3 = t_utils.convert_leak_volume_m3(leak_info.leakVolume)
+        leak_coordinate_round = round(leak_info.leakCoordinate, cfg.precision)
+
+    with SoftAssertions() as soft:
+        StepCheck("Проверка id полученного ТУ", "tu_id", soft).actual(
+            parsed_payload.replyContent.tuId
+        ).expected(cfg.tu_id).equal_to()
+
+        if cfg.leak.diagnostic_area_name:
+            StepCheck(
+                "Проверка названия диагностического участка утечки",
+                "diagnosticAreaName",
+                soft,
+            ).actual(leak_info.diagnosticAreaName).expected(
+                cfg.leak.diagnostic_area_name
+            ).equal_to()
+
+        if cfg.leak.expected_confirmation_status:
+            StepCheck("Проверка статуса утечки", "confirmationStatus", soft).actual(
+                leak_info.confirmationStatus
+            ).expected(cfg.leak.expected_confirmation_status.value).equal_to()
+
+        if cfg.leak.expected_type:
+            StepCheck("Проверка источника события (алгоритм)", "type", soft).actual(
+                leak_info.type
+            ).expected(cfg.leak.expected_type.value).equal_to()
+
+        StepCheck("Проверка наличия id утечки", "id", soft).actual(
+            leak_info.id
+        ).is_not_none()
+
+        StepCheck("Проверка координаты утечки", "leakCoordinate", soft).actual(
+            leak_coordinate_round
+        ).is_close_to(
+            cfg.leak.coordinate_m,
+            cfg.distance_tolerance_m,
+            f"значение допустимой погрешности координаты {cfg.distance_tolerance_m}",
+        )
+
+        StepCheck("Проверка времени обнаружения утечки", "leakDetectedAt", soft).actual(
+            leak_detected_at
+        ).is_between(leak_wait_end_time, leak_wait_start_time)
+
+        StepCheck("Проверка объема утечки", "volume", soft).actual(
+            leak_volume_m3
+        ).is_close_to(
+            cfg.leak.volume_m3,
+            cfg.volume_tolerance_m3,
+            f"значение допустимой погрешности по объему {cfg.volume_tolerance_m3}",
+        )
 
 
 @allure.tag("subscribeAllLeaksInfoRequest")
@@ -764,10 +898,15 @@ async def test_tu_leaks_info(ws_client: WebSocketClient, cfg: TestDataConfig):
 @allure.tag("AcknowledgeLeakRequest")
 async def test_acknowledge_leak_info(ws_client: WebSocketClient, cfg: TestDataConfig):
     """
-    [AcknowledgeLeak] Проверка квитирования утечки
+    [AcknowledgeLeak] Проверка квитирования утечки (первой, если их две)
+
+    Для наборов с двумя утечками: квитирует первую, проверяет что вторая осталась.
+    Для наборов с одной утечкой: квитирует её, проверяет что список пуст.
     """
+    has_second_leak = cfg.leak_2 is not None
+
     allure.dynamic.title(
-        f"[AcknowledgeLeak] Проверка квитирования утечки на данных {cfg.suite_name}"
+        f"[AcknowledgeLeak] Проверка квитирования {'первой ' if has_second_leak else ''}утечки на данных {cfg.suite_name}"
     )
     allure.dynamic.description(
         f"Проверка квитирования утечки через синхронный запрос типа: AcknowledgeLeakRequest\n"
@@ -776,20 +915,28 @@ async def test_acknowledge_leak_info(ws_client: WebSocketClient, cfg: TestDataCo
     )
 
     with allure.step("Получение id утечки"):
-        with allure.step("Получение сообщения об утечке типа: TuLeaksInfoContent"):
-            payload = await t_utils.connect_and_subscribe_msg(
+        with allure.step("Получение сообщения об утечке типа: AllLeaksInfoContent"):
+            parsed_payload = await t_utils.connect_and_get_parsed_msg_by_tu_id(
+                cfg.tu_id,
                 ws_client,
-                "TuLeaksInfoContent",
-                "subscribeTuLeaksInfoRequest",
-                {"tuId": cfg.tu_id},
+                "AllLeaksInfoContent",
+                "subscribeAllLeaksInfoRequest",
+                [],
             )
-            parsed_payload = parser.parse_tu_leaks_info_msg(payload)
+
+        StepCheck("Проверка наличия сообщения об утечке", "leaksInfo").actual(
+            parsed_payload.replyContent.leaksInfo
+        ).is_not_empty()
 
         with allure.step("Получение id утечки из принятого сообщения"):
-            StepCheck("Проверка наличия сообщения об утечке", "leaksInfo").actual(
-                parsed_payload.replyContent.leaksInfo
-            ).is_not_empty()
-            first_leak_info = parsed_payload.replyContent.leaksInfo[0]
+            leaks_info = parsed_payload.replyContent.leaksInfo
+            # Для двух утечек ищем первую по diagnostic_area_name
+            if has_second_leak and cfg.leak.diagnostic_area_name:
+                first_leak_info = t_utils.find_object_by_field(
+                    leaks_info, "diagnosticAreaName", cfg.leak.diagnostic_area_name
+                )
+            else:
+                first_leak_info = leaks_info[0]
             leak_id = str(first_leak_info.id)
 
     with allure.step("Отправка запроса на квитирование утечки"):
@@ -801,9 +948,10 @@ async def test_acknowledge_leak_info(ws_client: WebSocketClient, cfg: TestDataCo
         parsed_payload = parser.parse_acknowledge_leak_msg(payload)
         acknowledge_reply_status = parsed_payload.replyStatus
 
-    with allure.step("Проверка отсутствия утечки после квитирования"):
+    with allure.step("Проверка результата квитирования"):
         with allure.step("Очистка очереди websocket сообщений"):
             ws_client.clear_queue()
+        time.sleep(Const.BASIC_MESSAGE_TIMEOUT)
 
         parsed_payload = await t_utils.connect_and_get_parsed_msg_by_tu_id(
             cfg.tu_id,
@@ -813,14 +961,26 @@ async def test_acknowledge_leak_info(ws_client: WebSocketClient, cfg: TestDataCo
             [],
         )
         leaks_info = parsed_payload.replyContent.leaksInfo
+        leaks_id_list = [leak.id for leak in leaks_info]
 
     StepCheck("Проверка кода ответа на запрос о квитировании", "replyStatus").actual(
         acknowledge_reply_status
     ).expected(ReplyStatus.OK.value).equal_to()
 
-    StepCheck(
-        "Проверка отсутствия сообщений об утечке после квитирования", "leaksInfo"
-    ).actual(leaks_info).is_empty()
+    if has_second_leak:
+        # Для двух утечек: вторая должна остаться
+        StepCheck(
+            "Проверка наличия сообщений о неквитированных утечках", "leaksInfo"
+        ).actual(leaks_info).is_not_empty()
+
+        StepCheck(
+            "Проверка отсутствия квитированной утечки в сообщении allLeakInfo", "id"
+        ).does_not_contain(leaks_id_list, int(leak_id))
+    else:
+        # Для одной утечки: список должен быть пуст
+        StepCheck(
+            "Проверка отсутствия сообщений об утечке после квитирования", "leaksInfo"
+        ).actual(leaks_info).is_empty()
 
 
 # ============================================================================
@@ -869,22 +1029,22 @@ async def test_output_signals(ws_client: WebSocketClient, cfg: TestDataConfig):
         with allure.step("Получение типов выходных сигналов"):
             leak_signals_list = leak_linear_part.signals
             ack_leak_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, C.ADDRESS_SUFFIX_ACK_LEAK
+                leak_signals_list, Const.ADDRESS_SUFFIX_ACK_LEAK
             )
             leak_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, C.ADDRESS_SUFFIX_LEAK
+                leak_signals_list, Const.ADDRESS_SUFFIX_LEAK
             )
             mask_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, C.ADDRESS_SUFFIX_MASK
+                leak_signals_list, Const.ADDRESS_SUFFIX_MASK
             )
             point_leak_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, C.ADDRESS_SUFFIX_POINT_LEAK
+                leak_signals_list, Const.ADDRESS_SUFFIX_POINT_LEAK
             )
             q_leak_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, C.ADDRESS_SUFFIX_Q_LEAK
+                leak_signals_list, Const.ADDRESS_SUFFIX_Q_LEAK
             )
             time_leak_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, C.ADDRESS_SUFFIX_TIME_LEAK
+                leak_signals_list, Const.ADDRESS_SUFFIX_TIME_LEAK
             )
 
     with allure.step(
@@ -936,7 +1096,7 @@ async def test_output_signals(ws_client: WebSocketClient, cfg: TestDataConfig):
             )
 
             StepCheck(
-                "Проверка наличия времени утечки", C.ADDRESS_SUFFIX_TIME_LEAK
+                "Проверка наличия времени утечки", Const.ADDRESS_SUFFIX_TIME_LEAK
             ).actual(time_leak_value).is_not_none()
 
             time_leak_value_datetime = t_utils.to_moscow_timezone(time_leak_value)
@@ -951,19 +1111,19 @@ async def test_output_signals(ws_client: WebSocketClient, cfg: TestDataConfig):
 
     with SoftAssertions() as soft:
         StepCheck(
-            "Проверка сигнала квитирования утечки", C.ADDRESS_SUFFIX_ACK_LEAK, soft
-        ).actual(ack_leak_value).expected(C.OUTPUT_IS_ACK_LEAK).equal_to()
+            "Проверка сигнала квитирования утечки", Const.ADDRESS_SUFFIX_ACK_LEAK, soft
+        ).actual(ack_leak_value).expected(Const.OUTPUT_IS_ACK_LEAK).equal_to()
 
         StepCheck(
-            "Проверка сигнала наличия утечки", C.ADDRESS_SUFFIX_LEAK, soft
-        ).actual(leak_value).expected(C.OUTPUT_IS_LEAK).equal_to()
+            "Проверка сигнала наличия утечки", Const.ADDRESS_SUFFIX_LEAK, soft
+        ).actual(leak_value).expected(Const.OUTPUT_IS_LEAK).equal_to()
 
         StepCheck(
-            "Проверка сигнала маскирования утечки", C.ADDRESS_SUFFIX_MASK, soft
-        ).actual(mask_leak_value).expected(C.OUTPUT_IS_NOT_MASK).equal_to()
+            "Проверка сигнала маскирования утечки", Const.ADDRESS_SUFFIX_MASK, soft
+        ).actual(mask_leak_value).expected(Const.OUTPUT_IS_NOT_MASK).equal_to()
 
         StepCheck(
-            "Проверка сигнала координаты утечки", C.ADDRESS_SUFFIX_POINT_LEAK, soft
+            "Проверка сигнала координаты утечки", Const.ADDRESS_SUFFIX_POINT_LEAK, soft
         ).actual(point_leak_value_round).is_close_to(
             cfg.leak.coordinate_m,
             cfg.distance_tolerance_m,
@@ -971,7 +1131,7 @@ async def test_output_signals(ws_client: WebSocketClient, cfg: TestDataConfig):
         )
 
         StepCheck(
-            "Проверка сигнала объема утечки", C.ADDRESS_SUFFIX_Q_LEAK, soft
+            "Проверка сигнала объема утечки", Const.ADDRESS_SUFFIX_Q_LEAK, soft
         ).actual(q_leak_value_m3).is_close_to(
             cfg.leak.volume_m3,
             cfg.volume_tolerance_m3,
@@ -979,15 +1139,107 @@ async def test_output_signals(ws_client: WebSocketClient, cfg: TestDataConfig):
         )
 
         StepCheck(
-            "Проверка времени обнаружения утечки", C.ADDRESS_SUFFIX_TIME_LEAK, soft
+            "Проверка времени обнаружения утечки", Const.ADDRESS_SUFFIX_TIME_LEAK, soft
         ).actual(time_leak_value_datetime).is_between(
             leak_wait_end_time, leak_wait_start_time
         )
 
 
 # ============================================================================
-#                    ТЕСТЫ ДЛЯ ВТОРОЙ УТЕЧКИ (Select_19_20)
+#                    ТЕСТЫ ДЛЯ ВТОРОЙ УТЕЧКИ
 # ============================================================================
+
+
+@allure.tag("SubscribeLeaksRequest")
+async def test_leaks_content_leak_2(ws_client: WebSocketClient, cfg: TestDataConfig):
+    """
+    [LeaksContent] Проверка сообщения о ВТОРОЙ утечке типа LeaksContent
+    """
+    if not cfg.leak_2:
+        raise ValueError(f"leak_2 не определена для {cfg.suite_name}")
+
+    leak = cfg.leak_2
+
+    allure.dynamic.title(
+        f"[LeaksContent] Проверка второй утечки ({leak.coordinate_m}м) на данных {cfg.suite_name}"
+    )
+    allure.dynamic.description(
+        f"Проверка сообщения LeaksContent о второй утечке для набора данных {cfg.suite_name}\n"
+        f"на технологическом участке {cfg.tu_name}\n"
+        f"Ожидаемая координата утечки: {leak.coordinate_m} м\n"
+        f"Ожидаемый объем утечки: {leak.volume_m3} м³/ч"
+    )
+
+    with allure.step("Подключение по ws и получение сообщения об утечке типа: LeaksContent"):
+        payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "LeaksContent",
+            "SubscribeLeaksRequest",
+            {"tuId": cfg.tu_id},
+        )
+        parsed_payload = parser.parse_leaks_info_msg(payload)
+        leaks_list_info = parsed_payload.replyContent.leaksListInfo
+
+        leak_info = t_utils.find_object_by_field(
+            leaks_list_info, "diagnosticAreaName", leak.diagnostic_area_name
+        )
+
+        if not leak_info:
+            pytest.fail(f"Не найдена вторая утечка для {cfg.suite_name}")
+
+        leak_detected_at = leak_info.detectedAt
+        leak_wait_end_time, leak_wait_start_time = get_leak_time_window(
+            leak_detected_at, leak.time_tolerance_s
+        )
+        leak_volume_m3 = t_utils.convert_leak_volume_m3(leak_info.leakVolume)
+        leak_coordinate_round = round(leak_info.leakCoordinate, cfg.precision)
+
+    with SoftAssertions() as soft:
+        StepCheck("Проверка id полученного ТУ", "tu_id", soft).actual(
+            parsed_payload.replyContent.tuId
+        ).expected(cfg.tu_id).equal_to()
+
+        StepCheck(
+            "Проверка названия диагностического участка утечки",
+            "diagnosticAreaName",
+            soft,
+        ).actual(leak_info.diagnosticAreaName).expected(
+            leak.diagnostic_area_name
+        ).equal_to()
+
+        if leak.expected_confirmation_status:
+            StepCheck("Проверка статуса утечки", "confirmationStatus", soft).actual(
+                leak_info.confirmationStatus
+            ).expected(leak.expected_confirmation_status.value).equal_to()
+
+        if leak.expected_type:
+            StepCheck("Проверка источника события (алгоритм)", "type", soft).actual(
+                leak_info.type
+            ).expected(leak.expected_type.value).equal_to()
+
+        StepCheck("Проверка наличия id утечки", "id", soft).actual(
+            leak_info.id
+        ).is_not_none()
+
+        StepCheck("Проверка координаты утечки", "leakCoordinate", soft).actual(
+            leak_coordinate_round
+        ).is_close_to(
+            leak.coordinate_m,
+            cfg.distance_tolerance_m,
+            f"значение допустимой погрешности координаты {cfg.distance_tolerance_m}",
+        )
+
+        StepCheck("Проверка времени обнаружения утечки", "leakDetectedAt", soft).actual(
+            leak_detected_at
+        ).is_between(leak_wait_end_time, leak_wait_start_time)
+
+        StepCheck("Проверка объема утечки", "volume", soft).actual(
+            leak_volume_m3
+        ).is_close_to(
+            leak.volume_m3,
+            cfg.volume_tolerance_m3_leak_2,
+            f"значение допустимой погрешности по объему {cfg.volume_tolerance_m3_leak_2}",
+        )
 
 
 @allure.tag("subscribeAllLeaksInfoRequest")
@@ -1168,6 +1420,83 @@ async def test_tu_leaks_info_leak_2(ws_client: WebSocketClient, cfg: TestDataCon
         ).expected(leak.expected_stationary_status.value).equal_to()
 
 
+@allure.tag("AcknowledgeLeakRequest")
+async def test_acknowledge_leak_info_leak_2(ws_client: WebSocketClient, cfg: TestDataConfig):
+    """
+    [AcknowledgeLeak] Проверка квитирования ВТОРОЙ утечки
+
+    Квитирует вторую утечку, проверяет что список утечек пуст.
+    """
+    if not cfg.leak_2:
+        raise ValueError(f"leak_2 не определена для {cfg.suite_name}")
+
+    leak = cfg.leak_2
+
+    allure.dynamic.title(
+        f"[AcknowledgeLeak] Проверка квитирования второй утечки на данных {cfg.suite_name}"
+    )
+    allure.dynamic.description(
+        f"Проверка квитирования второй утечки через синхронный запрос типа: AcknowledgeLeakRequest\n"
+        f"на наборе данных {cfg.suite_name},\n"
+        f"на технологическом участке {cfg.tu_name}\n"
+        f"Ожидаемое ДУ возникновения утечки: {leak.diagnostic_area_name}"
+    )
+
+    with allure.step("Получение id второй утечки"):
+        with allure.step("Получение сообщения об утечке типа: AllLeaksInfoContent"):
+            parsed_payload = await t_utils.connect_and_get_parsed_msg_by_tu_id(
+                cfg.tu_id,
+                ws_client,
+                "AllLeaksInfoContent",
+                "subscribeAllLeaksInfoRequest",
+                [],
+            )
+
+        StepCheck("Проверка наличия сообщения об утечке", "leaksInfo").actual(
+            parsed_payload.replyContent.leaksInfo
+        ).is_not_empty()
+
+        with allure.step("Получение id второй утечки из принятого сообщения"):
+            leaks_info = parsed_payload.replyContent.leaksInfo
+            second_leak_info = t_utils.find_object_by_field(
+                leaks_info, "diagnosticAreaName", leak.diagnostic_area_name
+            )
+            if not second_leak_info:
+                pytest.fail(f"Не найдена вторая утечка для {cfg.suite_name}")
+            leak_id = str(second_leak_info.id)
+
+    with allure.step("Отправка запроса на квитирование второй утечки"):
+        payload = await t_utils.connect_and_get_msg(
+            ws_client,
+            "AcknowledgeLeakRequest",
+            {"leakId": leak_id, "tuId": cfg.tu_id, "additionalProperties": None},
+        )
+        parsed_payload = parser.parse_acknowledge_leak_msg(payload)
+        acknowledge_reply_status = parsed_payload.replyStatus
+
+    with allure.step("Проверка результата квитирования"):
+        with allure.step("Очистка очереди websocket сообщений"):
+            ws_client.clear_queue()
+        time.sleep(Const.BASIC_MESSAGE_TIMEOUT)
+
+        parsed_payload = await t_utils.connect_and_get_parsed_msg_by_tu_id(
+            cfg.tu_id,
+            ws_client,
+            "AllLeaksInfoContent",
+            "subscribeAllLeaksInfoRequest",
+            [],
+        )
+        leaks_info = parsed_payload.replyContent.leaksInfo
+
+    StepCheck("Проверка кода ответа на запрос о квитировании", "replyStatus").actual(
+        acknowledge_reply_status
+    ).expected(ReplyStatus.OK.value).equal_to()
+
+    StepCheck(
+        "Проверка отсутствия сообщений об утечках после квитирования", "leaksInfo"
+    ).actual(leaks_info).is_empty()
+
+
 @allure.tag("SubscribeOutputSignalsRequest")
 async def test_output_signals_leak_2(ws_client: WebSocketClient, cfg: TestDataConfig):
     """
@@ -1213,22 +1542,22 @@ async def test_output_signals_leak_2(ws_client: WebSocketClient, cfg: TestDataCo
         with allure.step("Получение типов выходных сигналов"):
             leak_signals_list = leak_linear_part.signals
             ack_leak_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, C.ADDRESS_SUFFIX_ACK_LEAK
+                leak_signals_list, Const.ADDRESS_SUFFIX_ACK_LEAK
             )
             leak_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, C.ADDRESS_SUFFIX_LEAK
+                leak_signals_list, Const.ADDRESS_SUFFIX_LEAK
             )
             mask_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, C.ADDRESS_SUFFIX_MASK
+                leak_signals_list, Const.ADDRESS_SUFFIX_MASK
             )
             point_leak_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, C.ADDRESS_SUFFIX_POINT_LEAK
+                leak_signals_list, Const.ADDRESS_SUFFIX_POINT_LEAK
             )
             q_leak_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, C.ADDRESS_SUFFIX_Q_LEAK
+                leak_signals_list, Const.ADDRESS_SUFFIX_Q_LEAK
             )
             time_leak_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, C.ADDRESS_SUFFIX_TIME_LEAK
+                leak_signals_list, Const.ADDRESS_SUFFIX_TIME_LEAK
             )
 
     with allure.step(
@@ -1280,7 +1609,7 @@ async def test_output_signals_leak_2(ws_client: WebSocketClient, cfg: TestDataCo
             )
 
             StepCheck(
-                "Проверка наличия времени утечки", C.ADDRESS_SUFFIX_TIME_LEAK
+                "Проверка наличия времени утечки", Const.ADDRESS_SUFFIX_TIME_LEAK
             ).actual(time_leak_value).is_not_none()
 
             time_leak_value_datetime = t_utils.to_moscow_timezone(time_leak_value)
@@ -1295,19 +1624,19 @@ async def test_output_signals_leak_2(ws_client: WebSocketClient, cfg: TestDataCo
 
     with SoftAssertions() as soft:
         StepCheck(
-            "Проверка сигнала квитирования утечки", C.ADDRESS_SUFFIX_ACK_LEAK, soft
-        ).actual(ack_leak_value).expected(C.OUTPUT_IS_ACK_LEAK).equal_to()
+            "Проверка сигнала квитирования утечки", Const.ADDRESS_SUFFIX_ACK_LEAK, soft
+        ).actual(ack_leak_value).expected(Const.OUTPUT_IS_ACK_LEAK).equal_to()
 
         StepCheck(
-            "Проверка сигнала наличия утечки", C.ADDRESS_SUFFIX_LEAK, soft
-        ).actual(leak_value).expected(C.OUTPUT_IS_LEAK).equal_to()
+            "Проверка сигнала наличия утечки", Const.ADDRESS_SUFFIX_LEAK, soft
+        ).actual(leak_value).expected(Const.OUTPUT_IS_LEAK).equal_to()
 
         StepCheck(
-            "Проверка сигнала маскирования утечки", C.ADDRESS_SUFFIX_MASK, soft
-        ).actual(mask_leak_value).expected(C.OUTPUT_IS_NOT_MASK).equal_to()
+            "Проверка сигнала маскирования утечки", Const.ADDRESS_SUFFIX_MASK, soft
+        ).actual(mask_leak_value).expected(Const.OUTPUT_IS_NOT_MASK).equal_to()
 
         StepCheck(
-            "Проверка сигнала координаты утечки", C.ADDRESS_SUFFIX_POINT_LEAK, soft
+            "Проверка сигнала координаты утечки", Const.ADDRESS_SUFFIX_POINT_LEAK, soft
         ).actual(point_leak_value_round).is_close_to(
             leak.coordinate_m,
             cfg.distance_tolerance_m,
@@ -1315,7 +1644,7 @@ async def test_output_signals_leak_2(ws_client: WebSocketClient, cfg: TestDataCo
         )
 
         StepCheck(
-            "Проверка сигнала объема утечки", C.ADDRESS_SUFFIX_Q_LEAK, soft
+            "Проверка сигнала объема утечки", Const.ADDRESS_SUFFIX_Q_LEAK, soft
         ).actual(q_leak_value_m3).is_close_to(
             leak.volume_m3,
             cfg.volume_tolerance_m3_leak_2,
@@ -1323,7 +1652,7 @@ async def test_output_signals_leak_2(ws_client: WebSocketClient, cfg: TestDataCo
         )
 
         StepCheck(
-            "Проверка времени обнаружения утечки", C.ADDRESS_SUFFIX_TIME_LEAK, soft
+            "Проверка времени обнаружения утечки", Const.ADDRESS_SUFFIX_TIME_LEAK, soft
         ).actual(time_leak_value_datetime).is_between(
             leak_wait_end_time, leak_wait_start_time
         )

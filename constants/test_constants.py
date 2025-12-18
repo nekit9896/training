@@ -39,6 +39,9 @@ class TestConstants:
     # --- Для конвертации объема ---
     MASS_KG: int = 3600
 
+    # --- Форматы даты/времени ---
+    OUTPUT_TIME_FORMAT: str = "%Y-%m-%dT%H:%M:%S"
+
     # --- Выбор колонок журнала ---
     COLUMN_SELECTION: list = [
         "Time",

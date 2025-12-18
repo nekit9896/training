@@ -78,6 +78,7 @@ class TestOffsets:
     main_page_info: Optional[float]
     mask_signal_msg: Optional[float]
     lds_status_initialization_out: Optional[float]
+    leaks_content: Optional[float]
     all_leaks_info: Optional[float]
     tu_leaks_info: Optional[float]
     lds_status_during_leak: Optional[float]
@@ -85,8 +86,10 @@ class TestOffsets:
     output_signals: Optional[float]
     main_page_info_unstationary: Optional[float]
     # --- Тесты для второй утечки (Select_19_20) ---
+    leaks_content_leak_2: Optional[float]
     all_leaks_info_leak_2: Optional[float]
     tu_leaks_info_leak_2: Optional[float]
+    acknowledge_leak_info_leak_2: Optional[float]
     output_signals_leak_2: Optional[float]
 
 
@@ -102,6 +105,7 @@ class TestCaseIds:
     main_page_info: str
     mask_signal_msg: str
     lds_status_initialization_out: str
+    leaks_content: str
     all_leaks_info: str
     tu_leaks_info: str
     lds_status_during_leak: str
@@ -109,8 +113,10 @@ class TestCaseIds:
     output_signals: str
     main_page_info_unstationary: str
     # --- Тест-кейсы для второй утечки ---
+    leaks_content_leak_2: str
     all_leaks_info_leak_2: str
     tu_leaks_info_leak_2: str
+    acknowledge_leak_info_leak_2: str
     output_signals_leak_2: str
 
 

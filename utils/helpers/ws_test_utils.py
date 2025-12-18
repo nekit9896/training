@@ -11,8 +11,8 @@ from models.subscribe_all_leaks_info_model import SubscribeAllLeaksInfoReply
 from models.subscribe_common_scheme_model import DiagnosticArea, FlowArea
 from pytest import fail
 
-from constants.expectations.base_expectations import \
-    BaseSelectTN3Expected as BaseExp
+from constants.test_constants import TestConstants as Const
+from constants.test_enums import LdsStatus
 from utils.helpers.ws_message_parser import ws_message_parser
 
 ObjectType = TypeVar(
@@ -26,7 +26,7 @@ def convert_leak_volume_m3(volume: float) -> float:
     Преобразует объем утечки в м3/час
     """
     #  Округляет результат для читабельности
-    return round(volume * BaseExp.MASS_KG, 3)
+    return round(volume * Const.MASS_KG, 3)
 
 
 def get_leak_wait_start_time(datetime_now_tz: datetime, delta_s: int) -> datetime:
@@ -62,10 +62,10 @@ def determine_lds_status_by_priority(lds_status_set: Set[int]) -> int:
     Определяет режим работы СОУ по приоритету и наличию режимов работы у ДУ на самом протяженном участки карты течений
     """
     lds_status_priority = [
-        BaseExp.LDS_STATUS_FAULTY_VAL,
-        BaseExp.LDS_STATUS_INITIALIZATION_VAL,
-        BaseExp.LDS_STATUS_DEGRADATION_VAL,
-        BaseExp.LDS_STATUS_SERVICEABLE_VAL,
+        LdsStatus.FAULTY.value,
+        LdsStatus.INITIALIZATION.value,
+        LdsStatus.DEGRADATION.value,
+        LdsStatus.SERVICEABLE.value,
     ]
 
     for status in lds_status_priority:
@@ -145,7 +145,7 @@ def to_moscow_timezone(date_str: str) -> datetime:
         if date_str.startswith(("'", '"', "")) or date_str.endswith(("'", '"', "")):
             date_str = date_str.strip().strip("'").strip('"')
 
-        date_utc = datetime.strptime(date_str, BaseExp.OUTPUT_TIME_FORMAT).replace(
+        date_utc = datetime.strptime(date_str, Const.OUTPUT_TIME_FORMAT).replace(
             tzinfo=timezone.utc
         )
         return date_utc.astimezone(ZoneInfo("Europe/Moscow"))
@@ -160,7 +160,7 @@ async def connect_and_get_parsed_msg_by_tu_id(
     ws_message_type: str,
     ws_invoke_type: str,
     ws_invoke_params: Any = None,
-    timeout: float = BaseExp.BASIC_MESSAGE_TIMEOUT,
+    timeout: float = Const.BASIC_MESSAGE_TIMEOUT,
 ) -> SubscribeAllLeaksInfoReply:
     """
     Подключается, ищет и парсит allLeaksInfo сообщение для конкретного ТУ
@@ -209,7 +209,7 @@ async def connect_and_subscribe_msg(
     ws_message_type: str,
     ws_invoke_type: str,
     ws_invoke_params: Any = None,
-    timeout: float = BaseExp.BASIC_MESSAGE_TIMEOUT,
+    timeout: float = Const.BASIC_MESSAGE_TIMEOUT,
 ) -> list:
     """
     Подключение типа subscribe к заданной подписке и получение сообщения с заданным типом контента
