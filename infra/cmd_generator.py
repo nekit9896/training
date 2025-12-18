@@ -25,7 +25,9 @@ class TimeProcessor:
     def __init__(self, duration_m: float) -> None:
         self._duration_m = duration_m
         self._current_time: datetime = datetime.now()
-        self._start_time: datetime = self._add_time_delta(seconds=Im_const.IMITATOR_START_DELAY_S)
+        self._start_time: datetime = self._add_time_delta(
+            seconds=Im_const.IMITATOR_START_DELAY_S
+        )
         self._formatted_start_time: str = self._get_formatted_start_time()
         self._formatted_stop_time: str = self._get_formatted_stop_time()
 
@@ -79,7 +81,9 @@ class TimeProcessor:
         :return: время остановки имитатора строкой
         """
 
-        stop_time = self._add_time_delta(minutes=self._duration_m, seconds=Im_const.IMITATOR_START_DELAY_S)
+        stop_time = self._add_time_delta(
+            minutes=self._duration_m, seconds=Im_const.IMITATOR_START_DELAY_S
+        )
         formatted_stop_time = self.get_formatted_time(stop_time)
         return formatted_stop_time
 
@@ -118,7 +122,9 @@ class ImitatorCmdGenerator:
             return str(result_path)
 
         except (ValueError, TypeError, OSError):
-            logger.exception(f"[ERROR] Ошибка при создании пути к данным прогона. Данные: {sub_path}")
+            logger.exception(
+                f"[ERROR] Ошибка при создании пути к данным прогона. Данные: {sub_path}"
+            )
             raise
 
     def _generate_sandbox_paths(self) -> tuple[str, str, str]:
@@ -138,10 +144,14 @@ class ImitatorCmdGenerator:
         :return: target для флага
         """
         try:
-            return Im_const.HOST_MAP.get(self._stand_name, {}).get(Im_const.IMITATOR_KEY_NAME)
+            return Im_const.HOST_MAP.get(self._stand_name, {}).get(
+                Im_const.IMITATOR_KEY_NAME
+            )
 
         except KeyError:
-            logger.exception(f"[ERROR] Не удалось получить target для стенда: {self._stand_name}")
+            logger.exception(
+                f"[ERROR] Не удалось получить target для стенда: {self._stand_name}"
+            )
             raise
 
     def _get_other_flags_values(self):
@@ -149,7 +159,9 @@ class ImitatorCmdGenerator:
         Метод получения значений флагов
         """
         try:
-            self._path_to_data, self._path_to_rules, self._path_to_tags = self._generate_sandbox_paths()
+            self._path_to_data, self._path_to_rules, self._path_to_tags = (
+                self._generate_sandbox_paths()
+            )
             self._start_time = self._time_processor.formatted_start_time
             self._stop_time = self._time_processor.formatted_stop_time
             self._target = self._get_target_host()
@@ -172,9 +184,9 @@ class ImitatorCmdGenerator:
                 f'--sourceTagTypes="{self._path_to_tags}"',
                 f'--startTime="{self._start_time}"',
                 f'--stopTime="{self._stop_time}"',
-                f'--speed={self._speed}',
+                f"--speed={self._speed}",
                 f'--opcua="{self._opcua}"',
-                f'--ns={self._ns}',
+                f"--ns={self._ns}",
             ]
 
             if self._target:
@@ -202,7 +214,9 @@ class ImitatorCmdGenerator:
 
 
 class UploadImitatorDataCmdGenerator:
-    def __init__(self, username: str, host: str, path_generator: ImitatorDataPathGenerator):
+    def __init__(
+        self, username: str, host: str, path_generator: ImitatorDataPathGenerator
+    ):
         # Список ожидаемых файлов в архиве
         self.expected_files: list = [Im_const.SANDBOX_TAGS, Im_const.SANDBOX_RULES]
         self._username = username
@@ -213,7 +227,9 @@ class UploadImitatorDataCmdGenerator:
         self._remote_temp_dir_path = self._path_generator.remote_temp_dir_path
         self._tar_package_name = self._path_generator.tar_package_name
         # Путь к архиву во временной директории на удаленном сервере
-        self._full_remote_tar_path = self._path_generator.generate_full_remote_tar_path()
+        self._full_remote_tar_path = (
+            self._path_generator.generate_full_remote_tar_path()
+        )
 
     def generate_check_remote_data_cmd(self) -> str:
         """
@@ -266,4 +282,3 @@ class UploadImitatorDataCmdGenerator:
         Генерирует команду проверки архива на удаленном сервере
         """
         return f"tar -tzf {self._full_remote_tar_path}"
-    

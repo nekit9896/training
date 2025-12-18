@@ -43,7 +43,9 @@ class ImitatorManager:
         """
         # Запись логов имитатора в отдельный файл
         # Кодировка установлена под WIN, для gitlab нужно установить utf-8
-        file_handler = logging.FileHandler(Im_const.IMITATOR_LOG_FILE_NAME, encoding=Im_const.WIN_ENCODING_CP1251)
+        file_handler = logging.FileHandler(
+            Im_const.IMITATOR_LOG_FILE_NAME, encoding=Im_const.WIN_ENCODING_CP1251
+        )
         file_handler.setLevel(logging.INFO)
         formatter = logging.Formatter()
         file_handler.setFormatter(formatter)
@@ -76,18 +78,26 @@ class ImitatorManager:
                 for line in self._imitator_process.stdout:
                     self._logger.info(line)
             else:
-                logger.error("[IMITATOR] [ERROR] Ошибка записи логов имитатора: Имитатор не запущен")
+                logger.error(
+                    "[IMITATOR] [ERROR] Ошибка записи логов имитатора: Имитатор не запущен"
+                )
                 raise
         except (OSError, ValueError):
-            logging.exception("[IMITATOR] [ERROR] Ошибка при получении логов имитатора!")
+            logging.exception(
+                "[IMITATOR] [ERROR] Ошибка при получении логов имитатора!"
+            )
 
     def _is_imitator_running(self) -> bool:
         """
         Проверяет наличие PID имитатора на стенде
         """
-        result = self._client.run_cmd(Im_const.IMITATOR_CHECK_CMD, check=False, need_output=True)
+        result = self._client.run_cmd(
+            Im_const.IMITATOR_CHECK_CMD, check=False, need_output=True
+        )
         if result:
-            logger.warning(f"[IMITATOR] [WARNING] Имитатор не остановлен! PID: {result}")
+            logger.warning(
+                f"[IMITATOR] [WARNING] Имитатор не остановлен! PID: {result}"
+            )
         else:
             logger.info("[IMITATOR] [OK] Имитатор остановлен успешно")
         return bool(result and result.strip())
@@ -97,7 +107,9 @@ class ImitatorManager:
         Останавливает имитатор
         """
         try:
-            self._client.terminate_process(self._imitator_process, timeout=Im_const.POPEN_WAIT_TIMOUT_S)
+            self._client.terminate_process(
+                self._imitator_process, timeout=Im_const.POPEN_WAIT_TIMOUT_S
+            )
             if self._is_imitator_running():
                 # Останавливает имитатор на стенде
                 self._client.run_cmd(Im_const.IMITATOR_KILL_CMD)

@@ -43,7 +43,9 @@ class SubprocessClient:
         if use_ssh:
             if os.name == Im_const.OS_NAME_WIN:
                 # Для запуска под WIN требуется добавить в команду путь к ключу
-                return f"ssh -i {self._ssh_key_name} {self._username}@{self._host} \"{cmd}\""
+                return (
+                    f'ssh -i {self._ssh_key_name} {self._username}@{self._host} "{cmd}"'
+                )
             else:
                 return f'ssh {self._username}@{self._host} "{cmd}"'
         return cmd
@@ -78,7 +80,9 @@ class SubprocessClient:
             raise
         except subprocess.CalledProcessError as err:
             output_error = err.stderr.strip()
-            logging.error(f"[RUN] [ERROR] Ошибка выполнения команды: {output_error}. Код ошибки: {err.returncode}")
+            logging.error(
+                f"[RUN] [ERROR] Ошибка выполнения команды: {output_error}. Код ошибки: {err.returncode}"
+            )
             raise
 
     def exec_popen(self, cmd, use_ssh: bool = True) -> Optional[subprocess.Popen]:
@@ -112,7 +116,12 @@ class SubprocessClient:
             logging.exception(f"[POPEN] [ERROR] Ошибка выполнения команды {cmd}")
 
     def run_cmd(
-        self, cmd: str, check: bool = True, timeout: int = None, need_output: bool = False, use_ssh: bool = True
+        self,
+        cmd: str,
+        check: bool = True,
+        timeout: int = None,
+        need_output: bool = False,
+        use_ssh: bool = True,
     ) -> Optional[str]:
         """
         Выполняет команду через subprocess.run с логированием или возвратом результата выполнения команды
@@ -151,7 +160,9 @@ class SubprocessClient:
                 process.wait(timeout=timeout)
                 logger.info("[POPEN] [OK] Процесс завершился успешно")
         except subprocess.TimeoutExpired:
-            logger.exception("[POPEN] [ERROR] Процесс не завершился, принудительное уничтожение процесса")
+            logger.exception(
+                "[POPEN] [ERROR] Процесс не завершился, принудительное уничтожение процесса"
+            )
             try:
                 process.kill()
                 process.wait()
@@ -159,7 +170,9 @@ class SubprocessClient:
                 logger.exception("[POPEN] [ERROR] Ошибка завершения процесса")
                 raise
         except Exception:
-            logger.exception("[POPEN] [ERROR] Неожиданная ошибка при завершении процесса")
+            logger.exception(
+                "[POPEN] [ERROR] Неожиданная ошибка при завершении процесса"
+            )
             raise
 
     @staticmethod

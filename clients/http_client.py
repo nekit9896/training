@@ -33,7 +33,9 @@ class HttpClient:
             response.raise_for_status()
             return response
         except requests.RequestException:
-            logger.exception(f"[HTTP_CLIENT] [ERROR] При выполнении запроса. METHOD: {method} URL: {url}")
+            logger.exception(
+                f"[HTTP_CLIENT] [ERROR] При выполнении запроса. METHOD: {method} URL: {url}"
+            )
 
     @staticmethod
     def get_base_url(url_key: str) -> str:
@@ -49,7 +51,9 @@ class HttpClient:
         :return: объект ответа на запрос загрузки отчета
         """
         base_testops_url = self.get_base_url(Env_const.TESTOPS_BASE_URL)
-        full_url = self.generate_full_url(base_testops_url, Http_const.TESTOPS_UPLOAD_ENDPOINT)
+        full_url = self.generate_full_url(
+            base_testops_url, Http_const.TESTOPS_UPLOAD_ENDPOINT
+        )
         response = self.make_request(Http_const.POST_METHOD, full_url, files=files)
         return response
 
@@ -59,12 +63,16 @@ class HttpClient:
         :return: содержимое ответа на запрос
         """
         base_testops_url = self.get_base_url(Env_const.TESTOPS_BASE_URL)
-        full_endpoint = Http_const.TESTOPS_ATTACHMENTS_LIST_ENDPOINT.format(test_case_id=test_case_id)
+        full_endpoint = Http_const.TESTOPS_ATTACHMENTS_LIST_ENDPOINT.format(
+            test_case_id=test_case_id
+        )
         full_url = self.generate_full_url(base_testops_url, full_endpoint)
         response = self.make_request(Http_const.GET_METHOD, full_url)
         return response.json()
 
-    def get_test_case_attachment_by_id(self, test_case_id: int, attachment_id: int) -> bytes:
+    def get_test_case_attachment_by_id(
+        self, test_case_id: int, attachment_id: int
+    ) -> bytes:
         """
         Получает вложение по id через GET запрос к TESTOPS
         :return: содержимое ответа на запрос

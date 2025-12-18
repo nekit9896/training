@@ -49,7 +49,7 @@ class RedisCleaner:
         :param delete: добавляет команду на удаление найденного ключа
         :return:
         """
-        cmd_key_name = f'\"*{keyword}*\"'
+        cmd_key_name = f'"*{keyword}*"'
         cmd_parts = [RC_const.REDIS_KEY_FIND_CMD, cmd_key_name]
         if delete:
             cmd_parts.append(RC_const.REDIS_KEY_DEL_CMD)
@@ -60,8 +60,12 @@ class RedisCleaner:
         """
         Создает список Redis ключей
         """
-        lb_redis_key = self._make_full_redis_key(RC_const.LB_REDIS_KEY, self._stand_name)
-        core_redis_key = self._make_full_redis_key(RC_const.CORE_REDIS_KEY, self._stand_name)
+        lb_redis_key = self._make_full_redis_key(
+            RC_const.LB_REDIS_KEY, self._stand_name
+        )
+        core_redis_key = self._make_full_redis_key(
+            RC_const.CORE_REDIS_KEY, self._stand_name
+        )
         return [lb_redis_key, core_redis_key]
 
     def _delete_keys_by_keyword(self, keyword: str) -> None:
@@ -74,7 +78,9 @@ class RedisCleaner:
             logger.info(f"[REDIS] [OK] Успех!В Redis удалены ключи: {keyword}")
 
         except RuntimeError:
-            logger.exception(f"[REDIS] [ERROR] Ошибка при удалении ключей в Redis: {keyword}")
+            logger.exception(
+                f"[REDIS] [ERROR] Ошибка при удалении ключей в Redis: {keyword}"
+            )
 
     def _check_deleted_keys(self, keyword: str) -> None:
         """
@@ -89,5 +95,6 @@ class RedisCleaner:
                 logger.info(f"[REDIS] [OK] Успех!В Redis не найдены ключи: {keyword}")
                 return
         except RuntimeError:
-            logger.exception(f"[REDIS] [ERROR] Ошибка при проверке ключей в Redis: {keyword}")
-            
+            logger.exception(
+                f"[REDIS] [ERROR] Ошибка при проверке ключей в Redis: {keyword}"
+            )

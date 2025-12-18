@@ -55,7 +55,9 @@ def parse_message(data_bytes) -> List[Any]:
     """
 
     length, header_len = read_varint(data_bytes)
-    logger.info(f"SignalR varint length: {length} bytes (префикс занял {header_len} байт)")
+    logger.info(
+        f"SignalR varint length: {length} bytes (префикс занял {header_len} байт)"
+    )
 
     # 3) извлекаем payload
     payload = data_bytes[header_len: header_len + length]  # fmt: skip

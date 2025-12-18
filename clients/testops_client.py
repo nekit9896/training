@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import BinaryIO, Optional
 
-import conftest
+import pytest
 import requests
 
 from constants.architecture_constants import EnvKeyConstants as Env_Const
@@ -23,7 +23,9 @@ class AllureResultsFileManager:
         self._allure_results_path = self._get_allure_results_path()
         self._allure_results_files_list = self._get_allure_results_files_list()
 
-    def setup_allure_results_for_upload(self) -> list[tuple[str, tuple[str, Optional[BinaryIO]]]]:
+    def setup_allure_results_for_upload(
+        self,
+    ) -> list[tuple[str, tuple[str, Optional[BinaryIO]]]]:
         """
         Финальная стадия подготовки файлов allure отчета для отправки по http
         :return: финальная версия списка файлов
@@ -46,7 +48,9 @@ class AllureResultsFileManager:
                 file_obj = open(file_path, "rb")
                 return file_obj
             except OSError:
-                logger.exception(f"[TEARDOWN] [ERROR] Не удалось открыть файл: {file_path}")
+                logger.exception(
+                    f"[TEARDOWN] [ERROR] Не удалось открыть файл: {file_path}"
+                )
                 return None
         else:
             logger.warning(f"[TEARDOWN] [WARNING] Не является файлом: {file_path}")
@@ -63,9 +67,13 @@ class AllureResultsFileManager:
         """
         :return: путь к директории allure-results
         """
-        allure_results_path = self._script_dir_path.parent / T_const.ALLURE_RESULTS_DIR_NAME
+        allure_results_path = (
+            self._script_dir_path.parent / T_const.ALLURE_RESULTS_DIR_NAME
+        )
         if not allure_results_path.is_dir():
-            logger.error(f"[TEARDOWN] [ERROR] {T_const.ALLURE_RESULTS_DIR_NAME} не найдена или не является директорией")
+            logger.error(
+                f"[TEARDOWN] [ERROR] {T_const.ALLURE_RESULTS_DIR_NAME} не найдена или не является директорией"
+            )
             raise FileNotFoundError
         return allure_results_path
 
@@ -80,11 +88,19 @@ class AllureResultsFileManager:
 
         stand_value = os.environ.get(stand_key)
 
-        environment_properties_path = self._allure_results_path / "environment.properties"
+        environment_properties_path = (
+            self._allure_results_path / "environment.properties"
+        )
         try:
-            with environment_properties_path.open("w", encoding="utf-8") as env_prop_file:
-                json.dump({"stand": stand_value}, env_prop_file, ensure_ascii=False, indent=1)
-            logger.info(f"[TEARDOWN] [OK] Создан файл environment.properties в {env_prop_file}")
+            with environment_properties_path.open(
+                "w", encoding="utf-8"
+            ) as env_prop_file:
+                json.dump(
+                    {"stand": stand_value}, env_prop_file, ensure_ascii=False, indent=1
+                )
+            logger.info(
+                f"[TEARDOWN] [OK] Создан файл environment.properties в {env_prop_file}"
+            )
         except Exception:
             logger.exception(f"[TEARDOWN] [ERROR] Не удалось создать {env_prop_file}")
 
@@ -127,7 +143,9 @@ class AllureResultsUploader:
             response.raise_for_status()
             return response
         except Exception as e:
-            logger.error(f"[TEARDOWN] [ERROR] METHOD: {method} URL: {url}. Ошибка выполнения запроса: {e}")
+            logger.error(
+                f"[TEARDOWN] [ERROR] METHOD: {method} URL: {url}. Ошибка выполнения запроса: {e}"
+            )
             pytest.exit(f"Не удалось загрузить allure-results: {e}")
 
     def upload_allure_results(self) -> None:
@@ -149,7 +167,9 @@ class AllureResultsUploader:
                     try:
                         file_obj.close()
                     except Exception:
-                        logger.exception("[TEARDOWN] [WARNING] Ошибка при закрытии файла")
+                        logger.exception(
+                            "[TEARDOWN] [WARNING] Ошибка при закрытии файла"
+                        )
 
     @staticmethod
     def _get_upload_success_msg(response: requests.Response) -> str:
@@ -160,10 +180,15 @@ class AllureResultsUploader:
         """
         try:
             response_json = response.json()
-            message = response_json.get(T_const.TESTOPS_UPLOAD_RESPONSE_MSG_KEY, T_const.TESTOPS_UPLOAD_ERROR_MSG)
+            message = response_json.get(
+                T_const.TESTOPS_UPLOAD_RESPONSE_MSG_KEY,
+                T_const.TESTOPS_UPLOAD_ERROR_MSG,
+            )
             return message
         except ValueError:
-            logger.exception("[TEARDOWN] [ERROR] Ошибка получения сообщения о загрузке файлов allure отчета")
+            logger.exception(
+                "[TEARDOWN] [ERROR] Ошибка получения сообщения о загрузке файлов allure отчета"
+            )
 
     def _make_upload_request(self) -> Optional[requests.Response]:
         """

@@ -7,7 +7,9 @@ class ImitatorConstants:
     IMITATOR_CHECK_CMD: str = "pgrep -f Playground"
     IMITATOR_KILL_CMD: str = "pkill -f Playground"
     IMITATOR_PATH = "/data/imitator/lds-flow-playground-csv-latest"
-    IMITATOR_RUN_CMD: str = f"dotnet {IMITATOR_PATH}/TN.LDS.Flow.Playground.Application.dll"
+    IMITATOR_RUN_CMD: str = (
+        f"dotnet {IMITATOR_PATH}/TN.LDS.Flow.Playground.Application.dll"
+    )
     IMITATOR_LOG_FILE_NAME: str = "imitator.log"
     IMITATOR_KEY_NAME: str = "imitator_key"
     SERVER_IP_KEY_NAME: str = "server_ip"
@@ -32,7 +34,7 @@ class ImitatorConstants:
     ENCODING_UTF_8: str = "utf-8"
     WIN_ENCODING_CP866: str = "cp866"  # Нужна только для запуска под WIN
     WIN_ENCODING_CP1251: str = "cp1251"  # Нужна только для запуска под WIN
-    OS_NAME_WIN: str = 'nt'
+    OS_NAME_WIN: str = "nt"
 
     HOST_MAP = {
         "dev1": {IMITATOR_KEY_NAME: "DEV1_", SERVER_IP_KEY_NAME: "secret"},
@@ -64,7 +66,9 @@ class RedisConstants:
     LB_REDIS_KEY: str = "lds-layer-builder"
     CORE_REDIS_KEY: str = "lds-core"
     REDIS_KEY_FIND_CMD: str = "docker exec -i redis-redis-01-1-1 redis-cli KEYS"
-    REDIS_KEY_DEL_CMD: str = "| xargs -r docker exec -i redis-redis-01-1-1 redis-cli DEL"
+    REDIS_KEY_DEL_CMD: str = (
+        "| xargs -r docker exec -i redis-redis-01-1-1 redis-cli DEL"
+    )
 
 
 class KeycloakClientConstants:
@@ -83,7 +87,7 @@ class TestOpsConstants:
     TESTOPS_UPLOAD_FILES_KEY: str = "files"
     POST_METHOD: str = "post"
     ALLURE_RESULTS_DIR_NAME: str = "allure-results"
-    GZIP_FILE_SIGNATURE: bytes = b'\x1f\x8b'
+    GZIP_FILE_SIGNATURE: bytes = b"\x1f\x8b"
 
 
 class HTTPClientConstants:
@@ -91,18 +95,22 @@ class HTTPClientConstants:
     POST_METHOD: str = "post"
     TESTOPS_UPLOAD_ENDPOINT: str = "/upload"
     TESTOPS_ATTACHMENTS_LIST_ENDPOINT: str = "/test_cases/{test_case_id}/attachments"
-    TESTOPS_LOAD_ATTACHMENT_ENDPOINT: str = "/test_cases/{test_case_id}/attachments/{attachment_id}?download=1"
+    TESTOPS_LOAD_ATTACHMENT_ENDPOINT: str = (
+        "/test_cases/{test_case_id}/attachments/{attachment_id}?download=1"
+    )
     TESTOPS_ATTACHMENTS_KEY: str = "items"
     TESTOPS_ATTACHMENT_FILENAME_KEY: str = "original_filename"
     TESTOPS_ATTACHMENT_ID_KEY: str = "id"
     TEST_ID_KEY: str = "test_id"
-    IMITATOR_RUN_DATA_FILENAME: str = "imitator_run_data.tar.gz"  # Название архива данных для прогона
+    IMITATOR_RUN_DATA_FILENAME: str = (
+        "imitator_run_data.tar.gz"  # Название архива данных для прогона
+    )
 
 
 class WebSocketClientConstants:
-    RS: bytes = b'\x1E'  # ASCII Record Separator
+    RS: bytes = b"\x1e"  # ASCII Record Separator
     HANDSHAKE_WAITING: float | int = 5.0
-    HANDSHAKE_MESSAGE: str = "{\"protocol\":\"messagepack\",\"version\":1}"
+    HANDSHAKE_MESSAGE: str = '{"protocol":"messagepack","version":1}'
     WS_HUBS: str = "/hubs/ldsClientHub"
     START_INVOCATION_ID: str = 1
     DEFAULT_RECONNECT_INTERVAL: float | int = 5.0

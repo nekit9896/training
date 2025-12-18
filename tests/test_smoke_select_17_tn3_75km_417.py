@@ -1,18 +1,18 @@
 """
-Smoke-тесты СОУ для набора данных Select_7_tn3_130km_113.
+Smoke-тесты СОУ для набора данных Select_17_tn3_75km_417.
 
 Запуск:
-    pytest tests/test_smoke_select_7_tn3_130km_113.py
+    pytest tests/test_smoke_select_17_tn3_75km_417.py
 
 Данные:
     - ТУ: Тихорецк-Новороссийск-3
-    - Координата утечки: 130 км
-    - Объем утечки: 113 м³/ч
+    - Координата утечки: 75 км
+    - Объем утечки: 417 м³/ч
 """
 
 import pytest
 
-from tests.test_config import SELECT_7_CONFIG
+from tests.test_config import SELECT_17_CONFIG
 from tests.test_smoke_base import make_test_param
 from tests.test_smoke_base import \
     test_acknowledge_leak_info as _test_acknowledge_leak_info
@@ -30,7 +30,7 @@ from tests.test_smoke_base import test_mask_signal_msg as _test_mask_signal_msg
 from tests.test_smoke_base import test_output_signals as _test_output_signals
 from tests.test_smoke_base import test_tu_leaks_info as _test_tu_leaks_info
 
-CONFIG = SELECT_7_CONFIG
+CONFIG = SELECT_17_CONFIG
 
 
 @pytest.mark.parametrize("cfg", [make_test_param(CONFIG, "basic_info")])

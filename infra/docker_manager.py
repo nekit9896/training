@@ -47,9 +47,13 @@ class DockerContainerManager:
         result = self._client.run_cmd(check_cmd, need_output=True)
 
         if result == exp_status:
-            logger.info(f"Статус контейнера: {container} соответствует ожидаемому статусу: {result}")
+            logger.info(
+                f"Статус контейнера: {container} соответствует ожидаемому статусу: {result}"
+            )
         else:
-            logger.error(f"[CONTAINERS] [ERROR] Статус: {result} контейнера: {container} не совпадает с ожидаемым")
+            logger.error(
+                f"[CONTAINERS] [ERROR] Статус: {result} контейнера: {container} не совпадает с ожидаемым"
+            )
         return result == exp_status
 
     def _check_container_group_status(self, containers: list, exp_status: str) -> None:
@@ -59,7 +63,10 @@ class DockerContainerManager:
         :param exp_status: ожидаемый статус
         :return:
         """
-        if all(self._check_container_status(container, exp_status) for container in containers):
+        if all(
+            self._check_container_status(container, exp_status)
+            for container in containers
+        ):
             logger.info(
                 f"[CONTAINERS] [OK] У всех контейнеров группы: {containers[0][:-6]} Статус: {exp_status} ожидаемый"
             )
@@ -205,7 +212,3 @@ class DockerContainerManager:
 
         self._operate_with_containers(DC_const.START_CMD, container_group)
         self._check_container_group_status(container_group, DC_const.RUNNING_STATUS)
-
-
-
-        

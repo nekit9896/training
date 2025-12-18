@@ -65,9 +65,13 @@ class StandSetupManager:
             self._docker_manager.start_lds_api_gw_containers()
             # Запуск lds-reports
             self._docker_manager.start_lds_reports_containers()
-            logger.info("[SETUP] [OK] Подготовка стенда для запуска имитатора прошла успешно")
+            logger.info(
+                "[SETUP] [OK] Подготовка стенда для запуска имитатора прошла успешно"
+            )
         except RuntimeError:
-            logger.exception("[SETUP] [ERROR] Ошибка при подготовке стенда к запуску имитатора")
+            logger.exception(
+                "[SETUP] [ERROR] Ошибка при подготовке стенда к запуску имитатора"
+            )
 
     def start_imitator(self) -> None:
         """
@@ -108,10 +112,14 @@ class StandSetupManager:
         :return: server ip
         """
         try:
-            return Im_const.HOST_MAP.get(self._stand_name, {}).get(Im_const.SERVER_IP_KEY_NAME)
+            return Im_const.HOST_MAP.get(self._stand_name, {}).get(
+                Im_const.SERVER_IP_KEY_NAME
+            )
 
         except KeyError:
-            logger.exception(f"[ERROR] Не удалось получить server ip для стенда: {self._stand_name}")
+            logger.exception(
+                f"[ERROR] Не удалось получить server ip для стенда: {self._stand_name}"
+            )
             raise
 
     def _choose_cmd_generator(self) -> ImitatorCmdGenerator:
@@ -120,17 +128,25 @@ class StandSetupManager:
         """
         if os.environ.get("RUN_WITHOUT_TESTOPS", "False").lower() == "true":
             # Запуск без TestOps
-            return ImitatorCmdGenerator(self._test_data_name, self._stand_name, self._duration_m)
+            return ImitatorCmdGenerator(
+                self._test_data_name, self._stand_name, self._duration_m
+            )
         else:
-            self._uploader = ImitatorDataUploader(self._stand_client, self._test_data_id, self._test_data_name)
+            self._uploader = ImitatorDataUploader(
+                self._stand_client, self._test_data_id, self._test_data_name
+            )
             self._data_path = self._uploader.remote_temp_dir_path
-            return ImitatorCmdGenerator(self._data_path, self._stand_name, self._duration_m)
+            return ImitatorCmdGenerator(
+                self._data_path, self._stand_name, self._duration_m
+            )
 
     def _init_clients(self) -> None:
         """
         Создает экземпляры необходимых для запуска клиентов
         """
         self._stand_client = SubprocessClient(self._username, self._server_ip)
-        self._redis_client = SubprocessClient(self._username, Im_const.REDIS_STAND_ADDRESS)
+        self._redis_client = SubprocessClient(
+            self._username, Im_const.REDIS_STAND_ADDRESS
+        )
         self._redis_cleaner = RedisCleaner(self._redis_client, self._stand_name)
         self._docker_manager = DockerContainerManager(self._stand_client)

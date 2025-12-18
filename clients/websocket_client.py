@@ -6,9 +6,12 @@ from typing import Any, Callable, List, Optional
 import msgpack
 import websockets
 
-from constants.architecture_constants import WebSocketClientConstants as WS_Const
-from utils.msgpack_utils.message_filters import is_desired_invocation_id, is_desired_type
-from utils.msgpack_utils.msgpack_utils import encode_with_varint_prefix, parse_message
+from constants.architecture_constants import \
+    WebSocketClientConstants as WS_Const
+from utils.msgpack_utils.message_filters import (is_desired_invocation_id,
+                                                 is_desired_type)
+from utils.msgpack_utils.msgpack_utils import (encode_with_varint_prefix,
+                                               parse_message)
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +80,9 @@ class WebSocketClient:
             if WS_Const.RS in buf:
                 return
 
-        raise TimeoutError("Handshake timeout: не получили сообщение с разделителем RS за указанное время")
+        raise TimeoutError(
+            "Handshake timeout: не получили сообщение с разделителем RS за указанное время"
+        )
 
     async def _connect_loop(self) -> None:
         """
@@ -86,7 +91,9 @@ class WebSocketClient:
         while not self._stop_event.is_set():
             try:
                 self.ws_request = f"{self._ws_url}/?access_token={self._access_token}"
-                logger.info(f"Попытка подключения по wss: {self._ws_url}/?access_token=...")
+                logger.info(
+                    f"Попытка подключения по wss: {self._ws_url}/?access_token=..."
+                )
                 self._ws = await websockets.connect(
                     self.ws_request,
                     ping_interval=WS_Const.PING_INTERVAL,
@@ -157,27 +164,41 @@ class WebSocketClient:
         logger.info(f"Отправляем сообщение: {packet}")
         await self._ws.send(packet)
 
-    async def receive_by_type(self, message_type: str, timeout: float = 5.0) -> List[Any]:
+    async def receive_by_type(
+        self, message_type: str, timeout: float = 5.0
+    ) -> List[Any]:
         """
         Фильтрует сообщения по message_type
         """
         try:
-            return await self._receive_by(filter_func=lambda msg: is_desired_type(msg, message_type), timeout=timeout)
+            return await self._receive_by(
+                filter_func=lambda msg: is_desired_type(msg, message_type),
+                timeout=timeout,
+            )
         except websockets.WebSocketException:
-            raise websockets.WebSocketException(f"Ошибка при фильтрации сообщений по {message_type}")
+            raise websockets.WebSocketException(
+                f"Ошибка при фильтрации сообщений по {message_type}"
+            )
 
-    async def receive_by_invocation_id(self, invocation_id: str, timeout: float = 5.0) -> List[Any]:
+    async def receive_by_invocation_id(
+        self, invocation_id: str, timeout: float = 5.0
+    ) -> List[Any]:
         """
         Фильтрует сообщения по invocation_id
         """
         try:
             return await self._receive_by(
-                filter_func=lambda msg: is_desired_invocation_id(msg, invocation_id), timeout=timeout
+                filter_func=lambda msg: is_desired_invocation_id(msg, invocation_id),
+                timeout=timeout,
             )
         except websockets.WebSocketException:
-            raise websockets.WebSocketException("Ошибка при фильтрации сообщений по invocation_id")
+            raise websockets.WebSocketException(
+                "Ошибка при фильтрации сообщений по invocation_id"
+            )
 
-    async def _receive_by(self, filter_func: Callable[[list], bool], timeout: float) -> List[Any]:
+    async def _receive_by(
+        self, filter_func: Callable[[list], bool], timeout: float
+    ) -> List[Any]:
         """
         Ждет и фильтрует сообщение по filter_func
         """
@@ -188,16 +209,19 @@ class WebSocketClient:
             # 2) Остаток времени до таймаута
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise asyncio.TimeoutError(f"Timeout при фильтрации сообщений {timeout:.1f} секунд")
+                raise asyncio.TimeoutError(
+                    f"Timeout при фильтрации сообщений {timeout:.1f} секунд"
+                )
 
             try:
                 # 3) Получает сообщение
                 msg = await asyncio.wait_for(self.recv_queue.get(), timeout=remaining)
             except asyncio.TimeoutError:
                 # 4) Явно перехватывает и пробрасывает свой TimeoutError
-                raise asyncio.TimeoutError(f"Timeout при фильтрации сообщений {timeout:.1f} секунд")
+                raise asyncio.TimeoutError(
+                    f"Timeout при фильтрации сообщений {timeout:.1f} секунд"
+                )
 
             # 5) Фильтрация по filter_func
             if isinstance(msg, list) and filter_func(msg):
                 return msg
-            

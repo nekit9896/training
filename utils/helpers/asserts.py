@@ -35,7 +35,11 @@ class SoftAssertions:
 
         # Прикрепляем все собранные failure-traceback'и к Allure, чтобы их было удобно смотреть
         joined = "\n\n".join(self.failures)
-        allure.attach(joined, name="soft assertion failures", attachment_type=allure.attachment_type.TEXT)
+        allure.attach(
+            joined,
+            name="soft assertion failures",
+            attachment_type=allure.attachment_type.TEXT,
+        )
 
         # Поднимаем итоговую ошибку, чтобы CI увидел падение теста
         raise AssertionError("Soft assertion failures:\n\n" + joined)
@@ -119,22 +123,30 @@ class StepMessageBuilder:
         ]
         return self._build_message(message_parts)
 
-    def is_close_to(self, exp_value: Any, act_value: Any, extra_info: Optional[Any] = None) -> str:
+    def is_close_to(
+        self, exp_value: Any, act_value: Any, extra_info: Optional[Any] = None
+    ) -> str:
         message_parts = [
             f"Ожидаемый результат: {self.field_name} = {self._format_val(exp_value)}",
             f"Фактический результат: {self.field_name} = {self._format_val(act_value)}",
         ]
         if extra_info:
-            message_parts.append(f"Дополнительная информация: {self._format_val(extra_info)}")
+            message_parts.append(
+                f"Дополнительная информация: {self._format_val(extra_info)}"
+            )
         return self._build_message(message_parts)
 
-    def is_less_than(self, exp_value: Any, act_value: Any, extra_info: Optional[Any] = None) -> str:
+    def is_less_than(
+        self, exp_value: Any, act_value: Any, extra_info: Optional[Any] = None
+    ) -> str:
         message_parts = [
             f"Ожидаемый результат: Значение в поле {self.field_name} < {self._format_val(exp_value)}",
             f"Фактический результат: {self.field_name} = {self._format_val(act_value)}",
         ]
         if extra_info:
-            message_parts.append(f"Дополнительная информация: {self._format_val(extra_info)}")
+            message_parts.append(
+                f"Дополнительная информация: {self._format_val(extra_info)}"
+            )
         return self._build_message(message_parts)
 
     def is_between(self, act_value: Any, upper_bound: Any, lower_bound: Any) -> str:
@@ -145,7 +157,9 @@ class StepMessageBuilder:
         ]
         return self._build_message(message_parts)
 
-    def does_not_contain(self, objects_list: List[ObjectType], forbidden_object: ObjectType) -> str:
+    def does_not_contain(
+        self, objects_list: List[ObjectType], forbidden_object: ObjectType
+    ) -> str:
         message_parts = [
             f"Ожидаемый результат: Список элементов: {objects_list}",
             f"Не содержит элемента: {forbidden_object}",
@@ -159,7 +173,9 @@ class StepCheck:
     Внутри всегда формируется единое сообщение и открывается allure.step.
     """
 
-    def __init__(self, check_step: str, field_name: str, failures: Optional[List[str]] = None):
+    def __init__(
+        self, check_step: str, field_name: str, failures: Optional[List[str]] = None
+    ):
         # Сохраняем название проверки
         self.check_step = check_step
         self._field_name = field_name
@@ -205,7 +221,9 @@ class StepCheck:
 
         # Проверяем, что actual задан
         if self._actual is None:
-            raise ValueError("Фактический результат должен быть заполнен при вызове equal_to()")
+            raise ValueError(
+                "Фактический результат должен быть заполнен при вызове equal_to()"
+            )
 
         msg = self._msg_builder.equal_to(self._expected, self._actual)
 
@@ -227,14 +245,18 @@ class StepCheck:
 
         # Проверяем, что actual задан
         if self._actual is None:
-            raise ValueError("Фактический результат должен быть заполнен при вызове is_not_equal_to()")
+            raise ValueError(
+                "Фактический результат должен быть заполнен при вызове is_not_equal_to()"
+            )
 
         msg = self._msg_builder.is_not_equal_to(self._expected, self._actual)
 
         try:
             with allure.step(msg):
                 # Бросаем AssertionError в момент выполнения шага, чтобы Allure увидел failed-step
-                assert_that(self._actual).described_as(msg).is_not_equal_to(self._expected)
+                assert_that(self._actual).described_as(msg).is_not_equal_to(
+                    self._expected
+                )
         except AssertionError as exc:
             # Ловушка для исключения сразу после выхода из with - сохраняем traceback и продолжаем
             self._handle_assertion(exc)
@@ -279,26 +301,34 @@ class StepCheck:
         except AssertionError as exc:
             self._handle_assertion(exc)
 
-    def is_close_to(self, expected: Any, allowed_diff: int | float, extra_info: Any) -> None:
+    def is_close_to(
+        self, expected: Any, allowed_diff: int | float, extra_info: Any
+    ) -> None:
         """
         Проверка допуска
         """
         if self._actual is None:
-            raise ValueError("Фактический результат должен быть заполнен при вызове is_close_to()")
+            raise ValueError(
+                "Фактический результат должен быть заполнен при вызове is_close_to()"
+            )
         self._expected = expected
 
         msg = self._msg_builder.is_close_to(expected, self._actual, extra_info)
 
         try:
             with allure.step(msg):
-                assert_that(self._actual).described_as(msg).is_close_to(expected, allowed_diff)
+                assert_that(self._actual).described_as(msg).is_close_to(
+                    expected, allowed_diff
+                )
         except AssertionError as exc:
             self._handle_assertion(exc)
 
     def is_less_than(self, threshold: Any, extra_info: Any) -> None:
         """Проверка, что значение меньше порога"""
         if self._actual is None:
-            raise ValueError("Фактический результат должен быть заполнен при вызове is_less_than()")
+            raise ValueError(
+                "Фактический результат должен быть заполнен при вызове is_less_than()"
+            )
 
         msg = self._msg_builder.is_less_than(self.check_step, self._actual, extra_info)
 
@@ -311,16 +341,22 @@ class StepCheck:
     def is_between(self, lower_bound: Any, upper_bound: Any) -> None:
         """Проверка, что значение в пределах установленных границ"""
         if self._actual is None:
-            raise ValueError("Фактический результат должен быть заполнен при вызове is_less_than()")
+            raise ValueError(
+                "Фактический результат должен быть заполнен при вызове is_less_than()"
+            )
         msg = self._msg_builder.is_between(self._actual, upper_bound, lower_bound)
 
         try:
             with allure.step(msg):
-                assert_that(self._actual).described_as(msg).is_between(upper_bound, lower_bound)
+                assert_that(self._actual).described_as(msg).is_between(
+                    upper_bound, lower_bound
+                )
         except AssertionError as exc:
             self._handle_assertion(exc)
 
-    def does_not_contain(self, objects_list: List[ObjectType], forbidden_object: ObjectType) -> None:
+    def does_not_contain(
+        self, objects_list: List[ObjectType], forbidden_object: ObjectType
+    ) -> None:
         """
         Выполняет проверку does_not_contain.
         """
@@ -329,6 +365,8 @@ class StepCheck:
 
         try:
             with allure.step(msg):
-                assert_that(objects_list).described_as(msg).does_not_contain(forbidden_object)
+                assert_that(objects_list).described_as(msg).does_not_contain(
+                    forbidden_object
+                )
         except AssertionError as exc:
             self._handle_assertion(exc)

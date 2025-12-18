@@ -20,7 +20,12 @@ class KeycloakAuthError(Exception):
         details (str, optional): Дополнительные детали об ошибке.
     """
 
-    def __init__(self, message: Optional[str] = None, error_code: Optional[int] = None, details: Optional[str] = None):
+    def __init__(
+        self,
+        message: Optional[str] = None,
+        error_code: Optional[int] = None,
+        details: Optional[str] = None,
+    ):
         self.message = message or "Ошибка авторизации с Keycloak"
         self.error_code = error_code
         self.details = details
@@ -43,7 +48,9 @@ class KeycloakClient:
     Клиент для получения JWT access token из Keycloak с помощью Resource Owner Password Credentials.
     """
 
-    def __init__(self, url: str, client_id: str, client_secret: str, username: str, password: str):
+    def __init__(
+        self, url: str, client_id: str, client_secret: str, username: str, password: str
+    ):
         """
         Инициализация клиента Keycloak.
 
@@ -106,12 +113,16 @@ class KeycloakClient:
         }
         try:
             headers = self.keycloak_headers
-            response_token = requests.post(self.url, data=data, headers=headers, timeout=5)
+            response_token = requests.post(
+                self.url, data=data, headers=headers, timeout=5
+            )
             response_token.raise_for_status()
             token_data = response_token.json()
             token = token_data.get(self.token_key)
             if not token:
-                raise KeycloakAuthError("Ответ не содержит access_token", details=str(token_data))
+                raise KeycloakAuthError(
+                    "Ответ не содержит access_token", details=str(token_data)
+                )
             self._token = token
             self._token_data = token_data
             self._token_data[self.issued_at_key] = int(time.time())
@@ -120,20 +131,30 @@ class KeycloakClient:
         except requests.HTTPError as http_err:
             try:
                 error_json = response_token.json()
-                error_details = error_json.get("error_description") or error_json.get("error")
+                error_details = error_json.get("error_description") or error_json.get(
+                    "error"
+                )
             except ValueError:
                 error_details = str(http_err)
-            error_code = response_token.status_code if response_token is not None else None
+            error_code = (
+                response_token.status_code if response_token is not None else None
+            )
             logging.error(f"HTTPError при авторизации в Keycloak: {http_err}")
             raise KeycloakAuthError(
-                message="Ошибка HTTP авторизации в Keycloak", error_code=error_code, details=error_details
+                message="Ошибка HTTP авторизации в Keycloak",
+                error_code=error_code,
+                details=error_details,
             )
         except requests.RequestException as req_err:
             logging.error(f"Сетевая ошибка при соединении с Keycloak: {req_err}")
-            raise KeycloakAuthError(message="Ошибка сетевого соединения с Keycloak", details=str(req_err))
+            raise KeycloakAuthError(
+                message="Ошибка сетевого соединения с Keycloak", details=str(req_err)
+            )
         except KeyError as key_err:
             logging.error(f"Некорректный формат ответа от Keycloak: {key_err}")
-            raise KeycloakAuthError(message="Некорректный формат ответа от Keycloak", details=str(key_err))
+            raise KeycloakAuthError(
+                message="Некорректный формат ответа от Keycloak", details=str(key_err)
+            )
 
     def _is_token_expired(self):
         """
@@ -152,4 +173,3 @@ class KeycloakClient:
         if now >= issued_at + expires_in - self.token_leeway:
             return True
         return False
-    

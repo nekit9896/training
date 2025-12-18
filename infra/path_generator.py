@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
-from pathlib import PurePosixPath  # Используется для корректного запуска на Windows
+from pathlib import \
+    PurePosixPath  # Используется для корректного запуска на Windows
 
 from constants.architecture_constants import ImitatorConstants as JC_const
 
@@ -41,7 +42,9 @@ class ImitatorDataPathGenerator:
         Создает путь к временной директории на удаленном сервере
         :return: путь к временной директории на удаленном сервере
         """
-        remote_temp_dir_path = PurePosixPath(JC_const.AUTOTEST_DATA_PATH) / self._test_package_name
+        remote_temp_dir_path = (
+            PurePosixPath(JC_const.AUTOTEST_DATA_PATH) / self._test_package_name
+        )
         return str(remote_temp_dir_path)
 
     def generate_full_remote_tar_path(self) -> str:
@@ -49,5 +52,7 @@ class ImitatorDataPathGenerator:
         Создает путь к архиву на удаленном сервере
         :return: путь к архиву на удаленном сервере
         """
-        full_remote_tar_path = PurePosixPath(self.remote_temp_dir_path) / self.tar_package_name
+        full_remote_tar_path = (
+            PurePosixPath(self.remote_temp_dir_path) / self.tar_package_name
+        )
         return str(full_remote_tar_path)
