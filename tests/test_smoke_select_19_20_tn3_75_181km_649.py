@@ -1,5 +1,4 @@
 import time
-from datetime import datetime
 
 import allure
 import pytest
@@ -346,12 +345,12 @@ async def test_lds_status_initialization_out(ws_client):
     "Проверка сообщения MainPageInfo "
     f"об установке режима Не стационар на наборе данных {Exp.TEST_SUITE_NAME_VAL}, \n"
     f"на технологическом участке {Exp.TU.TIKHORETSK_NOVOROSSIYSK_3.description}\n"
-    "Ожидаемое время установки режима Стационар : ~05:00\n"
+    "Ожидаемое время установки режима не стационар : ~40:00\n"
 )
 @allure.title(f"[MainPageInfo] Проверка установки не стационара на данных {Exp.TEST_SUITE_NAME_VAL}")
 @allure.tag("subscribeMainPageInfoRequest")
-@pytest.mark.test_case_id("3")
-@pytest.mark.offset(45)
+@pytest.mark.test_case_id("79")
+@pytest.mark.offset(40)
 @pytest.mark.asyncio
 async def test_main_page_info_unstationary(ws_client):
     with allure.step("Подключение по ws, получение и обработка сообщения типа: MainPageInfoContent"):
@@ -389,7 +388,7 @@ async def test_main_page_info_unstationary(ws_client):
 )
 @allure.title(f"[LeaksContent] проверка первой утечки на данных {Exp.TEST_SUITE_NAME_VAL}")
 @allure.tag("SubscribeLeaksRequest")
-@pytest.mark.test_case_id("4")
+@pytest.mark.test_case_id("72")
 @pytest.mark.offset(47.0)
 @pytest.mark.asyncio
 async def test_leaks_content_first_leak(ws_client, imitator_start_time):
@@ -400,7 +399,7 @@ async def test_leaks_content_first_leak(ws_client, imitator_start_time):
             "SubscribeLeaksRequest",
             {'tuId': Exp.TU.TIKHORETSK_NOVOROSSIYSK_3.id},
         )
-        parsed_payload = parser.parse_leaks_info_msg(payload)
+        parsed_payload = parser.parse_leaks_content_msg(payload)
         leaks_list_info = parsed_payload.replyContent.leaksListInfo
         first_leak = t_utils.find_object_by_field(
             leaks_list_info, "diagnosticAreaName", Exp.LEAK_1_DIAGNOSTIC_AREA_NAME_VAL
@@ -463,7 +462,7 @@ async def test_leaks_content_first_leak(ws_client, imitator_start_time):
     "Проверка сообщения AllLeaksInfo "
     f"о первой утечке на наборе данных {Exp.TEST_SUITE_NAME_VAL}, \n"
     f"на технологическом участке {Exp.TU.TIKHORETSK_NOVOROSSIYSK_3.description}\n"
-    "Ожидаемое окно возникновения утечки: ~37:00 - 43:00\n"
+    "Ожидаемое окно возникновения утечки: ~41:00 - 47:00\n"
     f"Ожидаемое ДУ возникновения утечки: {Exp.LEAK_1_DIAGNOSTIC_AREA_NAME_VAL}\n"
     "Допустимое время обнаружения 6 минут с момента начала утечки, "
     f"т к для данных {Exp.TEST_SUITE_NAME_VAL} интенсивность утечки 20,4%.\n"
@@ -471,7 +470,7 @@ async def test_leaks_content_first_leak(ws_client, imitator_start_time):
 )
 @allure.title(f"[AllLeaksInfo] проверка первой утечки на данных {Exp.TEST_SUITE_NAME_VAL}")
 @allure.tag("subscribeAllLeaksInfoRequest")
-@pytest.mark.test_case_id("4")
+@pytest.mark.test_case_id("66")
 @pytest.mark.offset(47.0)
 @pytest.mark.asyncio
 async def test_all_leaks_info_first_leak(ws_client, imitator_start_time):
@@ -559,14 +558,14 @@ async def test_all_leaks_info_first_leak(ws_client, imitator_start_time):
     "Проверка сообщения TuLeaksInfo "
     f"о первой утечке на наборе данных {Exp.TEST_SUITE_NAME_VAL}, \n"
     f"на технологическом участке {Exp.TU.TIKHORETSK_NOVOROSSIYSK_3.description}\n"
-    "Ожидаемое окно возникновения утечки: ~37:00 - 43:00\n"
+    "Ожидаемое окно возникновения утечки: ~41:00 - 47:00\n"
     "Допустимое время обнаружения 6 минут с момента начала утечки, "
     f"т к для данных {Exp.TEST_SUITE_NAME_VAL} интенсивность утечки 20,4%.\n"
     "Примечание: тесты сообщений об утечке должны выполняться раньше теста на квитирование"
 )
 @allure.title(f"[TuLeaksInfo] проверка первой утечки на данных {Exp.TEST_SUITE_NAME_VAL}")
 @allure.tag("subscribeTuLeaksInfoRequest")
-@pytest.mark.test_case_id("5")
+@pytest.mark.test_case_id("70")
 @pytest.mark.offset(47.0)
 @pytest.mark.asyncio
 async def test_tu_leaks_info_first_leak(ws_client, imitator_start_time):
@@ -650,13 +649,13 @@ async def test_tu_leaks_info_first_leak(ws_client, imitator_start_time):
     "Проверка режима работы СОУ во время утечки в сообщении типа: CommonScheme "
     f"на наборе данных {Exp.TEST_SUITE_NAME_VAL}, \n"
     f"на технологическом участке {Exp.TU.TIKHORETSK_NOVOROSSIYSK_3.description}\n"
-    "Время проведения проверки : 59:30\n"
+    "Время проведения проверки : 47:00\n"
     "Примечание: проверка режимов СОУ во время утечки должна выполняться раньше теста на квитирование\n"
     "В рамках данного теста проверяется режим СОУ на ДУ с утечкой и на соседних ДУ"
 )
 @allure.title(f"[CommonScheme] Проверка режима работы СОУ во время утечки на данных {Exp.TEST_SUITE_NAME_VAL}")
 @allure.tag("SubscribeCommonSchemeRequest")
-@pytest.mark.test_case_id("31")
+@pytest.mark.test_case_id("80")
 @pytest.mark.offset(47.0)
 @pytest.mark.asyncio
 async def test_lds_status_during_leak(ws_client):
@@ -698,7 +697,7 @@ async def test_lds_status_during_leak(ws_client):
     "Проверка сообщения LeaksContent "
     f"о второй утечке на наборе данных {Exp.TEST_SUITE_NAME_VAL}, \n"
     f"на технологическом участке {Exp.TU.TIKHORETSK_NOVOROSSIYSK_3.description}\n"
-    "Ожидаемое окно возникновения утечки: ~52:00 - 58:00\n"
+    "Ожидаемое окно возникновения утечки: ~55:00 - 61:00\n"
     f"Ожидаемое ДУ возникновения утечки: {Exp.LEAK_2_DIAGNOSTIC_AREA_NAME_VAL}\n"
     "Допустимое время обнаружения 6 минут с момента начала утечки, "
     f"т к для данных {Exp.TEST_SUITE_NAME_VAL} интенсивность утечки 20,4%.\n"
@@ -706,7 +705,7 @@ async def test_lds_status_during_leak(ws_client):
 )
 @allure.title(f"[LeaksContent] проверка второй утечки на данных {Exp.TEST_SUITE_NAME_VAL}")
 @allure.tag("SubscribeLeaksRequest")
-@pytest.mark.test_case_id("4")
+@pytest.mark.test_case_id("73")
 @pytest.mark.offset(61.0)
 @pytest.mark.asyncio
 async def test_leaks_content_second_leak(ws_client, imitator_start_time):
@@ -717,7 +716,7 @@ async def test_leaks_content_second_leak(ws_client, imitator_start_time):
             "SubscribeLeaksRequest",
             {'tuId': Exp.TU.TIKHORETSK_NOVOROSSIYSK_3.id},
         )
-        parsed_payload = parser.parse_leaks_info_msg(payload)
+        parsed_payload = parser.parse_leaks_content_msg(payload)
         leaks_list_info = parsed_payload.replyContent.leaksListInfo
         second_leak = t_utils.find_object_by_field(
             leaks_list_info, "diagnosticAreaName", Exp.LEAK_2_DIAGNOSTIC_AREA_NAME_VAL
@@ -780,7 +779,7 @@ async def test_leaks_content_second_leak(ws_client, imitator_start_time):
     "Проверка сообщения AllLeaksInfo "
     f"о второй утечке на наборе данных {Exp.TEST_SUITE_NAME_VAL}, \n"
     f"на технологическом участке {Exp.TU.TIKHORETSK_NOVOROSSIYSK_3.description}\n"
-    "Ожидаемое окно возникновения утечки: ~52:00 - 58:00\n"
+    "Ожидаемое окно возникновения утечки: ~55:00 - 61:00\n"
     f"Ожидаемое ДУ возникновения утечки: {Exp.LEAK_2_DIAGNOSTIC_AREA_NAME_VAL}\n"
     "Допустимое время обнаружения 6 минут с момента начала утечки, "
     f"т к для данных {Exp.TEST_SUITE_NAME_VAL} интенсивность утечки 20,4%.\n"
@@ -788,7 +787,7 @@ async def test_leaks_content_second_leak(ws_client, imitator_start_time):
 )
 @allure.title(f"[AllLeaksInfo] проверка второй утечки на данных {Exp.TEST_SUITE_NAME_VAL}")
 @allure.tag("subscribeAllLeaksInfoRequest")
-@pytest.mark.test_case_id("4")
+@pytest.mark.test_case_id("69")
 @pytest.mark.offset(61.0)
 @pytest.mark.asyncio
 async def test_all_leaks_info_second_leak(ws_client, imitator_start_time):
@@ -876,14 +875,14 @@ async def test_all_leaks_info_second_leak(ws_client, imitator_start_time):
     "Проверка сообщения TuLeaksInfo "
     f"о второй утечке на наборе данных {Exp.TEST_SUITE_NAME_VAL}, \n"
     f"на технологическом участке {Exp.TU.TIKHORETSK_NOVOROSSIYSK_3.description}\n"
-    "Ожидаемое окно возникновения утечки: ~52:00 - 58:00\n"
+    "Ожидаемое окно возникновения утечки: ~55:00 - 61:00\n"
     "Допустимое время обнаружения 6 минут с момента начала утечки, "
     f"т к для данных {Exp.TEST_SUITE_NAME_VAL} интенсивность утечки 20,4%.\n"
     "Примечание: тесты сообщений об утечке должны выполняться раньше теста на квитирование"
 )
 @allure.title(f"[TuLeaksInfo] проверка второй утечки на данных {Exp.TEST_SUITE_NAME_VAL}")
 @allure.tag("subscribeTuLeaksInfoRequest")
-@pytest.mark.test_case_id("5")
+@pytest.mark.test_case_id("71")
 @pytest.mark.offset(61.0)
 @pytest.mark.asyncio
 async def test_tu_leaks_info_second_leak(ws_client, imitator_start_time):
@@ -973,28 +972,24 @@ async def test_tu_leaks_info_second_leak(ws_client, imitator_start_time):
 )
 @allure.title(f"[AcknowledgeLeak] проверка квитирования первой утечки на данных {Exp.TEST_SUITE_NAME_VAL}")
 @allure.tag("AcknowledgeLeakRequest")
-@pytest.mark.test_case_id("6")
+@pytest.mark.test_case_id("74")
 @pytest.mark.offset(62.0)
 @pytest.mark.asyncio
 async def test_acknowledge_leak_info_first_leak(ws_client):
     with allure.step("Получение id первой утечки"):
-        with allure.step("Подключение по ws и получение сообщения об утечке типа: AllLeaksInfoContent"):
-            parsed_payload = await t_utils.connect_and_get_parsed_msg_by_tu_id(
-                Exp.TU.TIKHORETSK_NOVOROSSIYSK_3.id,
+        with allure.step("Подключение по ws и получение сообщения об утечке типа: LeaksContent"):
+            payload = await t_utils.connect_and_subscribe_msg(
                 ws_client,
-                "AllLeaksInfoContent",
-                "subscribeAllLeaksInfoRequest",
-                [],
+                "LeaksContent",
+                "SubscribeLeaksRequest",
+                {'tuId': Exp.TU.TIKHORETSK_NOVOROSSIYSK_3.id},
             )
 
-        StepCheck("Проверка наличия сообщения об утечке типа AllLeaksInfoContent", "leaksInfo").actual(
-            parsed_payload.replyContent.leaksInfo
-        ).is_not_empty()
         with allure.step("Обработка сообщения об утечке типа AllLeaksInfoContent"):
-            # Для дальнейших проверок берет первое сообщение об утечке
-            leaks_info = parsed_payload.replyContent.leaksInfo
+            parsed_payload = parser.parse_leaks_content_msg(payload)
+            leaks_list_info = parsed_payload.replyContent.leaksListInfo
             first_leak_info = t_utils.find_object_by_field(
-                leaks_info, "diagnosticAreaName", Exp.LEAK_1_DIAGNOSTIC_AREA_NAME_VAL
+                leaks_list_info, "diagnosticAreaName", Exp.LEAK_1_DIAGNOSTIC_AREA_NAME_VAL
             )
             first_leak_id = first_leak_info.id
     with allure.step(
@@ -1043,30 +1038,26 @@ async def test_acknowledge_leak_info_first_leak(ws_client):
 )
 @allure.title(f"[AcknowledgeLeak] проверка квитирования второй утечки на данных {Exp.TEST_SUITE_NAME_VAL}")
 @allure.tag("AcknowledgeLeakRequest")
-@pytest.mark.test_case_id("6")
+@pytest.mark.test_case_id("75")
 @pytest.mark.offset(62.5)
 @pytest.mark.asyncio
 async def test_acknowledge_leak_info_second_leak(ws_client):
     with allure.step("Получение id второй утечки"):
-        with allure.step("Подключение по ws и получение сообщения об утечке типа: AllLeaksInfoContent"):
-            parsed_payload = await t_utils.connect_and_get_parsed_msg_by_tu_id(
-                Exp.TU.TIKHORETSK_NOVOROSSIYSK_3.id,
+        with allure.step("Подключение по ws и получение сообщения об утечке типа: LeaksContent"):
+            payload = await t_utils.connect_and_subscribe_msg(
                 ws_client,
-                "AllLeaksInfoContent",
-                "subscribeAllLeaksInfoRequest",
-                [],
+                "LeaksContent",
+                "SubscribeLeaksRequest",
+                {'tuId': Exp.TU.TIKHORETSK_NOVOROSSIYSK_3.id},
             )
 
-        StepCheck("Проверка наличия сообщения об утечке типа AllLeaksInfoContent", "leaksInfo").actual(
-            parsed_payload.replyContent.leaksInfo
-        ).is_not_empty()
         with allure.step("Обработка сообщения об утечке типа AllLeaksInfoContent"):
-            # Для дальнейших проверок берет первое сообщение об утечке
-            leaks_info = parsed_payload.replyContent.leaksInfo
-            second_leak_info = t_utils.find_object_by_field(
-                leaks_info, "diagnosticAreaName", Exp.LEAK_2_DIAGNOSTIC_AREA_NAME_VAL
+            parsed_payload = parser.parse_leaks_content_msg(payload)
+            leaks_list_info = parsed_payload.replyContent.leaksListInfo
+            second_leak = t_utils.find_object_by_field(
+                leaks_list_info, "diagnosticAreaName", Exp.LEAK_2_DIAGNOSTIC_AREA_NAME_VAL
             )
-            second_leak_id = second_leak_info.id
+            second_leak_id = second_leak.id
     with allure.step(
         "Подключение по ws, отправка сообщения и обработка ответа о квитировании утечки типа: AcknowledgeLeakRequest"
     ):
@@ -1112,7 +1103,7 @@ async def test_acknowledge_leak_info_second_leak(ws_client):
     f"{Exp.LEAK_1_LINEAR_PART_ID_VAL}"
 )
 @allure.tag("SubscribeOutputSignalsRequest")
-@pytest.mark.test_case_id("33")
+@pytest.mark.test_case_id("77")
 @pytest.mark.offset(63.0)
 @pytest.mark.asyncio
 async def test_output_signals_first_leak(ws_client, imitator_start_time):
@@ -1238,7 +1229,7 @@ async def test_output_signals_first_leak(ws_client, imitator_start_time):
     f"{Exp.LEAK_2_LINEAR_PART_ID_VAL}"
 )
 @allure.tag("SubscribeOutputSignalsRequest")
-@pytest.mark.test_case_id("33")
+@pytest.mark.test_case_id("78")
 @pytest.mark.offset(63.5)
 @pytest.mark.asyncio
 async def test_output_signals_second_leak(ws_client, imitator_start_time):

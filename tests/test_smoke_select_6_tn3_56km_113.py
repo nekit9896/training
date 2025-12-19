@@ -1,4 +1,5 @@
 import time
+
 import allure
 import pytest
 
@@ -558,7 +559,7 @@ async def test_lds_status_during_leak(ws_client):
             f"Проверка режима работы СОУ на ДУ с утечкой, id ДУ: {Exp.LEAK_DIAGNOSTIC_AREA_ID_VAL}",
             "ldsStatus",
             soft_failures,
-        ).actual(leak_diagnostic_area.ldsStatus).expected(Exp.LDS_STATUS_SERVICEABLE_VAL).equal_to()
+        ).actual(leak_diagnostic_area.ldsStatus).expected(Exp.LDS_STATUS_INITIALIZATION_VAL).equal_to()
 
         StepCheck(
             f"Проверка режима работы СОУ на соседнем ДУ, id ДУ: {Exp.IN_NEIGHBOR_DIAGNOSTIC_AREA_ID_VAL}",

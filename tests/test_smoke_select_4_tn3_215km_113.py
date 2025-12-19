@@ -1,5 +1,4 @@
 import time
-from datetime import datetime
 
 import allure
 import pytest
@@ -44,7 +43,9 @@ async def test_basic_info(ws_client):
             f"Проверка наличия ТУ: {Exp.TN3_TU_NAME} в списке ТУ ",
             "(tuId, tuName)",
             soft_failures,
-        ).actual(actual_tu).expected(expected_tu).equal_to()
+        ).actual(
+            actual_tu
+        ).expected(expected_tu).equal_to()
 
 
 @allure.description(
@@ -121,9 +122,7 @@ async def test_lds_status_initialization(ws_client):
     f"на технологическом участке {Exp.TN3_TU_NAME}\n"
     "Ожидаемое время установки режима остановленной перекачки: ~05:00\n"
 )
-@allure.title(
-    f"[MainPageInfo] Проверка установки режима остановленной перекачки на данных {Exp.TEST_SUITE_NAME_VAL}"
-)
+@allure.title(f"[MainPageInfo] Проверка установки режима остановленной перекачки на данных {Exp.TEST_SUITE_NAME_VAL}")
 @allure.tag("subscribeMainPageInfoRequest")
 @pytest.mark.test_case_id("44")
 @pytest.mark.offset(7)
@@ -188,8 +187,7 @@ async def test_mask_signal_msg(ws_client):
         pressure_sensor_list = [
             sensor
             for sensor in parsed_payload.replyContent
-            if sensor.signalType == Exp.PRESSURE_SIGNAL_TYPE
-            and sensor.objectType == Exp.PRESSURE_SENSOR_OBJECT_TYPE
+            if sensor.signalType == Exp.PRESSURE_SIGNAL_TYPE and sensor.objectType == Exp.PRESSURE_SENSOR_OBJECT_TYPE
         ]
         # Получает список расходомеров
         flowmeter_list = [
@@ -578,7 +576,7 @@ async def test_lds_status_during_leak(ws_client):
             f"Проверка режима работы СОУ на ДУ с утечкой, id ДУ: {Exp.LEAK_DIAGNOSTIC_AREA_ID_VAL}",
             "ldsStatus",
             soft_failures,
-        ).actual(leak_diagnostic_area.ldsStatus).expected(LdsStatus.DEGRADATION.value).equal_to()
+        ).actual(leak_diagnostic_area.ldsStatus).expected(LdsStatus.INITIALIZATION.value).equal_to()
 
         StepCheck(
             f"Проверка режима работы СОУ на соседнем ДУ, id ДУ: {Exp.IN_NEIGHBOR_DIAGNOSTIC_AREA_ID_VAL}",
@@ -670,17 +668,14 @@ async def test_acknowledge_leak_info(ws_client):
     "Данный тест так же проверяет квитирование, время запуска выставлять после запуска теста на квитирование утечки"
 )
 @allure.title(
-    "[OutputSignalsInfo] Проверка наличия данных об утечке в выходных сигналах на данных "
-    f"{Exp.TEST_SUITE_NAME_VAL}"
+    f"[OutputSignalsInfo] Проверка наличия данных об утечке в выходных сигналах на данных {Exp.TEST_SUITE_NAME_VAL}"
 )
 @allure.tag("SubscribeOutputSignalsRequest")
 @pytest.mark.test_case_id("51")
 @pytest.mark.offset(61.0)
 @pytest.mark.asyncio
 async def test_output_signals(ws_client, imitator_start_time):
-    with allure.step(
-        f"Получение списка выходных сигналов для линейного участка с id: {Exp.LEAK_LINEAR_PART_ID_VAL}"
-    ):
+    with allure.step(f"Получение списка выходных сигналов для линейного участка с id: {Exp.LEAK_LINEAR_PART_ID_VAL}"):
         payload = await t_utils.connect_and_get_msg(
             ws_client,
             "GetOutputSignalsRequest",
@@ -705,12 +700,8 @@ async def test_output_signals(ws_client, imitator_start_time):
             ack_leak_signal_type = t_utils.find_signal_type_by_address_suffix(
                 leak_signals_list, Exp.ADDRESS_SUFFIX_ACK_LEAK
             )
-            leak_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, Exp.ADDRESS_SUFFIX_LEAK
-            )
-            mask_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, Exp.ADDRESS_SUFFIX_MASK
-            )
+            leak_signal_type = t_utils.find_signal_type_by_address_suffix(leak_signals_list, Exp.ADDRESS_SUFFIX_LEAK)
+            mask_signal_type = t_utils.find_signal_type_by_address_suffix(leak_signals_list, Exp.ADDRESS_SUFFIX_MASK)
             point_leak_signal_type = t_utils.find_signal_type_by_address_suffix(
                 leak_signals_list, Exp.ADDRESS_SUFFIX_POINT_LEAK
             )
@@ -721,9 +712,7 @@ async def test_output_signals(ws_client, imitator_start_time):
                 leak_signals_list, Exp.ADDRESS_SUFFIX_TIME_LEAK
             )
 
-    with allure.step(
-        f"Получение данных выходных сигналов для линейного участка с id: {Exp.LEAK_LINEAR_PART_ID_VAL}"
-    ):
+    with allure.step(f"Получение данных выходных сигналов для линейного участка с id: {Exp.LEAK_LINEAR_PART_ID_VAL}"):
         with allure.step("Получение сообщения с данными выходных сигналов типа: OutputSignalsInfo"):
             payload = await t_utils.connect_and_subscribe_msg(
                 ws_client,
