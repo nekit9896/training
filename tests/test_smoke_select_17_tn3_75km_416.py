@@ -220,7 +220,7 @@ async def test_mask_signal_msg(ws_client):
     with allure.step(
         "Подключение по ws, получение и обработка данных о статусе датчиков из сообщения типа: InputSignalsContent"
     ):
-        time.sleep(Exp.BASIC_MESSAGE_TIMEOUT)  # Тестово добавляем время для ожидания отработки бэка по маскированию
+        time.sleep(Exp.BASIC_MESSAGE_TIMEOUT)
         payload = await t_utils.connect_and_subscribe_msg(
             ws_client,
             "InputSignalsContent",
@@ -267,7 +267,7 @@ async def test_mask_signal_msg(ws_client):
     with allure.step(
         "Подключение по ws, получение и обработка данных о статусе датчиков из сообщения типа: InputSignalsContent"
     ):
-        time.sleep(Exp.BASIC_MESSAGE_TIMEOUT)  # Тестово добавляем время для ожидания отработки бэка по маскированию
+        time.sleep(Exp.BASIC_MESSAGE_TIMEOUT)
 
         payload = await t_utils.connect_and_subscribe_msg(
             ws_client,
