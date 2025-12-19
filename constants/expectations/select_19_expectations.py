@@ -5,6 +5,10 @@ class Select19Expected(BaseSelectTN3Expected):
     # ----- Base -----
     TEST_SUITE_NAME_VAL: str = "Select_19_20_tn3_75_181km_649"
     TEST_DATA_ARCH_NAME_VAL: str = f"{TEST_SUITE_NAME_VAL}.tar.gz"
+    # ----- LeakTimeIntervals -----
+    # Интервалы от старта имитатора до обнаружения утечек (секунды)
+    FIRST_LEAK_START_INTERVAL: int = 2460  # ~41 минута - время первой утечки
+    SECOND_LEAK_START_INTERVAL: int = 3300  # ~55 минут - время второй утечки
     # ----- Leak1Expected -----
     LEAK_1_DIAGNOSTIC_AREA_NAME_VAL: str = "Т-Н-3.НПС-5 «Тихорецкая».УЗР вых - Т-Н-3.НПС-3 «Нововеличковская».УЗР вых"
     LEAK_1_DIAGNOSTIC_AREA_ID_VAL: int = 2

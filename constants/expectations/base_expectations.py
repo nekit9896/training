@@ -24,6 +24,8 @@ class BaseSelectTN3Expected:
     MASS_KG: int = 3600  # Коэффициент массы, нужно умножить что бы получить объем в м3/час
     ALLOWED_VOLUME_DIFF: float = 0.2  # Относительная погрешность по объему
     ALLOWED_DISTANCE_DIFF_METERS: int = 5000  # Погрешность координаты
+    # ----- LeakTimeIntervals -----
+    LEAK_START_INTERVAL: int = 2100  # Интервал от старта имитатора до первого обнаружения утечки (секунды) 35 минут по умолчанию
     # ----- OutPutInfoExpected -----
     ADDRESS_SUFFIX_ACK_LEAK: str = "AckLeak"
     ADDRESS_SUFFIX_LEAK: str = "Leak"

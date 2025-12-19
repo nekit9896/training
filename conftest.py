@@ -25,6 +25,7 @@ def pytest_configure(config):
         "current_suite": None,
         "suite_start_time": None,
         "stand_manager": None,
+        "imitator_start_time": None,  # datetime объект времени старта имитатора для расчёта интервалов утечек
     }
 
 
@@ -148,6 +149,8 @@ def pytest_runtest_setup(item):
         stand_manager = StandSetupManager(
             duration_m=imitator_duration, test_data_id=data_id, test_data_name=test_data_name
         )
+        # Сохраняем время старта имитатора для расчёта интервалов утечек в тестах
+        cfg["imitator_start_time"] = stand_manager.start_time
         try:
             stand_manager.setup_stand_for_imitator_run()
         except RuntimeError as error:
@@ -258,6 +261,20 @@ async def ws_client():
     auth_token = get_token()
     async with WebSocketClient(ws_host, auth_token) as client:
         yield client
+
+
+@pytest.fixture
+def imitator_start_time(request):
+    """
+    Фикстура для получения времени старта имитатора (datetime объект).
+    Используется для точного расчёта времени обнаружения утечек:
+    - leak_start_time = imitator_start_time + timedelta(seconds=LEAK_START_INTERVAL)
+    - leak_end_time = imitator_start_time + timedelta(seconds=LEAK_START_INTERVAL + ALLOWED_TIME_DIFF_SECONDS)
+    """
+    start_time = request.config.group_state.get("imitator_start_time")
+    if start_time is None:
+        pytest.fail("imitator_start_time не установлен. Убедитесь что тест запущен после инициализации имитатора.")
+    return start_time
 
 
 def pytest_sessionfinish(session, exitstatus):

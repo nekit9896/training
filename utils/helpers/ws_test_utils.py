@@ -34,6 +34,55 @@ def get_leak_wait_start_time(datetime_now_tz: datetime, delta_s: int) -> datetim
     return (datetime_now_tz - timedelta(seconds=delta_s)).replace(microsecond=0)
 
 
+def calculate_leak_start_time(imitator_start_time: datetime, leak_interval_seconds: int) -> datetime:
+    """
+    Рассчитывает время начала утечки на основе времени старта имитатора.
+
+    :param imitator_start_time: datetime объект времени старта имитатора
+    :param leak_interval_seconds: интервал от старта до утечки в секундах (LEAK_START_INTERVAL)
+    :return: datetime время ожидаемого начала утечки
+    """
+    return (imitator_start_time + timedelta(seconds=leak_interval_seconds)).replace(microsecond=0)
+
+
+def calculate_leak_end_time(
+    imitator_start_time: datetime, leak_interval_seconds: int, allowed_diff_seconds: int
+) -> datetime:
+    """
+    Рассчитывает крайнее время обнаружения утечки (с учётом допустимой погрешности).
+
+    :param imitator_start_time: datetime объект времени старта имитатора
+    :param leak_interval_seconds: интервал от старта до утечки в секундах (LEAK_START_INTERVAL)
+    :param allowed_diff_seconds: допустимая погрешность времени обнаружения (ALLOWED_TIME_DIFF_SECONDS)
+    :return: datetime крайнее время обнаружения утечки
+    """
+    total_seconds = leak_interval_seconds + allowed_diff_seconds
+    return (imitator_start_time + timedelta(seconds=total_seconds)).replace(microsecond=0)
+
+
+def get_leak_time_window(
+    imitator_start_time: datetime, leak_interval_seconds: int, allowed_diff_seconds: int, detected_at_tz=None
+) -> tuple[datetime, datetime]:
+    """
+    Возвращает временное окно для проверки времени обнаружения утечки.
+
+    :param imitator_start_time: datetime объект времени старта имитатора
+    :param leak_interval_seconds: интервал от старта до утечки в секундах
+    :param allowed_diff_seconds: допустимая погрешность времени обнаружения
+    :param detected_at_tz: timezone из времени обнаружения утечки (опционально)
+    :return: tuple (leak_start_time, leak_end_time) для использования в is_between проверке
+    """
+    leak_start = calculate_leak_start_time(imitator_start_time, leak_interval_seconds)
+    leak_end = calculate_leak_end_time(imitator_start_time, leak_interval_seconds, allowed_diff_seconds)
+
+    # Если передан timezone, применяем его к временам для корректного сравнения
+    if detected_at_tz is not None:
+        leak_start = leak_start.replace(tzinfo=detected_at_tz)
+        leak_end = leak_end.replace(tzinfo=detected_at_tz)
+
+    return leak_start, leak_end
+
+
 def get_random_item(item_list: List[RandomObjectType]) -> Optional[RandomObjectType]:
     """
     Получает случайный объект из списка

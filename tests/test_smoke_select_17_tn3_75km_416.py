@@ -355,7 +355,7 @@ async def test_lds_status_initialization_out(ws_client):
 @pytest.mark.test_case_id("42")
 @pytest.mark.offset(61.0)
 @pytest.mark.asyncio
-async def test_all_leaks_info(ws_client):
+async def test_all_leaks_info(ws_client, imitator_start_time):
     with allure.step("Подключение по ws и получение сообщения об утечке типа: AllLeaksInfoContent"):
         parsed_payload = await t_utils.connect_and_get_parsed_msg_by_tu_id(
             Exp.TN3_TU_ID,
@@ -373,9 +373,13 @@ async def test_all_leaks_info(ws_client):
         first_leak_info = parsed_payload.replyContent.leaksInfo[0]
         # Получает время обнаружения утечки
         leak_detected_at = first_leak_info.leakDetectedAt
-        # Принимает timezone что бы она была одинаковая, убирает микросекунды
-        leak_wait_end_time = datetime.now(leak_detected_at.tzinfo).replace(microsecond=0)
-        leak_wait_start_time = t_utils.get_leak_wait_start_time(leak_wait_end_time, Exp.ALLOWED_TIME_DIFF_SECONDS)
+        # Рассчитываем временное окно на основе start_time имитатора
+        leak_wait_start_time, leak_wait_end_time = t_utils.get_leak_time_window(
+            imitator_start_time,
+            Exp.LEAK_START_INTERVAL,
+            Exp.ALLOWED_TIME_DIFF_SECONDS,
+            detected_at_tz=leak_detected_at.tzinfo,
+        )
         # Получает объем утечки в м3/час
         leak_volume_m3 = t_utils.convert_leak_volume_m3(first_leak_info.volume)
         leak_coordinate_round = round(first_leak_info.leakCoordinate, 3)
@@ -415,8 +419,8 @@ async def test_all_leaks_info(ws_client):
         StepCheck("Проверка времени обнаружения утечки", "leakDetectedAt", soft_failures).actual(
             leak_detected_at
         ).is_between(
-            leak_wait_end_time,
             leak_wait_start_time,
+            leak_wait_end_time,
         )
 
         StepCheck("Проверка объема утечки", "volume", soft_failures).actual(leak_volume_m3).is_close_to(
@@ -444,7 +448,7 @@ async def test_all_leaks_info(ws_client):
 @pytest.mark.test_case_id("57")
 @pytest.mark.offset(63.0)
 @pytest.mark.asyncio
-async def test_tu_leaks_info(ws_client):
+async def test_tu_leaks_info(ws_client, imitator_start_time):
     with allure.step("Подключение по ws и получение сообщения об утечке типа: TuLeaksInfoContent"):
         payload = await t_utils.connect_and_subscribe_msg(
             ws_client,
@@ -461,9 +465,13 @@ async def test_tu_leaks_info(ws_client):
         # Для дальнейших проверок берет первое сообщение об утечке
         first_leak_info = parsed_payload.replyContent.leaksInfo[0]
         leak_detected_at = first_leak_info.leakDetectedAt
-        # Принимает timezone что бы она была одинаковая, убирает микросекунды
-        leak_wait_end_time = datetime.now(leak_detected_at.tzinfo).replace(microsecond=0)
-        leak_wait_start_time = t_utils.get_leak_wait_start_time(leak_wait_end_time, Exp.ALLOWED_TIME_DIFF_SECONDS)
+        # Рассчитываем временное окно на основе start_time имитатора
+        leak_wait_start_time, leak_wait_end_time = t_utils.get_leak_time_window(
+            imitator_start_time,
+            Exp.LEAK_START_INTERVAL,
+            Exp.ALLOWED_TIME_DIFF_SECONDS,
+            detected_at_tz=leak_detected_at.tzinfo,
+        )
         leak_volume_m3 = t_utils.convert_leak_volume_m3(first_leak_info.volume)
         leak_coordinate_round = round(first_leak_info.leakCoordinate, 3)
 
@@ -501,7 +509,7 @@ async def test_tu_leaks_info(ws_client):
 
         StepCheck("Проверка времени обнаружения утечки", "leakDetectedAt", soft_failures).actual(
             leak_detected_at
-        ).is_between(leak_wait_end_time, leak_wait_start_time)
+        ).is_between(leak_wait_start_time, leak_wait_end_time)
 
         StepCheck("Проверка объема утечки", "volume", soft_failures).actual(leak_volume_m3).is_close_to(
             Exp.VOLUME_M3,
@@ -639,7 +647,7 @@ async def test_acknowledge_leak_info(ws_client):
 @pytest.mark.test_case_id("63")
 @pytest.mark.offset(66.0)
 @pytest.mark.asyncio
-async def test_output_signals(ws_client):
+async def test_output_signals(ws_client, imitator_start_time):
     with allure.step(f"Получение списка выходных сигналов для линейного участка с id: {Exp.LEAK_LINEAR_PART_ID_VAL}"):
         payload = await t_utils.connect_and_get_msg(
             ws_client,
@@ -710,8 +718,13 @@ async def test_output_signals(ws_client):
                 time_leak_value
             ).is_not_none()
             time_leak_value_datetime = t_utils.to_moscow_timezone(time_leak_value)
-            leak_wait_end_time = datetime.now(time_leak_value_datetime.tzinfo).replace(microsecond=0)
-            leak_wait_start_time = t_utils.get_leak_wait_start_time(leak_wait_end_time, Exp.ALLOWED_TIME_DIFF_SECONDS)
+            # Рассчитываем временное окно на основе start_time имитатора
+            leak_wait_start_time, leak_wait_end_time = t_utils.get_leak_time_window(
+                imitator_start_time,
+                Exp.LEAK_START_INTERVAL,
+                Exp.OUTPUT_ALLOWED_TIME_DIFF_SECONDS,
+                detected_at_tz=time_leak_value_datetime.tzinfo,
+            )
             q_leak_value_m3 = t_utils.convert_leak_volume_m3(float(q_leak_leak_value))
             point_leak_value_round = round(float(point_leak_value), 3)
     with SoftAssertions() as soft_failures:
@@ -740,4 +753,4 @@ async def test_output_signals(ws_client):
         )
         StepCheck("Проверка времени обнаружения утечки", Exp.ADDRESS_SUFFIX_TIME_LEAK, soft_failures).actual(
             time_leak_value_datetime
-        ).is_between(leak_wait_end_time, leak_wait_start_time)
+        ).is_between(leak_wait_start_time, leak_wait_end_time)
