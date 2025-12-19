@@ -34,6 +34,10 @@ async def test_basic_info(ws_client):
             Exp.REPLY_STATUS_OK_VAL
         ).equal_to()
 
+        StepCheck("Проверка наличия объектов в списке ТУ", "tus", soft_failures).actual(
+            parsed_payload.replyContent.basicInfo.tus
+        ).is_not_empty()
+
         StepCheck(
             f"Проверка наличия ТУ: {Exp.TN3_TU_NAME} в списке ТУ ",
             "(tuId, tuName)",
