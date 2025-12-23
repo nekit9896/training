@@ -1,0 +1,26 @@
+"""
+Модуль конфигурации тестов.
+
+Экспортирует:
+- SuiteConfig - главный конфиг набора данных
+- LeakTestConfig - конфиг утечки
+- CaseMarkers - маркеры тест-кейса
+- DiagnosticAreaStatusConfig - конфиг статусов ДУ
+- SuiteConstants - общие константы
+"""
+
+from test_config.models import (
+    DiagnosticAreaStatusConfig,
+    LeakTestConfig,
+    CaseMarkers,
+    SuiteConstants,
+    SuiteConfig,
+)
+
+__all__ = [
+    "SuiteConfig",
+    "LeakTestConfig",
+    "CaseMarkers",
+    "DiagnosticAreaStatusConfig",
+    "SuiteConstants",
+]

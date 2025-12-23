@@ -94,4 +94,3 @@ class LdsStatus(Enum):
     INITIALIZATION = 2  # Инициализация
     DEGRADATION = 3  # Ухудшенные характеристики
     SERVICEABLE = 4  # Исправность
-    
