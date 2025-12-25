@@ -140,7 +140,8 @@ async def test_leaks_content_first_leak(ws_client, imitator_start_time):
         first_leak = t_utils.find_object_by_field(
             leaks_list_info, "diagnosticAreaName", LEAK_1.diagnostic_area_name
         )
-        leak_detected_at = first_leak.detectedAt
+        # Конвертируем время обнаружения в московское время
+        leak_detected_at = t_utils.ensure_moscow_timezone(first_leak.detectedAt)
         leak_wait_start_time, leak_wait_end_time = t_utils.get_leak_time_window(
             imitator_start_time,
             LEAK_1.leak_start_interval_seconds,
@@ -242,7 +243,8 @@ async def test_leaks_content_second_leak(ws_client, imitator_start_time):
         second_leak = t_utils.find_object_by_field(
             leaks_list_info, "diagnosticAreaName", LEAK_2.diagnostic_area_name
         )
-        leak_detected_at = second_leak.detectedAt
+        # Конвертируем время обнаружения в московское время
+        leak_detected_at = t_utils.ensure_moscow_timezone(second_leak.detectedAt)
         leak_wait_start_time, leak_wait_end_time = t_utils.get_leak_time_window(
             imitator_start_time,
             LEAK_2.leak_start_interval_seconds,

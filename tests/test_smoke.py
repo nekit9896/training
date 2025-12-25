@@ -4,6 +4,9 @@
 Использует параметризацию pytest для запуска одинаковых тестов
 на разных наборах данных без дублирования кода.
 
+Наборы данных обнаруживаются автоматически из test_config/datasets/.
+Для добавления нового набора достаточно создать файл конфигурации.
+
 Запуск:
 - Все тесты: pytest tests/test_smoke.py
 - Один набор: pytest tests/test_smoke.py -k select_17
@@ -13,12 +16,7 @@
 import allure
 import pytest
 
-from test_config.datasets import (
-    SELECT_4_CONFIG,
-    SELECT_6_CONFIG,
-    SELECT_7_CONFIG,
-    SELECT_17_CONFIG,
-)
+from test_config.datasets import SINGLE_LEAK_CONFIGS
 from test_config.models import SuiteConfig
 from test_scenarios import scenarios
 
@@ -32,18 +30,16 @@ def get_suite_markers(config: SuiteConfig):
     ]
 
 
-# ===== Конфигурации для параметризации =====
-SINGLE_LEAK_CONFIGS = [
-    pytest.param(SELECT_4_CONFIG, id=SELECT_4_CONFIG.suite_name, marks=get_suite_markers(SELECT_4_CONFIG)),
-    pytest.param(SELECT_6_CONFIG, id=SELECT_6_CONFIG.suite_name, marks=get_suite_markers(SELECT_6_CONFIG)),
-    pytest.param(SELECT_7_CONFIG, id=SELECT_7_CONFIG.suite_name, marks=get_suite_markers(SELECT_7_CONFIG)),
-    pytest.param(SELECT_17_CONFIG, id=SELECT_17_CONFIG.suite_name, marks=get_suite_markers(SELECT_17_CONFIG)),
+# ===== Автоматическое построение параметризации из обнаруженных конфигов =====
+PARAMETRIZED_CONFIGS = [
+    pytest.param(config, id=config.suite_name, marks=get_suite_markers(config))
+    for config in SINGLE_LEAK_CONFIGS
 ]
 
 
 # ===== ПАРАМЕТРИЗОВАННЫЕ ТЕСТЫ =====
 
-@pytest.mark.parametrize("config", SINGLE_LEAK_CONFIGS)
+@pytest.mark.parametrize("config", PARAMETRIZED_CONFIGS)
 class TestSingleLeakSuite:
     """
     Параметризованные тесты для наборов данных с одной утечкой.

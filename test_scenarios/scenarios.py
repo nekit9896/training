@@ -329,7 +329,8 @@ async def leaks_content(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imita
         else:
             leak_info = leaks_list_info[0]
 
-        leak_detected_at = leak_info.detectedAt
+        # Конвертируем время обнаружения в московское время
+        leak_detected_at = t_utils.ensure_moscow_timezone(leak_info.detectedAt)
         leak_wait_start_time, leak_wait_end_time = t_utils.get_leak_time_window(
             imitator_start_time,
             leak.leak_start_interval_seconds,
@@ -409,7 +410,8 @@ async def all_leaks_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imit
         else:
             first_leak_info = leaks_info[0]
 
-        leak_detected_at = first_leak_info.leakDetectedAt
+        # Конвертируем время обнаружения в московское время
+        leak_detected_at = t_utils.ensure_moscow_timezone(first_leak_info.leakDetectedAt)
         leak_wait_start_time, leak_wait_end_time = t_utils.get_leak_time_window(
             imitator_start_time,
             leak.leak_start_interval_seconds,
@@ -497,7 +499,8 @@ async def tu_leaks_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imita
         else:
             first_leak_info = tu_leaks_info_list[0]
 
-        leak_detected_at = first_leak_info.leakDetectedAt
+        # Конвертируем время обнаружения в московское время
+        leak_detected_at = t_utils.ensure_moscow_timezone(first_leak_info.leakDetectedAt)
         leak_wait_start_time, leak_wait_end_time = t_utils.get_leak_time_window(
             imitator_start_time,
             leak.leak_start_interval_seconds,

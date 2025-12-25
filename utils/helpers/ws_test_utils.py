@@ -166,6 +166,24 @@ def find_diagnostic_area_by_id(flow_areas: List[FlowArea], id_value: int) -> Dia
         fail(f"Не найден ДУ по id: {id_value}")
 
 
+def ensure_moscow_timezone(dt: datetime) -> datetime:
+    """
+    Конвертирует datetime в московское время.
+    
+    :param dt: datetime объект (может быть naive или с любой timezone)
+    :return: datetime в московской таймзоне
+    """
+    if dt is None:
+        return dt
+    
+    # Если datetime без timezone - считаем что это UTC
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    
+    # Конвертируем в московское время
+    return dt.astimezone(ZoneInfo("Europe/Moscow"))
+
+
 def to_moscow_timezone(date_str: str) -> datetime:
     """
     Преобразует строку времени в московское время
