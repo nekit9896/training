@@ -12,25 +12,8 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from constants.expectations.enums import TU, LdsStatus, StationaryStatus
-
-
-# ===== Общие константы из BaseExpectations =====
-class SuiteConstants:
-    """Общие константы для всех тестов"""
-    
-    # Погрешности
-    ALLOWED_VOLUME_DIFF: float = 0.2  # Относительная погрешность по объему (20%)
-    ALLOWED_DISTANCE_DIFF_METERS: int = 5000  # Погрешность координаты в метрах
-    
-    # Временные интервалы по умолчанию
-    DEFAULT_LEAK_START_INTERVAL: int = 2100  # 35 минут - время до обнаружения утечки
-    DEFAULT_OUTPUT_TEST_DELAY: int = 120  # Задержка для теста выходных сигналов
-    
-    # Прочее
-    BASIC_MESSAGE_TIMEOUT: float = 5.0
-    PRECISION: int = 3
-    MASS_KG: int = 3600  # Коэффициент массы для расчёта объёма м3/час
+from constants.enums import TU, LdsStatus, StationaryStatus
+import constants.test_constants as test_const
 
 
 @dataclass
@@ -89,9 +72,9 @@ class LeakTestConfig:
     volume_m3: float = None
     
     # ===== Временные интервалы (секунды) =====
-    leak_start_interval_seconds: int = SuiteConstants.DEFAULT_LEAK_START_INTERVAL
+    leak_start_interval_seconds: int = test_const.LEAK_START_INTERVAL
     allowed_time_diff_seconds: int = 0  # Допустимое время обнаружения
-    output_test_delay_seconds: int = SuiteConstants.DEFAULT_OUTPUT_TEST_DELAY
+    output_test_delay_seconds: int = test_const.OUTPUT_TEST_DELAY
     
     # ===== Ожидаемые статусы =====
     expected_lds_status: int = LdsStatus.SERVICEABLE.value
@@ -107,7 +90,7 @@ class LeakTestConfig:
     @property
     def allowed_volume_m3(self) -> float:
         """Допустимая погрешность объёма"""
-        return self.volume_m3 * SuiteConstants.ALLOWED_VOLUME_DIFF
+        return self.volume_m3 * test_const.ALLOWED_VOLUME_DIFF
     
     @property
     def output_allowed_time_diff_seconds(self) -> int:
@@ -164,9 +147,9 @@ class SuiteConfig:
     main_page_info_unstationary_test: Optional[CaseMarkers] = None
     
     # ===== Общие константы (можно переопределить) =====
-    allowed_distance_diff_meters: int = SuiteConstants.ALLOWED_DISTANCE_DIFF_METERS
-    precision: int = SuiteConstants.PRECISION
-    basic_message_timeout: float = SuiteConstants.BASIC_MESSAGE_TIMEOUT
+    allowed_distance_diff_meters: int = test_const.ALLOWED_DISTANCE_DIFF_METERS
+    precision: int = test_const.PRECISION
+    basic_message_timeout: float = test_const.BASIC_MESSAGE_TIMEOUT
     
     # ===== Свойства для удобства =====
     @property
@@ -195,4 +178,4 @@ class SuiteConfig:
     @property
     def allowed_volume_diff(self) -> float:
         """Относительная погрешность по объёму"""
-        return SuiteConstants.ALLOWED_VOLUME_DIFF
+        return test_const.ALLOWED_VOLUME_DIFF

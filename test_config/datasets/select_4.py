@@ -7,7 +7,7 @@
 - Объём утечки 113.6 м³
 """
 
-from constants.expectations.enums import TU, LdsStatus, StationaryStatus
+from constants.enums import TU, LdsStatus, StationaryStatus
 from test_config.models import (
     DiagnosticAreaStatusConfig,
     LeakTestConfig,

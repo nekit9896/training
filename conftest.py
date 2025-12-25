@@ -29,7 +29,86 @@ def pytest_configure(config):
     }
 
 
+# ===== Маппинг имён тестов на атрибуты конфига для получения маркеров =====
+# Используется для добавления offset и test_case_id маркеров во время сбора тестов
+TEST_CONFIG_MAPPING = {
+    'test_basic_info': 'basic_info_test',
+    'test_journal_info': 'journal_info_test',
+    'test_lds_status_initialization': 'lds_status_initialization_test',
+    'test_main_page_info': 'main_page_info_test',
+    'test_mask_signal_msg': 'mask_signal_test',
+    'test_lds_status_initialization_out': 'lds_status_initialization_out_test',
+    'test_lds_status_during_leak': 'lds_status_during_leak_test',
+    # Тесты утечек - для наборов с одной утечкой
+    'test_leaks_content': 'leak.leaks_content_test',
+    'test_all_leaks_info': 'leak.all_leaks_info_test',
+    'test_tu_leaks_info': 'leak.tu_leaks_info_test',
+    'test_acknowledge_leak_info': 'leak.acknowledge_leak_test',
+    'test_output_signals': 'leak.output_signals_test',
+}
+
+
+def _get_test_config_from_suite_config(suite_config, config_path: str):
+    """
+    Получает конфигурацию теста из конфига набора по пути (например, 'leak.all_leaks_info_test').
+    
+    :param suite_config: SuiteConfig объект
+    :param config_path: путь к атрибуту (разделённый точками)
+    :return: CaseMarkers объект или None
+    """
+    obj = suite_config
+    for attr in config_path.split('.'):
+        obj = getattr(obj, attr, None)
+        if obj is None:
+            return None
+    return obj
+
+
 def pytest_collection_modifyitems(session, config, items):
+    """
+    1. Исключает тесты, у которых конфиг = None (тест отключён для этого набора данных)
+    2. Добавляет маркеры offset и test_case_id из конфига к каждому параметризованному тесту
+    3. Сортирует тесты по test_suite_name для группировки по наборам данных
+    """
+    selected_items = []
+    deselected_items = []
+    
+    for item in items:
+        # Проверяем, что это параметризованный тест с конфигом
+        if hasattr(item, 'callspec') and 'config' in item.callspec.params:
+            suite_config = item.callspec.params['config']
+            
+            # Получаем имя функции теста (без параметров)
+            test_name = item.originalname or item.name.split('[')[0]
+            
+            # Получаем путь к конфигу теста
+            config_path = TEST_CONFIG_MAPPING.get(test_name)
+            if config_path:
+                test_config = _get_test_config_from_suite_config(suite_config, config_path)
+                
+                # Если конфиг теста = None, исключаем тест из прогона
+                if test_config is None:
+                    deselected_items.append(item)
+                    continue
+                
+                # Добавляем маркер offset
+                if hasattr(test_config, 'offset') and test_config.offset is not None:
+                    item.add_marker(pytest.mark.offset(test_config.offset))
+                
+                # Добавляем маркер test_case_id
+                if hasattr(test_config, 'test_case_id') and test_config.test_case_id is not None:
+                    item.add_marker(pytest.mark.test_case_id(test_config.test_case_id))
+        
+        selected_items.append(item)
+    
+    # Уведомляем pytest об исключённых тестах
+    if deselected_items:
+        config.hook.pytest_deselected(items=deselected_items)
+    
+    # Заменяем список тестов на отфильтрованный
+    items[:] = selected_items
+
+    # Сортировка тестов по test_suite_name
     def suite_key(item):
         """
         Сортировка тестов по test_suite_name (без падения на None)
@@ -38,7 +117,6 @@ def pytest_collection_modifyitems(session, config, items):
         return test_suite_name_marker.args[0] if test_suite_name_marker else ""
 
     items.sort(key=suite_key)
-    return items
 
 
 @pytest.fixture(autouse=True)
@@ -82,14 +160,14 @@ def compute_imitator_duration(item, current_test_suite: str) -> float:
     """
 
     suite_items = [
-        item
-        for item in item.session.items
-        if (marker := item.get_closest_marker("test_suite_name")) and marker.args[0] == current_test_suite
+        suite_item
+        for suite_item in item.session.items
+        if (marker := suite_item.get_closest_marker("test_suite_name")) and marker.args[0] == current_test_suite
     ]
 
     offsets = []
-    for item in suite_items:
-        offset_marker = item.get_closest_marker("offset")
+    for suite_item in suite_items:
+        offset_marker = suite_item.get_closest_marker("offset")
         if offset_marker:
             try:
                 offsets.append(float(offset_marker.args[0]))
@@ -149,8 +227,6 @@ def pytest_runtest_setup(item):
         stand_manager = StandSetupManager(
             duration_m=imitator_duration, test_data_id=data_id, test_data_name=test_data_name
         )
-        # Сохраняем время старта имитатора для расчёта интервалов утечек в тестах
-        cfg["imitator_start_time"] = stand_manager.start_time
         try:
             stand_manager.setup_stand_for_imitator_run()
         except RuntimeError as error:
@@ -172,6 +248,8 @@ def pytest_runtest_setup(item):
             pytest.exit(f"[SETUP] [ERROR] ошибка запуска СORE контейнеров: {error}")
 
         cfg["stand_manager"] = stand_manager
+        # Сохраняем время старта имитатора для расчёта интервалов утечек в тестах
+        cfg["imitator_start_time"] = stand_manager.start_time
 
     yield  # pytest продолжит выполнение теста
 

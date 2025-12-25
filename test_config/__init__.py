@@ -6,14 +6,14 @@
 - LeakTestConfig - конфиг утечки
 - CaseMarkers - маркеры тест-кейса
 - DiagnosticAreaStatusConfig - конфиг статусов ДУ
-- SuiteConstants - общие константы
+
+Общие константы находятся в constants/test_constants.py
 """
 
 from test_config.models import (
     DiagnosticAreaStatusConfig,
     LeakTestConfig,
     CaseMarkers,
-    SuiteConstants,
     SuiteConfig,
 )
 
@@ -22,5 +22,4 @@ __all__ = [
     "LeakTestConfig",
     "CaseMarkers",
     "DiagnosticAreaStatusConfig",
-    "SuiteConstants",
 ]

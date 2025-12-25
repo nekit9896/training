@@ -7,7 +7,7 @@
 - 4 соседних диагностических участка (in, out, out_2)
 """
 
-from constants.expectations.enums import TU, LdsStatus, StationaryStatus
+from constants.enums import TU, LdsStatus, StationaryStatus
 from test_config.models import (
     DiagnosticAreaStatusConfig,
     LeakTestConfig,

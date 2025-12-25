@@ -9,7 +9,7 @@ import time
 
 import allure
 
-from constants.expectations.enums import LdsStatus, ReplyStatus
+from constants.enums import ConfirmationStatus, LdsStatus, ReplyStatus, ReservedType
 from constants.test_constants import (
     ADDRESS_SUFFIX_ACK_LEAK,
     ADDRESS_SUFFIX_LEAK,
@@ -305,6 +305,81 @@ async def lds_status_initialization_out(ws_client, cfg: SuiteConfig):
         "Проверка: СОУ находится не в режиме 'Инициализация'",
         "ldsStatus",
     ).actual(lds_status).expected(LdsStatus.INITIALIZATION.value).is_not_equal_to()
+
+
+async def leaks_content(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imitator_start_time):
+    """
+    Проверка утечки через сообщение LeaksContent.
+    """
+    with allure.step("Подключение по ws и получение сообщения об утечке типа: LeaksContent"):
+        payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "LeaksContent",
+            "SubscribeLeaksRequest",
+            {'tuId': cfg.tu_id},
+        )
+        parsed_payload = parser.parse_leaks_content_msg(payload)
+        leaks_list_info = parsed_payload.replyContent.leaksListInfo
+
+        # Ищем утечку по имени ДУ или берём первую
+        if leak.diagnostic_area_name:
+            leak_info = t_utils.find_object_by_field(
+                leaks_list_info, "diagnosticAreaName", leak.diagnostic_area_name
+            )
+        else:
+            leak_info = leaks_list_info[0]
+
+        leak_detected_at = leak_info.detectedAt
+        leak_wait_start_time, leak_wait_end_time = t_utils.get_leak_time_window(
+            imitator_start_time,
+            leak.leak_start_interval_seconds,
+            leak.allowed_time_diff_seconds,
+            detected_at_tz=leak_detected_at.tzinfo,
+        )
+        leak_volume_m3 = t_utils.convert_leak_volume_m3(leak_info.leakVolume)
+        leak_coordinate_round = round(leak_info.leakCoordinate, cfg.precision)
+
+    with SoftAssertions() as soft_failures:
+        StepCheck("Проверка id полученного ТУ", "tu_id", soft_failures).actual(
+            parsed_payload.replyContent.tuId
+        ).expected(cfg.tu_id).equal_to()
+
+        if leak.diagnostic_area_name:
+            StepCheck("Проверка названия диагностического участка утечки", "diagnosticAreaName", soft_failures).actual(
+                leak_info.diagnosticAreaName
+            ).expected(leak.diagnostic_area_name).equal_to()
+        else:
+            StepCheck("Проверка наличия названия участка утечки", "diagnosticAreaName", soft_failures).actual(
+                leak_info.diagnosticAreaName
+            ).is_not_none()
+
+        StepCheck("Проверка статуса утечки", "confirmationStatus", soft_failures).actual(
+            leak_info.confirmationStatus
+        ).expected(ConfirmationStatus.CONFIRMED.value).equal_to()
+
+        StepCheck("Проверка источника события (алгоритм)", "type", soft_failures).actual(
+            leak_info.type
+        ).expected(ReservedType.UNSTATIONARY_FLOW.value).equal_to()
+
+        StepCheck("Проверка наличия id утечки", "id", soft_failures).actual(leak_info.id).is_not_none()
+
+        StepCheck("Проверка координаты утечки", "leakCoordinate", soft_failures).actual(
+            leak_coordinate_round
+        ).is_close_to(
+            leak.coordinate_meters,
+            cfg.allowed_distance_diff_meters,
+            f"значение допустимой погрешности координаты {cfg.allowed_distance_diff_meters}",
+        )
+
+        StepCheck("Проверка времени обнаружения утечки", "leakDetectedAt", soft_failures).actual(
+            leak_detected_at
+        ).is_between(leak_wait_start_time, leak_wait_end_time)
+
+        StepCheck("Проверка объема утечки", "volume", soft_failures).actual(leak_volume_m3).is_close_to(
+            leak.volume_m3,
+            leak.allowed_volume_m3,
+            f"значение допустимой погрешности по объему {leak.allowed_volume_m3}",
+        )
 
 
 async def all_leaks_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imitator_start_time):

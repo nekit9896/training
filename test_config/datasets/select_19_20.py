@@ -9,13 +9,8 @@
 - Допустимое время обнаружения 6 минут
 """
 
-from constants.expectations.enums import TU, ConfirmationStatus, LdsStatus, ReservedType, StationaryStatus
-from test_config.models import (
-    DiagnosticAreaStatusConfig,
-    LeakTestConfig,
-    CaseMarkers,
-    SuiteConfig,
-)
+from constants.enums import TU, ConfirmationStatus, LdsStatus, ReservedType, StationaryStatus
+import test_config.models as models
 
 # ===== Константы набора =====
 SUITE_NAME = "Select_19_20_tn3_75_181km_649"
@@ -53,7 +48,7 @@ OUT_NEIGHBOR_DIAGNOSTIC_AREA_ID = 3
 
 
 # ===== Конфигурация набора =====
-SELECT_19_20_CONFIG = SuiteConfig(
+SELECT_19_20_CONFIG = models.SuiteConfig(
     # ----- Метаданные -----
     suite_name=SUITE_NAME,
     suite_data_id=SUITE_DATA_ID,
@@ -65,14 +60,14 @@ SELECT_19_20_CONFIG = SuiteConfig(
     
     # ===== БАЗОВЫЕ ТЕСТЫ =====
     
-    basic_info_test=CaseMarkers(
+    basic_info_test=models.CaseMarkers(
         test_case_id="1",
         offset=1,
         title="[BasicInfo] Проверка базовой информации СОУ: список ТУ",
         tag="BasicInfo",
     ),
     
-    journal_info_test=CaseMarkers(
+    journal_info_test=models.CaseMarkers(
         test_case_id="2",
         offset=5,
         title="[MessagesInfo] Проверка наличия сообщений в журнале",
@@ -83,7 +78,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
         ),
     ),
     
-    lds_status_initialization_test=CaseMarkers(
+    lds_status_initialization_test=models.CaseMarkers(
         test_case_id="29",
         offset=5,
         title=f"[CommonScheme] Проверка режима работы СОУ: 'Инициализация' на данных {SUITE_NAME}",
@@ -97,7 +92,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
         ),
     ),
     
-    main_page_info_test=CaseMarkers(
+    main_page_info_test=models.CaseMarkers(
         test_case_id="3",
         offset=7,
         title=f"[MainPageInfo] Проверка установки стационара на данных {SUITE_NAME}",
@@ -111,7 +106,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
     ),
     
     # ----- Дополнительный тест на нестационар (специфика двух утечек) -----
-    main_page_info_unstationary_test=CaseMarkers(
+    main_page_info_unstationary_test=models.CaseMarkers(
         test_case_id="79",
         offset=40,
         title=f"[MainPageInfo] Проверка установки не стационара на данных {SUITE_NAME}",
@@ -124,7 +119,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
         ),
     ),
     
-    mask_signal_test=CaseMarkers(
+    mask_signal_test=models.CaseMarkers(
         test_case_id="32",
         offset=8.0,
         title=f"[MaskSignal] проверка маскирования датчиков на данных {SUITE_NAME}",
@@ -142,7 +137,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
         ),
     ),
     
-    lds_status_initialization_out_test=CaseMarkers(
+    lds_status_initialization_out_test=models.CaseMarkers(
         test_case_id="30",
         offset=30,
         title=f"[CommonScheme] Проверка выхода СОУ из Инициализации на данных {SUITE_NAME}",
@@ -156,7 +151,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
         ),
     ),
     
-    lds_status_during_leak_test=CaseMarkers(
+    lds_status_during_leak_test=models.CaseMarkers(
         test_case_id="80",
         offset=47.0,
         title=f"[CommonScheme] Проверка режима работы СОУ во время утечки на данных {SUITE_NAME}",
@@ -172,7 +167,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
     ),
     
     # ===== КОНФИГУРАЦИЯ СТАТУСОВ СОУ ВО ВРЕМЯ УТЕЧКИ =====
-    lds_status_during_leak_config=DiagnosticAreaStatusConfig(
+    lds_status_during_leak_config=models.DiagnosticAreaStatusConfig(
         diagnostic_area_id=LEAK_1_DIAGNOSTIC_AREA_ID,
         expected_lds_status=LdsStatus.INITIALIZATION.value,
         in_neighbor_id=IN_NEIGHBOR_DIAGNOSTIC_AREA_ID,
@@ -184,7 +179,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
     # ===== Конфигурации утечек =====
     leaks=[
         # ===== ПЕРВАЯ УТЕЧКА (75 км) =====
-        LeakTestConfig(
+        models.LeakTestConfig(
             # ----- Идентификаторы -----
             diagnostic_area_name=LEAK_1_DIAGNOSTIC_AREA_NAME,
             diagnostic_area_id=LEAK_1_DIAGNOSTIC_AREA_ID,
@@ -205,7 +200,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
             expected_stationary_status=StationaryStatus.UNSTATIONARY.value,
             
             # ----- Тест LeaksContent (первая утечка) -----
-            leaks_content_test=CaseMarkers(
+            leaks_content_test=models.CaseMarkers(
                 test_case_id="72",
                 offset=47.0,
                 title=f"[LeaksContent] проверка первой утечки на данных {SUITE_NAME}",
@@ -223,7 +218,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
             ),
             
             # ----- Тест AllLeaksInfo (первая утечка) -----
-            all_leaks_info_test=CaseMarkers(
+            all_leaks_info_test=models.CaseMarkers(
                 test_case_id="66",
                 offset=47.0,
                 title=f"[AllLeaksInfo] проверка первой утечки на данных {SUITE_NAME}",
@@ -241,7 +236,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
             ),
             
             # ----- Тест TuLeaksInfo (первая утечка) -----
-            tu_leaks_info_test=CaseMarkers(
+            tu_leaks_info_test=models.CaseMarkers(
                 test_case_id="70",
                 offset=47.0,
                 title=f"[TuLeaksInfo] проверка первой утечки на данных {SUITE_NAME}",
@@ -258,7 +253,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
             ),
             
             # ----- Тест AcknowledgeLeak (первая утечка) -----
-            acknowledge_leak_test=CaseMarkers(
+            acknowledge_leak_test=models.CaseMarkers(
                 test_case_id="74",
                 offset=62.0,
                 title=f"[AcknowledgeLeak] проверка квитирования первой утечки на данных {SUITE_NAME}",
@@ -275,7 +270,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
             ),
             
             # ----- Тест OutputSignals (первая утечка) -----
-            output_signals_test=CaseMarkers(
+            output_signals_test=models.CaseMarkers(
                 test_case_id="77",
                 offset=63.0,
                 title=f"[OutputSignalsInfo] Проверка данных о первой утечке в выходных сигналах на линейном участке с id: {LEAK_1_LINEAR_PART_ID}",
@@ -293,7 +288,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
         ),
         
         # ===== ВТОРАЯ УТЕЧКА (181 км) =====
-        LeakTestConfig(
+        models.LeakTestConfig(
             # ----- Идентификаторы -----
             diagnostic_area_name=LEAK_2_DIAGNOSTIC_AREA_NAME,
             diagnostic_area_id=LEAK_2_DIAGNOSTIC_AREA_ID,
@@ -314,7 +309,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
             expected_stationary_status=StationaryStatus.UNSTATIONARY.value,
             
             # ----- Тест LeaksContent (вторая утечка) -----
-            leaks_content_test=CaseMarkers(
+            leaks_content_test=models.CaseMarkers(
                 test_case_id="73",
                 offset=61.0,
                 title=f"[LeaksContent] проверка второй утечки на данных {SUITE_NAME}",
@@ -332,7 +327,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
             ),
             
             # ----- Тест AllLeaksInfo (вторая утечка) -----
-            all_leaks_info_test=CaseMarkers(
+            all_leaks_info_test=models.CaseMarkers(
                 test_case_id="69",
                 offset=61.0,
                 title=f"[AllLeaksInfo] проверка второй утечки на данных {SUITE_NAME}",
@@ -350,7 +345,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
             ),
             
             # ----- Тест TuLeaksInfo (вторая утечка) -----
-            tu_leaks_info_test=CaseMarkers(
+            tu_leaks_info_test=models.CaseMarkers(
                 test_case_id="71",
                 offset=61.0,
                 title=f"[TuLeaksInfo] проверка второй утечки на данных {SUITE_NAME}",
@@ -367,7 +362,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
             ),
             
             # ----- Тест AcknowledgeLeak (вторая утечка) -----
-            acknowledge_leak_test=CaseMarkers(
+            acknowledge_leak_test=models.CaseMarkers(
                 test_case_id="75",
                 offset=62.5,
                 title=f"[AcknowledgeLeak] проверка квитирования второй утечки на данных {SUITE_NAME}",
@@ -384,7 +379,7 @@ SELECT_19_20_CONFIG = SuiteConfig(
             ),
             
             # ----- Тест OutputSignals (вторая утечка) -----
-            output_signals_test=CaseMarkers(
+            output_signals_test=models.CaseMarkers(
                 test_case_id="78",
                 offset=63.5,
                 title=f"[OutputSignalsInfo] Проверка данных о второй утечке в выходных сигналах на линейном участке с id: {LEAK_2_LINEAR_PART_ID}",

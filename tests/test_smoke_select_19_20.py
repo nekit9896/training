@@ -9,7 +9,7 @@ import time
 import allure
 import pytest
 
-from constants.expectations.enums import ConfirmationStatus, LdsStatus, ReservedType, ReplyStatus, StationaryStatus
+from constants.enums import ConfirmationStatus, ReservedType, ReplyStatus, StationaryStatus
 from test_config.datasets import SELECT_19_20_CONFIG
 from test_scenarios import scenarios
 from utils.helpers import ws_test_utils as t_utils
