@@ -17,6 +17,18 @@ from constants.architecture_constants import WebSocketClientConstants as WSCliCo
 from infra.stand_setup_manager import StandSetupManager
 
 
+def pytest_addoption(parser):
+    """
+    Добавляет кастомные опции командной строки pytest.
+    """
+    parser.addoption(
+        "--suites",
+        action="store",
+        default=None,
+        help="Запустить только указанные наборы данных. Пример: --suites=select_4,select_19_20",
+    )
+
+
 def pytest_configure(config):
     """
     Храним состояние сессии
@@ -66,14 +78,32 @@ def _get_test_config_from_suite_config(suite_config, config_path: str):
 
 def pytest_collection_modifyitems(session, config, items):
     """
-    1. Исключает тесты, у которых конфиг = None (тест отключён для этого набора данных)
-    2. Добавляет маркеры offset и test_case_id из конфига к каждому параметризованному тесту
-    3. Сортирует тесты по test_suite_name для группировки по наборам данных
+    1. Фильтрует тесты по --suites (если указано)
+    2. Исключает тесты, у которых конфиг = None (тест отключён для этого набора данных)
+    3. Добавляет маркеры offset и test_case_id из конфига к каждому параметризованному тесту
+    4. Сортирует тесты по test_suite_name для группировки по наборам данных
     """
+    # Получаем список выбранных наборов из --suites
+    suites_option = config.getoption("--suites")
+    selected_suites = None
+    if suites_option:
+        # Парсим список наборов: "select_4,select_19_20" -> ["select_4", "select_19_20"]
+        selected_suites = [s.strip().lower() for s in suites_option.split(",")]
+    
     selected_items = []
     deselected_items = []
     
     for item in items:
+        # Фильтрация по --suites
+        if selected_suites:
+            suite_marker = item.get_closest_marker("test_suite_name")
+            if suite_marker:
+                suite_name = suite_marker.args[0].lower()
+                # Проверяем, содержит ли имя набора одну из выбранных подстрок
+                if not any(selected in suite_name for selected in selected_suites):
+                    deselected_items.append(item)
+                    continue
+        
         # Проверяем, что это параметризованный тест с конфигом
         if hasattr(item, 'callspec') and 'config' in item.callspec.params:
             suite_config = item.callspec.params['config']
