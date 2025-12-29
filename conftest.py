@@ -15,6 +15,7 @@ from constants.architecture_constants import EnvKeyConstants as EnvConst
 from constants.architecture_constants import ImitatorConstants as ImConst
 from constants.architecture_constants import WebSocketClientConstants as WSCliConst
 from infra.stand_setup_manager import StandSetupManager
+from test_config.datasets import ALL_CONFIGS
 
 
 def pytest_addoption(parser):
@@ -27,6 +28,50 @@ def pytest_addoption(parser):
         default=None,
         help="Запустить только указанные наборы данных. Пример: --suites=select_4,select_19_20",
     )
+
+
+def _find_config_by_suite_name(suite_name: str):
+    """Находит конфиг по имени набора данных."""
+    for config in ALL_CONFIGS:
+        if config.suite_name == suite_name:
+            return config
+    return None
+
+
+@pytest.fixture(autouse=True)
+def allure_suite_hierarchy(request):
+    """
+    Автоматически устанавливает иерархию Allure для группировки тестов по наборам данных.
+    
+    В Allure отчёте тесты группируются:
+    - Parent Suite: SingleLeakSuite / MultiLeakSuite (тип набора)
+    - Suite: select_4 / select_6 / ... (имя набора данных)
+    
+    Работает как с параметризованными тестами (config в параметрах),
+    так и с обычными тестами (через маркер test_suite_name).
+    """
+    config = None
+    suite_name = None
+    
+    # Пробуем получить конфиг из параметризации
+    if hasattr(request, 'fixturenames') and 'config' in request.fixturenames:
+        try:
+            config = request.getfixturevalue('config')
+            suite_name = config.suite_name
+        except Exception:
+            pass
+    
+    # Если не нашли, пробуем найти конфиг по маркеру test_suite_name
+    if not config:
+        marker = request.node.get_closest_marker('test_suite_name')
+        if marker:
+            suite_name = marker.args[0]
+            config = _find_config_by_suite_name(suite_name)
+    
+    if config and suite_name:
+        parent_suite = "MultiLeakSuite" if config.has_multiple_leaks else "SingleLeakSuite"
+        allure.dynamic.parent_suite(parent_suite)
+        allure.dynamic.suite(suite_name)
 
 
 def pytest_configure(config):
@@ -43,37 +88,57 @@ def pytest_configure(config):
 
 # ===== Маппинг имён тестов на атрибуты конфига для получения маркеров =====
 # Используется для добавления offset и test_case_id маркеров во время сбора тестов
-TEST_CONFIG_MAPPING = {
+
+# Тесты уровня набора (маркеры из SuiteConfig)
+SUITE_LEVEL_TEST_MAPPING = {
     'test_basic_info': 'basic_info_test',
     'test_journal_info': 'journal_info_test',
     'test_lds_status_initialization': 'lds_status_initialization_test',
     'test_main_page_info': 'main_page_info_test',
     'test_mask_signal_msg': 'mask_signal_test',
     'test_lds_status_initialization_out': 'lds_status_initialization_out_test',
+    'test_main_page_info_unstationary': 'main_page_info_unstationary_test',
     'test_lds_status_during_leak': 'lds_status_during_leak_test',
-    # Тесты утечек - для наборов с одной утечкой
-    'test_leaks_content': 'leak.leaks_content_test',
-    'test_all_leaks_info': 'leak.all_leaks_info_test',
-    'test_tu_leaks_info': 'leak.tu_leaks_info_test',
-    'test_acknowledge_leak_info': 'leak.acknowledge_leak_test',
-    'test_output_signals': 'leak.output_signals_test',
+}
+
+# Тесты уровня утечки (маркеры из LeakTestConfig - параметр leak)
+LEAK_LEVEL_TEST_MAPPING = {
+    'test_leaks_content': 'leaks_content_test',
+    'test_all_leaks_info': 'all_leaks_info_test',
+    'test_tu_leaks_info': 'tu_leaks_info_test',
+    'test_acknowledge_leak_info': 'acknowledge_leak_test',
+    'test_output_signals': 'output_signals_test',
 }
 
 
-def _get_test_config_from_suite_config(suite_config, config_path: str):
+
+def _get_test_markers_config(item, test_name):
     """
-    Получает конфигурацию теста из конфига набора по пути (например, 'leak.all_leaks_info_test').
+    Получает конфигурацию с маркерами для теста.
     
-    :param suite_config: SuiteConfig объект
-    :param config_path: путь к атрибуту (разделённый точками)
+    Для leak-level тестов: маркеры берутся из параметра leak
+    Для suite-level тестов: маркеры берутся из config
+    
     :return: CaseMarkers объект или None
     """
-    obj = suite_config
-    for attr in config_path.split('.'):
-        obj = getattr(obj, attr, None)
-        if obj is None:
-            return None
-    return obj
+    if not hasattr(item, 'callspec'):
+        return None
+    
+    params = item.callspec.params
+    
+    # Проверяем, есть ли параметр leak (для leak-level тестов)
+    if 'leak' in params and test_name in LEAK_LEVEL_TEST_MAPPING:
+        leak = params['leak']
+        attr_name = LEAK_LEVEL_TEST_MAPPING[test_name]
+        return getattr(leak, attr_name, None)
+    
+    # Для suite-level тестов берём из config
+    if 'config' in params and test_name in SUITE_LEVEL_TEST_MAPPING:
+        suite_config = params['config']
+        attr_name = SUITE_LEVEL_TEST_MAPPING[test_name]
+        return getattr(suite_config, attr_name, None)
+    
+    return None
 
 
 def pytest_collection_modifyitems(session, config, items):
@@ -104,30 +169,24 @@ def pytest_collection_modifyitems(session, config, items):
                     deselected_items.append(item)
                     continue
         
-        # Проверяем, что это параметризованный тест с конфигом
-        if hasattr(item, 'callspec') and 'config' in item.callspec.params:
-            suite_config = item.callspec.params['config']
+        # Получаем имя функции теста (без параметров)
+        test_name = item.originalname or item.name.split('[')[0]
+        
+        # Получаем конфиг с маркерами для теста
+        test_config = _get_test_markers_config(item, test_name)
+        
+        if test_config is not None:
+            # Добавляем маркер offset
+            if hasattr(test_config, 'offset') and test_config.offset is not None:
+                item.add_marker(pytest.mark.offset(test_config.offset))
             
-            # Получаем имя функции теста (без параметров)
-            test_name = item.originalname or item.name.split('[')[0]
-            
-            # Получаем путь к конфигу теста
-            config_path = TEST_CONFIG_MAPPING.get(test_name)
-            if config_path:
-                test_config = _get_test_config_from_suite_config(suite_config, config_path)
-                
-                # Если конфиг теста = None, исключаем тест из прогона
-                if test_config is None:
-                    deselected_items.append(item)
-                    continue
-                
-                # Добавляем маркер offset
-                if hasattr(test_config, 'offset') and test_config.offset is not None:
-                    item.add_marker(pytest.mark.offset(test_config.offset))
-                
-                # Добавляем маркер test_case_id
-                if hasattr(test_config, 'test_case_id') and test_config.test_case_id is not None:
-                    item.add_marker(pytest.mark.test_case_id(test_config.test_case_id))
+            # Добавляем маркер test_case_id
+            if hasattr(test_config, 'test_case_id') and test_config.test_case_id is not None:
+                item.add_marker(pytest.mark.test_case_id(test_config.test_case_id))
+        elif test_name in SUITE_LEVEL_TEST_MAPPING or test_name in LEAK_LEVEL_TEST_MAPPING:
+            # Конфиг теста = None - исключаем тест из прогона
+            deselected_items.append(item)
+            continue
         
         selected_items.append(item)
     

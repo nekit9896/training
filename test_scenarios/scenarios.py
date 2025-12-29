@@ -137,6 +137,34 @@ async def main_page_info(ws_client, cfg: SuiteConfig):
         ).equal_to()
 
 
+async def main_page_info_unstationary(ws_client, cfg: SuiteConfig):
+    """
+    Проверка установки режима Нестационар (для наборов с несколькими утечками).
+    Запускается после первой утечки, когда режим переходит в Нестационар.
+    """
+    with allure.step("Подключение по ws, получение и обработка сообщения типа: MainPageInfoContent"):
+        payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "MainPageInfoContent",
+            "subscribeMainPageInfoRequest",
+            {'tuIds': [cfg.tu_id], 'additionalProperties': None},
+        )
+        parsed_payload = parser.parse_main_page_msg(payload)
+
+    with SoftAssertions() as soft_failures:
+        StepCheck("Проверка id полученного ТУ", "tu_id", soft_failures).actual(
+            parsed_payload.replyContent.tuId
+        ).expected(cfg.tu_id).equal_to()
+
+        StepCheck(
+            f"Проверка установки режима Нестационар для ТУ {cfg.tu_name}",
+            "stationary_status",
+            soft_failures,
+        ).actual(parsed_payload.replyContent.tuInfo.stationaryStatus).expected(
+            StationaryStatus.UNSTATIONARY.value
+        ).equal_to()
+
+
 async def mask_signal_msg(ws_client, cfg: SuiteConfig):
     """
     Проверка маскирования датчиков.
@@ -618,6 +646,9 @@ async def lds_status_during_leak(ws_client, cfg: SuiteConfig):
 async def acknowledge_leak_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfig = None):
     """
     Проверка квитирования утечки.
+    
+    Для multi-leak наборов: после квитирования проверяется что утечка удалена из списка.
+    Для single-leak наборов: проверяется что список утечек пуст.
     """
     with allure.step("Получение id утечки"):
         with allure.step("Подключение по ws, получение и обработка сообщения об утечке типа: TuLeaksInfoContent"):
@@ -635,14 +666,21 @@ async def acknowledge_leak_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfi
             ).is_not_empty()
 
             leaks_info = parsed_payload.replyContent.leaksInfo
+            
+            # Для multi-leak ищем по control_site_id или diagnostic_area_name
             if leak and leak.control_site_id:
-                first_leak_info = t_utils.find_object_by_field(
+                leak_to_ack = t_utils.find_object_by_field(
                     leaks_info, "controlledSiteId", leak.control_site_id
                 )
+            elif leak and leak.diagnostic_area_name:
+                # Fallback: поиск по имени ДУ
+                leak_to_ack = t_utils.find_object_by_field(
+                    leaks_info, "diagnosticAreaName", leak.diagnostic_area_name
+                )
             else:
-                first_leak_info = leaks_info[0]
+                leak_to_ack = leaks_info[0]
 
-            leak_id = str(first_leak_info.id)
+            acknowledged_leak_id = leak_to_ack.id
 
     with allure.step(
         "Подключение по ws, отправка сообщения и обработка ответа о квитировании утечки типа: AcknowledgeLeakRequest"
@@ -650,7 +688,7 @@ async def acknowledge_leak_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfi
         payload = await t_utils.connect_and_get_msg(
             ws_client,
             "AcknowledgeLeakRequest",
-            {'leakId': leak_id, 'tuId': cfg.tu_id, 'additionalProperties': None},
+            {'leakId': str(acknowledged_leak_id), 'tuId': cfg.tu_id, 'additionalProperties': None},
         )
         parsed_payload = parser.parse_acknowledge_leak_msg(payload)
         acknowledge_reply_status = parsed_payload.replyStatus
@@ -668,13 +706,17 @@ async def acknowledge_leak_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfi
             "subscribeAllLeaksInfoRequest",
             [],
         )
-        leaks_info = parsed_payload.replyContent.leaksInfo
+        remaining_leaks = parsed_payload.replyContent.leaksInfo
+        remaining_leak_ids = [leak.id for leak in remaining_leaks] if remaining_leaks else []
 
     StepCheck("Проверка кода ответа на запрос о квитировании", "replyStatus").actual(
         acknowledge_reply_status
     ).expected(ReplyStatus.OK.value).equal_to()
 
-    StepCheck("Проверка отсутствия сообщений об утечке после квитирования", "leaksInfo").actual(leaks_info).is_empty()
+    # Проверяем что квитированная утечка исчезла из списка
+    StepCheck(
+        "Проверка отсутствия квитированной утечки в списке AllLeaksInfo", "id"
+    ).does_not_contain(remaining_leak_ids, acknowledged_leak_id)
 
 
 async def output_signals(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imitator_start_time):
