@@ -15,17 +15,20 @@
 - Несколько наборов: pytest tests/test_smoke.py --suites=select_4,select_19_20
 """
 
+from datetime import datetime
+from typing import Any, List
+
 import allure
 import pytest
 
 from test_config.datasets import ALL_CONFIGS
-from test_config.models import SuiteConfig, LeakTestConfig
+from test_config.models import LeakTestConfig, SuiteConfig
 from test_scenarios import scenarios
 
 
 # ===== ГЕНЕРАЦИЯ ПАРАМЕТРОВ =====
 
-def _get_suite_markers(config: SuiteConfig):
+def _get_suite_markers(config: SuiteConfig) -> List[pytest.MarkDecorator]:
     """Маркеры для тестового набора."""
     return [
         pytest.mark.test_suite_name(config.suite_name),
@@ -34,7 +37,7 @@ def _get_suite_markers(config: SuiteConfig):
     ]
 
 
-def _generate_suite_params():
+def _generate_suite_params() -> List[Any]:
     """
     Генерирует параметры для тестов уровня набора данных.
     Один параметр на каждый config.
@@ -45,15 +48,12 @@ def _generate_suite_params():
     ]
 
 
-def _generate_leak_params():
+def _generate_leak_params() -> List[Any]:
     """
     Генерирует параметры для тестов уровня утечки.
     
     Для single-leak конфигов: один параметр (config, leak, 1)
     Для multi-leak конфигов: N параметров (config, leak_n, n) для каждой утечки
-    
-    Returns:
-        list: [(config, leak, leak_number), ...]
     """
     params = []
     
@@ -88,16 +88,18 @@ def _generate_leak_params():
 
 
 # ===== ПАРАМЕТРЫ ДЛЯ ТЕСТОВ =====
-SUITE_PARAMS = _generate_suite_params()
-LEAK_PARAMS = _generate_leak_params()
+SUITE_PARAMS: List[Any] = _generate_suite_params()
+LEAK_PARAMS: List[Any] = _generate_leak_params()
 
 
 # ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
 
-def _apply_allure_markers(test_config):
+def _apply_allure_markers(test_config: Any) -> None:
     """Применяет allure-маркеры из конфига теста."""
     if not test_config:
-        return
+        msg = "Нет конфигурации теста: тест остановлен"
+        allure.attach(msg, name="Ошибка подготовки теста", attachment_type=allure.attachment_type.TEXT)
+        pytest.exit(msg)
     allure.dynamic.title(test_config.title)
     allure.dynamic.tag(test_config.tag)
     if test_config.description:
@@ -115,49 +117,49 @@ class TestSuiteScenarios:
     """
     
     @pytest.mark.asyncio
-    async def test_basic_info(self, ws_client, config: SuiteConfig):
+    async def test_basic_info(self, ws_client: Any, config: SuiteConfig) -> None:
         """[BasicInfo] Проверка базовой информации СОУ: список ТУ"""
         _apply_allure_markers(config.basic_info_test)
         await scenarios.basic_info(ws_client, config)
     
     @pytest.mark.asyncio
-    async def test_journal_info(self, ws_client, config: SuiteConfig):
+    async def test_journal_info(self, ws_client: Any, config: SuiteConfig) -> None:
         """[MessagesInfo] Проверка наличия сообщений в журнале"""
         _apply_allure_markers(config.journal_info_test)
         await scenarios.journal_info(ws_client, config)
     
     @pytest.mark.asyncio
-    async def test_lds_status_initialization(self, ws_client, config: SuiteConfig):
+    async def test_lds_status_initialization(self, ws_client: Any, config: SuiteConfig) -> None:
         """[CommonScheme] Проверка режима работы СОУ: Инициализация"""
         _apply_allure_markers(config.lds_status_initialization_test)
         await scenarios.lds_status_initialization(ws_client, config)
     
     @pytest.mark.asyncio
-    async def test_main_page_info(self, ws_client, config: SuiteConfig):
+    async def test_main_page_info(self, ws_client: Any, config: SuiteConfig) -> None:
         """[MainPageInfo] Проверка установки стационара/остановленной перекачки"""
         _apply_allure_markers(config.main_page_info_test)
         await scenarios.main_page_info(ws_client, config)
     
     @pytest.mark.asyncio
-    async def test_mask_signal_msg(self, ws_client, config: SuiteConfig):
+    async def test_mask_signal_msg(self, ws_client: Any, config: SuiteConfig) -> None:
         """[MaskSignal] Проверка маскирования датчиков"""
         _apply_allure_markers(config.mask_signal_test)
         await scenarios.mask_signal_msg(ws_client, config)
     
     @pytest.mark.asyncio
-    async def test_lds_status_initialization_out(self, ws_client, config: SuiteConfig):
+    async def test_lds_status_initialization_out(self, ws_client: Any, config: SuiteConfig) -> None:
         """[CommonScheme] Проверка выхода СОУ из Инициализации"""
         _apply_allure_markers(config.lds_status_initialization_out_test)
         await scenarios.lds_status_initialization_out(ws_client, config)
     
     @pytest.mark.asyncio
-    async def test_main_page_info_unstationary(self, ws_client, config: SuiteConfig):
+    async def test_main_page_info_unstationary(self, ws_client: Any, config: SuiteConfig) -> None:
         """[MainPageInfo] Проверка установки режима Нестационар (для multi-leak)"""
         _apply_allure_markers(config.main_page_info_unstationary_test)
         await scenarios.main_page_info_unstationary(ws_client, config)
     
     @pytest.mark.asyncio
-    async def test_lds_status_during_leak(self, ws_client, config: SuiteConfig):
+    async def test_lds_status_during_leak(self, ws_client: Any, config: SuiteConfig) -> None:
         """[CommonScheme] Проверка режима работы СОУ во время утечки"""
         _apply_allure_markers(config.lds_status_during_leak_test)
         await scenarios.lds_status_during_leak(ws_client, config)
@@ -176,8 +178,13 @@ class TestLeakScenarios:
     
     @pytest.mark.asyncio
     async def test_leaks_content(
-        self, ws_client, config: SuiteConfig, leak: LeakTestConfig, leak_number: int, imitator_start_time
-    ):
+        self,
+        ws_client: Any,
+        config: SuiteConfig,
+        leak: LeakTestConfig,
+        leak_number: int,
+        imitator_start_time: datetime,
+    ) -> None:
         """[LeaksContent] Проверка утечки через LeaksContent"""
         _apply_allure_markers(leak.leaks_content_test)
         # Добавляем номер утечки в title для multi-leak
@@ -187,8 +194,13 @@ class TestLeakScenarios:
     
     @pytest.mark.asyncio
     async def test_all_leaks_info(
-        self, ws_client, config: SuiteConfig, leak: LeakTestConfig, leak_number: int, imitator_start_time
-    ):
+        self,
+        ws_client: Any,
+        config: SuiteConfig,
+        leak: LeakTestConfig,
+        leak_number: int,
+        imitator_start_time: datetime,
+    ) -> None:
         """[AllLeaksInfo] Проверка начала утечки"""
         _apply_allure_markers(leak.all_leaks_info_test)
         if config.has_multiple_leaks:
@@ -197,8 +209,13 @@ class TestLeakScenarios:
     
     @pytest.mark.asyncio
     async def test_tu_leaks_info(
-        self, ws_client, config: SuiteConfig, leak: LeakTestConfig, leak_number: int, imitator_start_time
-    ):
+        self,
+        ws_client: Any,
+        config: SuiteConfig,
+        leak: LeakTestConfig,
+        leak_number: int,
+        imitator_start_time: datetime,
+    ) -> None:
         """[TuLeaksInfo] Проверка утечки"""
         _apply_allure_markers(leak.tu_leaks_info_test)
         if config.has_multiple_leaks:
@@ -207,8 +224,8 @@ class TestLeakScenarios:
     
     @pytest.mark.asyncio
     async def test_acknowledge_leak_info(
-        self, ws_client, config: SuiteConfig, leak: LeakTestConfig, leak_number: int
-    ):
+        self, ws_client: Any, config: SuiteConfig, leak: LeakTestConfig, leak_number: int
+    ) -> None:
         """[AcknowledgeLeak] Проверка квитирования утечки"""
         _apply_allure_markers(leak.acknowledge_leak_test)
         if config.has_multiple_leaks:
@@ -217,8 +234,13 @@ class TestLeakScenarios:
     
     @pytest.mark.asyncio
     async def test_output_signals(
-        self, ws_client, config: SuiteConfig, leak: LeakTestConfig, leak_number: int, imitator_start_time
-    ):
+        self,
+        ws_client: Any,
+        config: SuiteConfig,
+        leak: LeakTestConfig,
+        leak_number: int,
+        imitator_start_time: datetime,
+    ) -> None:
         """[OutputSignalsInfo] Проверка данных об утечке в выходных сигналах"""
         _apply_allure_markers(leak.output_signals_test)
         if config.has_multiple_leaks:

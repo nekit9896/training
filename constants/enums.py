@@ -94,3 +94,17 @@ class LdsStatus(Enum):
     INITIALIZATION = 2  # Инициализация
     DEGRADATION = 3  # Ухудшенные характеристики
     SERVICEABLE = 4  # Исправность
+
+
+class ReservedType(Enum):
+    """Тип источника события (алгоритм обнаружения утечки)"""
+    UNSTATIONARY_FLOW = 1  # Нестационарный поток
+    WAVE_DETECTION = 2  # Волновой метод
+    STATIONARY_BALANCE = 3  # Стационарный баланс
+
+
+class ConfirmationStatus(Enum):
+    """Статус подтверждения утечки"""
+    CONFIRMED = 1  # Подтверждена
+    WAITING = 2  # Ожидание подтверждения
+    POSSIBLE = 3  # Возможная

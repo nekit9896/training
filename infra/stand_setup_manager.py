@@ -1,5 +1,6 @@
 import logging
 import os
+from urllib.parse import urlparse
 
 from clients.subprocess_client import SubprocessClient
 from constants.architecture_constants import EnvKeyConstants
@@ -114,6 +115,37 @@ class StandSetupManager:
             self._uploader.delete_with_confirm()
         except RuntimeError:
             logger.exception("[TEARDOWN] [ERROR] Не удалось удалить данные с сервера")
+
+    def _parse_opc_target(self) -> tuple[str, int]:
+        """
+        Извлекает хост и порт OPC из переменной окружения OPC_URL.
+        """
+        opc_url = os.environ.get(EnvKeyConstants.OPC_URL)
+        if not opc_url:
+            raise RuntimeError(f"Переменная окружения {EnvKeyConstants.OPC_URL} не задана")
+
+        parsed = urlparse(opc_url)
+        if not parsed.hostname or not parsed.port:
+            raise RuntimeError(
+                f"Некорректное значение OPC_URL: '{opc_url}'. Ожидается формат вида opc.tcp://host:port"
+            )
+
+        return parsed.hostname, parsed.port
+
+    def check_opc_server_status(self, timeout_s: int = 5) -> None:
+        """
+        Проверяет доступность OPC сервера с сервера стенда через /dev/tcp.
+        """
+        host, port = self._parse_opc_target()
+        check_cmd = (
+            f"if timeout {timeout_s} bash -lc 'cat < /dev/null > /dev/tcp/{host}/{port}'; "
+            f"then echo {Im_const.CMD_STATUS_OK}; else echo {Im_const.CMD_STATUS_FAIL}; fi"
+        )
+        result = self._stand_client.run_cmd(check_cmd, need_output=True)
+        if result != Im_const.CMD_STATUS_OK:
+            raise RuntimeError(f"OPC сервер {host}:{port} недоступен с сервера стенда")
+
+        logger.info(f"[SETUP] [OK] OPC сервер {host}:{port} доступен")
 
     def _get_server_ip(self) -> str:
         """

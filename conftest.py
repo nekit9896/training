@@ -317,6 +317,15 @@ def pytest_runtest_setup(item):
             duration_m=imitator_duration, test_data_id=data_id, test_data_name=test_data_name
         )
         try:
+            stand_manager.check_opc_server_status()
+        except RuntimeError as error:
+            msg = (
+                "[SETUP] [ERROR] OPC сервер недоступен. Имитатор и автотесты не запущены. "
+                f"Ошибка при проверке статуса OPC: {error}"
+            )
+            allure.attach(msg, name="OPC сервер недоступен", attachment_type=allure.attachment_type.TEXT)
+            pytest.exit(msg)
+        try:
             stand_manager.setup_stand_for_imitator_run()
         except RuntimeError as error:
             pytest.exit(f"[SETUP] [ERROR] ошибка при подготовке стенда: {error}")
