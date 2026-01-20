@@ -12,7 +12,7 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from constants.enums import TU, LdsStatus, StationaryStatus
+from constants.enums import TU, LdsStatus, ReservedType, StationaryStatus
 import constants.test_constants as test_const
 
 
@@ -79,6 +79,7 @@ class LeakTestConfig:
     # ===== Ожидаемые статусы =====
     expected_lds_status: int = LdsStatus.SERVICEABLE.value
     expected_stationary_status: int = StationaryStatus.UNSTATIONARY.value
+    expected_type: int = ReservedType.UNSTATIONARY_FLOW.value  # Ожидаемый тип источника события (алгоритм)
     
     # ===== Тест-кейсы для этой утечки =====
     leaks_content_test: Optional[CaseMarkers] = None

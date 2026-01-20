@@ -9,7 +9,7 @@ import time
 
 import allure
 
-from constants.enums import ConfirmationStatus, LdsStatus, ReplyStatus, ReservedType
+from constants.enums import ConfirmationStatus, LdsStatus, ReplyStatus, StationaryStatus
 from constants.test_constants import (
     ADDRESS_SUFFIX_ACK_LEAK,
     ADDRESS_SUFFIX_LEAK,
@@ -388,7 +388,7 @@ async def leaks_content(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imita
 
         StepCheck("Проверка источника события (алгоритм)", "type", soft_failures).actual(
             leak_info.type
-        ).expected(ReservedType.UNSTATIONARY_FLOW.value).equal_to()
+        ).expected(leak.expected_type).equal_to()
 
         StepCheck("Проверка наличия id утечки", "id", soft_failures).actual(leak_info.id).is_not_none()
 
