@@ -137,7 +137,7 @@ class StepMessageBuilder:
             message_parts.append(f"Дополнительная информация: {self._format_val(extra_info)}")
         return self._build_message(message_parts)
 
-    def is_between(self, act_value: Any, upper_bound: Any, lower_bound: Any) -> str:
+    def is_between(self, act_value: Any, lower_bound: Any, upper_bound: Any) -> str:
         message_parts = [
             f"Ожидаемый результат: "
             f"Значение в поле {self.field_name} должно быть в диапазоне [{lower_bound}, {upper_bound}]",
@@ -312,11 +312,11 @@ class StepCheck:
         """Проверка, что значение в пределах установленных границ"""
         if self._actual is None:
             raise ValueError("Фактический результат должен быть заполнен при вызове is_less_than()")
-        msg = self._msg_builder.is_between(self._actual, upper_bound, lower_bound)
+        msg = self._msg_builder.is_between(self._actual, lower_bound, upper_bound)
 
         try:
             with allure.step(msg):
-                assert_that(self._actual).described_as(msg).is_between(upper_bound, lower_bound)
+                assert_that(self._actual).described_as(msg).is_between(lower_bound, upper_bound)
         except AssertionError as exc:
             self._handle_assertion(exc)
 

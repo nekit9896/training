@@ -169,9 +169,9 @@ class WsMessageParser:
         )
         return parsed_payload
 
-    def parse_leaks_info_msg(self, data: list) -> SubscribeLeaksReply:
+    def parse_leaks_content_msg(self, data: list) -> SubscribeLeaksReply:
         """
-        Парсит allLeaksInfo сообщение
+        Парсит LeaksContent сообщение
         """
         payload = self._find_reply_status_in_ws_msg(data)
         parsed_payload = self._parse_message(data_class=SubscribeLeaksReply, data=payload)

@@ -20,6 +20,7 @@ class TimeProcessor:
     time_processor = TimeProcessor(test_duration_m)
     start_time = time_processor.formatted_start_time
     stop_time = time_processor.formatted_stop_time
+    start_time_dt = time_processor.start_time  # datetime объект для расчётов
     """
 
     def __init__(self, duration_m: float) -> None:
@@ -28,6 +29,11 @@ class TimeProcessor:
         self._start_time: datetime = self._add_time_delta(seconds=Im_const.IMITATOR_START_DELAY_S)
         self._formatted_start_time: str = self._get_formatted_start_time()
         self._formatted_stop_time: str = self._get_formatted_stop_time()
+
+    @property
+    def start_time(self) -> datetime:
+        """Возвращает время старта имитатора как datetime объект для расчётов интервалов"""
+        return self._start_time
 
     @property
     def formatted_start_time(self) -> str:
@@ -92,6 +98,7 @@ class ImitatorCmdGenerator:
     from utils.imitator_cmd_generator import ImitatorCmdGenerator
     cmd_generator = ImitatorCmdGenerator(path_to_test_data, host, test_duration_m)
     final_cmd = cmd_generator.generate_final_imitator_cmd()
+    start_time_dt = cmd_generator.start_time  # datetime объект для расчётов интервалов утечек
     """
 
     def __init__(self, sandbox_path: str, stand_name: str, duration_m: float) -> None:
@@ -106,6 +113,11 @@ class ImitatorCmdGenerator:
         self.final_cmd: str = ""
         self._get_other_flags_values()
         self._generate_flags()
+
+    @property
+    def start_time(self) -> datetime:
+        """Возвращает время старта имитатора как datetime объект для расчётов интервалов утечек"""
+        return self._time_processor.start_time
 
     def _generate_inner_test_data_path(self, sub_path: str) -> str:
         """

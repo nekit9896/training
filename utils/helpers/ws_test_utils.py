@@ -9,9 +9,9 @@ from zoneinfo import ZoneInfo
 import allure
 from pytest import fail
 
-from constants.expectations.base_expectations import BaseSelectTN3Expected as BaseExp
-from models.subscribe_all_leaks_info_model import SubscribeAllLeaksInfoReply
-from models.subscribe_common_scheme_model import DiagnosticArea, FlowArea
+from constants.enums import LdsStatus
+import constants.test_constants as test_const
+from test_config.models import SubscribeAllLeaksInfoReply, DiagnosticArea, FlowArea
 from utils.helpers.ws_message_parser import ws_message_parser
 
 ObjectType = TypeVar("ObjectType")  # создает типовую переменную для поиска объектов в списке
@@ -23,7 +23,7 @@ def convert_leak_volume_m3(volume: float) -> float:
     Преобразует объем утечки в м3/час
     """
     #  Округляет результат для читабельности
-    return round(volume * BaseExp.MASS_KG, 3)
+    return round(volume * test_const.MASS_KG, 3)
 
 
 def get_leak_wait_start_time(datetime_now_tz: datetime, delta_s: int) -> datetime:
@@ -32,6 +32,55 @@ def get_leak_wait_start_time(datetime_now_tz: datetime, delta_s: int) -> datetim
     Получает начала диапазона ожидания утечки
     """
     return (datetime_now_tz - timedelta(seconds=delta_s)).replace(microsecond=0)
+
+
+def calculate_leak_start_time(imitator_start_time: datetime, leak_interval_seconds: int) -> datetime:
+    """
+    Рассчитывает время начала утечки на основе времени старта имитатора.
+
+    :param imitator_start_time: datetime объект времени старта имитатора
+    :param leak_interval_seconds: интервал от старта до утечки в секундах (LEAK_START_INTERVAL)
+    :return: datetime время ожидаемого начала утечки
+    """
+    return (imitator_start_time + timedelta(seconds=leak_interval_seconds)).replace(microsecond=0)
+
+
+def calculate_leak_end_time(
+    imitator_start_time: datetime, leak_interval_seconds: int, allowed_diff_seconds: int
+) -> datetime:
+    """
+    Рассчитывает крайнее время обнаружения утечки (с учётом допустимой погрешности).
+
+    :param imitator_start_time: datetime объект времени старта имитатора
+    :param leak_interval_seconds: интервал от старта до утечки в секундах (LEAK_START_INTERVAL)
+    :param allowed_diff_seconds: допустимая погрешность времени обнаружения (ALLOWED_TIME_DIFF_SECONDS)
+    :return: datetime крайнее время обнаружения утечки
+    """
+    total_seconds = leak_interval_seconds + allowed_diff_seconds
+    return (imitator_start_time + timedelta(seconds=total_seconds)).replace(microsecond=0)
+
+
+def get_leak_time_window(
+    imitator_start_time: datetime, leak_interval_seconds: int, allowed_diff_seconds: int, detected_at_tz=None
+) -> tuple[datetime, datetime]:
+    """
+    Возвращает временное окно для проверки времени обнаружения утечки.
+
+    :param imitator_start_time: datetime объект времени старта имитатора
+    :param leak_interval_seconds: интервал от старта до утечки в секундах
+    :param allowed_diff_seconds: допустимая погрешность времени обнаружения
+    :param detected_at_tz: timezone из времени обнаружения утечки (опционально)
+    :return: tuple (leak_start_time, leak_end_time) для использования в is_between проверке
+    """
+    leak_start = calculate_leak_start_time(imitator_start_time, leak_interval_seconds)
+    leak_end = calculate_leak_end_time(imitator_start_time, leak_interval_seconds, allowed_diff_seconds)
+
+    # Если передан timezone, применяем его к временам для корректного сравнения
+    if detected_at_tz is not None:
+        leak_start = leak_start.replace(tzinfo=detected_at_tz)
+        leak_end = leak_end.replace(tzinfo=detected_at_tz)
+
+    return leak_start, leak_end
 
 
 def get_random_item(item_list: List[RandomObjectType]) -> Optional[RandomObjectType]:
@@ -57,10 +106,10 @@ def determine_lds_status_by_priority(lds_status_set: Set[int]) -> int:
     Определяет режим работы СОУ по приоритету и наличию режимов работы у ДУ на самом протяженном участки карты течений
     """
     lds_status_priority = [
-        BaseExp.LDS_STATUS_FAULTY_VAL,
-        BaseExp.LDS_STATUS_INITIALIZATION_VAL,
-        BaseExp.LDS_STATUS_DEGRADATION_VAL,
-        BaseExp.LDS_STATUS_SERVICEABLE_VAL,
+        LdsStatus.FAULTY.value,
+        LdsStatus.INITIALIZATION.value,
+        LdsStatus.DEGRADATION.value,
+        LdsStatus.SERVICEABLE.value,
     ]
 
     for status in lds_status_priority:
@@ -117,6 +166,24 @@ def find_diagnostic_area_by_id(flow_areas: List[FlowArea], id_value: int) -> Dia
         fail(f"Не найден ДУ по id: {id_value}")
 
 
+def ensure_moscow_timezone(dt: datetime) -> datetime:
+    """
+    Конвертирует datetime в московское время.
+    
+    :param dt: datetime объект (может быть naive или с любой timezone)
+    :return: datetime в московской таймзоне
+    """
+    if dt is None:
+        return dt
+    
+    # Если datetime без timezone - считаем что это UTC
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    
+    # Конвертируем в московское время
+    return dt.astimezone(ZoneInfo("Europe/Moscow"))
+
+
 def to_moscow_timezone(date_str: str) -> datetime:
     """
     Преобразует строку времени в московское время
@@ -128,7 +195,7 @@ def to_moscow_timezone(date_str: str) -> datetime:
         if date_str.startswith(("'", '"', '')) or date_str.endswith(("'", '"', '')):
             date_str = date_str.strip().strip("'").strip('"')
 
-        date_utc = datetime.strptime(date_str, BaseExp.OUTPUT_TIME_FORMAT).replace(tzinfo=timezone.utc)
+        date_utc = datetime.strptime(date_str, test_const.OUTPUT_TIME_FORMAT).replace(tzinfo=timezone.utc)
         return date_utc.astimezone(ZoneInfo("Europe/Moscow"))
 
     except (TypeError, ValueError):
@@ -141,7 +208,7 @@ async def connect_and_get_parsed_msg_by_tu_id(
     ws_message_type: str,
     ws_invoke_type: str,
     ws_invoke_params: Any = None,
-    timeout: float = BaseExp.BASIC_MESSAGE_TIMEOUT,
+    timeout: float = test_const.BASIC_MESSAGE_TIMEOUT,
 ) -> SubscribeAllLeaksInfoReply:
     """
     Подключается, ищет и парсит allLeaksInfo сообщение для конкретного ТУ
@@ -186,7 +253,7 @@ async def connect_and_subscribe_msg(
     ws_message_type: str,
     ws_invoke_type: str,
     ws_invoke_params: Any = None,
-    timeout: float = BaseExp.BASIC_MESSAGE_TIMEOUT,
+    timeout: float = test_const.BASIC_MESSAGE_TIMEOUT,
 ) -> list:
     """
     Подключение типа subscribe к заданной подписке и получение сообщения с заданным типом контента

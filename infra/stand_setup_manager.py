@@ -24,6 +24,9 @@ class StandSetupManager:
     imitator_thread.start()
     time.sleep(20)
     core_thread.start()
+
+    Доступ к времени старта имитатора для расчёта интервалов утечек:
+    start_time = setup_manager.start_time  # datetime объект
     """
 
     def __init__(
@@ -45,6 +48,16 @@ class StandSetupManager:
         self._final_cmd = self._cmd_generator.generate_final_imitator_cmd()
         # Экземпляр имитатор менеджера нужно создавать после генерации команды, отдельно от других клиентов
         self._imitator_manager = ImitatorManager(self._stand_client, self._final_cmd)
+
+    @property
+    def start_time(self):
+        """
+        Возвращает время старта имитатора как datetime объект.
+        Используется для расчёта интервалов утечек в тестах:
+        - leak_start_time = start_time + LEAK_START_INTERVAL
+        - leak_end_time = start_time + LEAK_START_INTERVAL + ALLOWED_TIME_DIFF_SECONDS
+        """
+        return self._cmd_generator.start_time
 
     def setup_stand_for_imitator_run(self) -> None:
         try:
