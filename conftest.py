@@ -15,63 +15,6 @@ from constants.architecture_constants import EnvKeyConstants as EnvConst
 from constants.architecture_constants import ImitatorConstants as ImConst
 from constants.architecture_constants import WebSocketClientConstants as WSCliConst
 from infra.stand_setup_manager import StandSetupManager
-from test_config.datasets import ALL_CONFIGS
-
-
-def pytest_addoption(parser):
-    """
-    Добавляет кастомные опции командной строки pytest.
-    """
-    parser.addoption(
-        "--suites",
-        action="store",
-        default=None,
-        help="Запустить только указанные наборы данных. Пример: --suites=select_4,select_19_20",
-    )
-
-
-def _find_config_by_suite_name(suite_name: str):
-    """Находит конфиг по имени набора данных."""
-    for config in ALL_CONFIGS:
-        if config.suite_name == suite_name:
-            return config
-    return None
-
-
-@pytest.fixture(autouse=True)
-def allure_suite_hierarchy(request):
-    """
-    Автоматически устанавливает иерархию Allure для группировки тестов по наборам данных.
-    
-    В Allure отчёте тесты группируются:
-    - Parent Suite: SingleLeakSuite / MultiLeakSuite (тип набора)
-    - Suite: select_4 / select_6 / ... (имя набора данных)
-    
-    Работает как с параметризованными тестами (config в параметрах),
-    так и с обычными тестами (через маркер test_suite_name).
-    """
-    config = None
-    suite_name = None
-    
-    # Пробуем получить конфиг из параметризации
-    if hasattr(request, 'fixturenames') and 'config' in request.fixturenames:
-        try:
-            config = request.getfixturevalue('config')
-            suite_name = config.suite_name
-        except Exception:
-            pass
-    
-    # Если не нашли, пробуем найти конфиг по маркеру test_suite_name
-    if not config:
-        marker = request.node.get_closest_marker('test_suite_name')
-        if marker:
-            suite_name = marker.args[0]
-            config = _find_config_by_suite_name(suite_name)
-    
-    if config and suite_name:
-        parent_suite = "MultiLeakSuite" if config.has_multiple_leaks else "SingleLeakSuite"
-        allure.dynamic.parent_suite(parent_suite)
-        allure.dynamic.suite(suite_name)
 
 
 def pytest_configure(config):
@@ -82,122 +25,10 @@ def pytest_configure(config):
         "current_suite": None,
         "suite_start_time": None,
         "stand_manager": None,
-        "imitator_start_time": None,  # datetime объект времени старта имитатора для расчёта интервалов утечек
     }
 
 
-# ===== Маппинг имён тестов на атрибуты конфига для получения маркеров =====
-# Используется для добавления offset и test_case_id маркеров во время сбора тестов
-
-# Тесты уровня набора (маркеры из SuiteConfig)
-SUITE_LEVEL_TEST_MAPPING = {
-    'test_basic_info': 'basic_info_test',
-    'test_journal_info': 'journal_info_test',
-    'test_lds_status_initialization': 'lds_status_initialization_test',
-    'test_main_page_info': 'main_page_info_test',
-    'test_mask_signal_msg': 'mask_signal_test',
-    'test_lds_status_initialization_out': 'lds_status_initialization_out_test',
-    'test_main_page_info_unstationary': 'main_page_info_unstationary_test',
-    'test_lds_status_during_leak': 'lds_status_during_leak_test',
-}
-
-# Тесты уровня утечки (маркеры из LeakTestConfig - параметр leak)
-LEAK_LEVEL_TEST_MAPPING = {
-    'test_leaks_content': 'leaks_content_test',
-    'test_all_leaks_info': 'all_leaks_info_test',
-    'test_tu_leaks_info': 'tu_leaks_info_test',
-    'test_acknowledge_leak_info': 'acknowledge_leak_test',
-    'test_output_signals': 'output_signals_test',
-}
-
-
-
-def _get_test_markers_config(item, test_name):
-    """
-    Получает конфигурацию с маркерами для теста.
-    
-    Для leak-level тестов: маркеры берутся из параметра leak
-    Для suite-level тестов: маркеры берутся из config
-    
-    :return: CaseMarkers объект или None
-    """
-    if not hasattr(item, 'callspec'):
-        return None
-    
-    params = item.callspec.params
-    
-    # Проверяем, есть ли параметр leak (для leak-level тестов)
-    if 'leak' in params and test_name in LEAK_LEVEL_TEST_MAPPING:
-        leak = params['leak']
-        attr_name = LEAK_LEVEL_TEST_MAPPING[test_name]
-        return getattr(leak, attr_name, None)
-    
-    # Для suite-level тестов берём из config
-    if 'config' in params and test_name in SUITE_LEVEL_TEST_MAPPING:
-        suite_config = params['config']
-        attr_name = SUITE_LEVEL_TEST_MAPPING[test_name]
-        return getattr(suite_config, attr_name, None)
-    
-    return None
-
-
 def pytest_collection_modifyitems(session, config, items):
-    """
-    1. Фильтрует тесты по --suites (если указано)
-    2. Исключает тесты, у которых конфиг = None (тест отключён для этого набора данных)
-    3. Добавляет маркеры offset и test_case_id из конфига к каждому параметризованному тесту
-    4. Сортирует тесты по test_suite_name для группировки по наборам данных
-    """
-    # Получаем список выбранных наборов из --suites
-    suites_option = config.getoption("--suites")
-    selected_suites = None
-    if suites_option:
-        # Парсим список наборов: "select_4,select_19_20" -> ["select_4", "select_19_20"]
-        selected_suites = [s.strip().lower() for s in suites_option.split(",")]
-    
-    selected_items = []
-    deselected_items = []
-    
-    for item in items:
-        # Фильтрация по --suites
-        if selected_suites:
-            suite_marker = item.get_closest_marker("test_suite_name")
-            if suite_marker:
-                suite_name = suite_marker.args[0].lower()
-                # Проверяем, содержит ли имя набора одну из выбранных подстрок
-                if not any(selected in suite_name for selected in selected_suites):
-                    deselected_items.append(item)
-                    continue
-        
-        # Получаем имя функции теста (без параметров)
-        test_name = item.originalname or item.name.split('[')[0]
-        
-        # Получаем конфиг с маркерами для теста
-        test_config = _get_test_markers_config(item, test_name)
-        
-        if test_config is not None:
-            # Добавляем маркер offset
-            if hasattr(test_config, 'offset') and test_config.offset is not None:
-                item.add_marker(pytest.mark.offset(test_config.offset))
-            
-            # Добавляем маркер test_case_id
-            if hasattr(test_config, 'test_case_id') and test_config.test_case_id is not None:
-                item.add_marker(pytest.mark.test_case_id(test_config.test_case_id))
-        elif test_name in SUITE_LEVEL_TEST_MAPPING or test_name in LEAK_LEVEL_TEST_MAPPING:
-            # Конфиг теста = None - исключаем тест из прогона
-            deselected_items.append(item)
-            continue
-        
-        selected_items.append(item)
-    
-    # Уведомляем pytest об исключённых тестах
-    if deselected_items:
-        config.hook.pytest_deselected(items=deselected_items)
-    
-    # Заменяем список тестов на отфильтрованный
-    items[:] = selected_items
-
-    # Сортировка тестов по test_suite_name
     def suite_key(item):
         """
         Сортировка тестов по test_suite_name (без падения на None)
@@ -206,6 +37,7 @@ def pytest_collection_modifyitems(session, config, items):
         return test_suite_name_marker.args[0] if test_suite_name_marker else ""
 
     items.sort(key=suite_key)
+    return items
 
 
 @pytest.fixture(autouse=True)
@@ -249,14 +81,14 @@ def compute_imitator_duration(item, current_test_suite: str) -> float:
     """
 
     suite_items = [
-        suite_item
-        for suite_item in item.session.items
-        if (marker := suite_item.get_closest_marker("test_suite_name")) and marker.args[0] == current_test_suite
+        item
+        for item in item.session.items
+        if (marker := item.get_closest_marker("test_suite_name")) and marker.args[0] == current_test_suite
     ]
 
     offsets = []
-    for suite_item in suite_items:
-        offset_marker = suite_item.get_closest_marker("offset")
+    for item in suite_items:
+        offset_marker = item.get_closest_marker("offset")
         if offset_marker:
             try:
                 offsets.append(float(offset_marker.args[0]))
@@ -337,8 +169,6 @@ def pytest_runtest_setup(item):
             pytest.exit(f"[SETUP] [ERROR] ошибка запуска СORE контейнеров: {error}")
 
         cfg["stand_manager"] = stand_manager
-        # Сохраняем время старта имитатора для расчёта интервалов утечек в тестах
-        cfg["imitator_start_time"] = stand_manager.start_time
 
     yield  # pytest продолжит выполнение теста
 
@@ -428,20 +258,6 @@ async def ws_client():
     auth_token = get_token()
     async with WebSocketClient(ws_host, auth_token) as client:
         yield client
-
-
-@pytest.fixture
-def imitator_start_time(request):
-    """
-    Фикстура для получения времени старта имитатора (datetime объект).
-    Используется для точного расчёта времени обнаружения утечек:
-    - leak_start_time = imitator_start_time + timedelta(seconds=LEAK_START_INTERVAL)
-    - leak_end_time = imitator_start_time + timedelta(seconds=LEAK_START_INTERVAL + ALLOWED_TIME_DIFF_SECONDS)
-    """
-    start_time = request.config.group_state.get("imitator_start_time")
-    if start_time is None:
-        pytest.fail("imitator_start_time не установлен. Убедитесь что тест запущен после инициализации имитатора.")
-    return start_time
 
 
 def pytest_sessionfinish(session, exitstatus):
