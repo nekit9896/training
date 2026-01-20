@@ -316,6 +316,7 @@ def pytest_runtest_setup(item):
         stand_manager = StandSetupManager(
             duration_m=imitator_duration, test_data_id=data_id, test_data_name=test_data_name
         )
+        cfg["stand_manager"] = stand_manager
         try:
             stand_manager.check_opc_server_status()
         except RuntimeError as error:
@@ -345,7 +346,6 @@ def pytest_runtest_setup(item):
         except RuntimeError as error:
             pytest.exit(f"[SETUP] [ERROR] ошибка запуска СORE контейнеров: {error}")
 
-        cfg["stand_manager"] = stand_manager
         # Сохраняем время старта имитатора для расчёта интервалов утечек в тестах
         cfg["imitator_start_time"] = stand_manager.start_time
 
@@ -457,10 +457,37 @@ def pytest_sessionfinish(session, exitstatus):
     """
     В завершении сессии — отправляем единый Allure‑отчёт в TestOps.
     """
-    uploader = AllureResultsUploader()
-    logger.info("Uploading Allure results to TestOps")
-    uploader.upload_allure_results()
-    shutil.rmtree("allure-results")
+    # 1) teardown стенда: остановить имитатор и удалить временные данные на стенде.
+    # Делаем это здесь, потому что при pytest.exit/ошибках не всегда отрабатывают пер-suite teardown хуки.
+    try:
+        stand_manager = getattr(session.config, "group_state", {}).get("stand_manager")
+        if stand_manager:
+            try:
+                stand_manager.stop_imitator_wrapper()
+            except Exception:
+                logger.exception("[SESSIONFINISH] Ошибка при остановке имитатора")
+            try:
+                stand_manager.server_test_data_remover()
+            except Exception:
+                logger.exception("[SESSIONFINISH] Ошибка при удалении временных данных на стенде")
+    except Exception:
+        logger.exception("[SESSIONFINISH] Ошибка при получении stand_manager из group_state")
+
+    # 2) Выгрузка allure-results в TestOps
+    try:
+        uploader = AllureResultsUploader()
+        logger.info("Uploading Allure results to TestOps")
+        uploader.upload_allure_results()
+    except Exception:
+        logger.exception("[SESSIONFINISH] Ошибка при выгрузке allure-results в TestOps")
+
+    try:
+        if os.path.isdir("allure-results"):
+            shutil.rmtree("allure-results")
+    except Exception:
+        logger.exception("[SESSIONFINISH] Ошибка при удалении allure-results")
+
+    # 3) Удаление локальных архивов с данными (runner)
     project_root = os.path.dirname(os.path.abspath(__file__))
     files_for_drop = glob.glob(os.path.join(project_root, "*.tar.gz"))
     if not files_for_drop:

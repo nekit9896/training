@@ -30,7 +30,6 @@ pip install -r requirements.txt
 - **`KEYCLOAK_URL`**, **`KEYCLOAK_CLIENT_ID`**, **`KEYCLOAK_CLIENT_SECRET`**, **`KEYCLOAK_USERNAME`**, **`KEYCLOAK_PASSWORD`**
 - **`TESTOPS_BASE_URL`** — базовый домен TestOps (без протокола), используется для ссылок/выгрузки
 - **`SSH_USER_DEV`**, **`SSH_KEY_NAME`** — для выполнения команд на сервере стенда (setup/teardown)
-- **`RUN_WITHOUT_TESTOPS=true`** (опционально) — отключает загрузку/удаление данных через TestOps
 
 ## Запуск тестов
 

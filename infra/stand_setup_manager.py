@@ -104,16 +104,30 @@ class StandSetupManager:
             logger.exception("[SETUP] [ERROR] Ошибка запуска CORE")
 
     def stop_imitator_wrapper(self):
+        """
+        В teardown может вызываться даже если имитатор не успел стартовать.
+        """
         try:
+            if not self._imitator_manager.imitator_process:
+                logger.info("[TEARDOWN] [SKIP] Имитатор не был запущен (process=None)")
+                return
             self._imitator_manager.wait_and_stop_imitator()
             logger.info("[TEARDOWN] [OK] Имитатор остановлен")
-        except RuntimeError:
+        except Exception:
             logger.exception("[TEARDOWN] [ERROR] Не удалось остановить имитатор")
 
     def server_test_data_remover(self):
+        """
+        Может вызываться в teardown даже если загрузка не успела выполниться.
+        """
+        uploader = getattr(self, "_uploader", None)
+        if uploader is None:
+            logger.info("[TEARDOWN] [SKIP] uploader не инициализирован, удаление данных со стенда пропущено")
+            return
+
         try:
-            self._uploader.delete_with_confirm()
-        except RuntimeError:
+            uploader.delete_with_confirm()
+        except Exception:
             logger.exception("[TEARDOWN] [ERROR] Не удалось удалить данные с сервера")
 
     def _parse_opc_target(self) -> tuple[str, int]:
