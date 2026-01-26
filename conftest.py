@@ -78,12 +78,29 @@ def pytest_configure(config):
     """
     Храним состояние сессии
     """
+    config.addinivalue_line(
+        "markers",
+        "critical_stop: если тест упал, останавливаем дальнейшее выполнение сессии (session.shouldstop)",
+    )
     config.group_state = {
         "current_suite": None,
         "suite_start_time": None,
         "stand_manager": None,
         "imitator_start_time": None,  # datetime объект времени старта имитатора для расчёта интервалов утечек
     }
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """
+    Делает падение критического теста (marker critical_stop) однозначным:
+    - сам тест будет FAILED (pytest.fail)
+    - после него прекращаем запуск остальных тестов (session.shouldstop)
+    """
+    outcome = yield
+    report = outcome.get_result()
+    if report.when == "call" and report.failed and item.get_closest_marker("critical_stop"):
+        item.session.shouldstop = f"Критическая проверка упала: {item.nodeid}"
 
 
 # ===== Маппинг имён тестов на атрибуты конфига для получения маркеров =====
