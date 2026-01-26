@@ -117,6 +117,7 @@ class TestSuiteScenarios:
     """
     
     @pytest.mark.asyncio
+    @pytest.mark.critical_stop
     async def test_basic_info(self, ws_client: Any, config: SuiteConfig) -> None:
         """[BasicInfo] Проверка базовой информации СОУ: список ТУ"""
         _apply_allure_markers(config.basic_info_test)

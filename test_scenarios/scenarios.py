@@ -8,6 +8,7 @@ Pytest маркеры и allure декораторы применяются в �
 import time
 
 import allure
+import pytest
 
 from constants.enums import ConfirmationStatus, LdsStatus, ReplyStatus, StationaryStatus
 from constants.test_constants import (
@@ -44,6 +45,23 @@ async def basic_info(ws_client, cfg: SuiteConfig):
         actual_tu = [
             (tu.tuId, tu.tuName) for tu in parsed_payload.replyContent.basicInfo.tus if tu.tuId == cfg.tu_id
         ]
+
+    with allure.step("Поверка ТУ в списке доступных ТУ на сервере"):
+        # Критическая проверка: если нужного ТУ нет в BasicInfoContent — считаем что ТУ отключен (через Zookeeper)
+        # и прерываем весь прогон.
+        if expected_tu[0] not in actual_tu:
+            msg = (
+                f"ТУ отключен: в BasicInfoContent отсутствует ТУ для запущенного набора данных: "
+                f"tuId={cfg.tu_id}, tuName='{cfg.tu_name}', suite={cfg.suite_name}. "
+                f"Необходимо убедиться, что ТУ включен (Zookeeper) и перезапустить прогон."
+                # ;configurations / tn3.json
+            )
+            allure.attach(
+                f"Ожидаемый ТУ: {expected_tu}\nПолученные ТУ: {actual_tu}",
+                name="Предварительная проверка: ТУ отключен",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+            pytest.fail(msg, pytrace=False)
 
     with SoftAssertions() as soft_failures:
         StepCheck("Проверка статуса ответа", "replyStatus", soft_failures).actual(
