@@ -34,6 +34,7 @@ def _get_suite_markers(config: SuiteConfig) -> List[pytest.MarkDecorator]:
         pytest.mark.test_suite_name(config.suite_name),
         pytest.mark.test_suite_data_id(config.suite_data_id),
         pytest.mark.test_data_name(config.archive_name),
+        pytest.mark.technological_unit_id(config.technological_unit.id),
     ]
 
 

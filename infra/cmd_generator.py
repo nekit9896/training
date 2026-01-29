@@ -216,7 +216,7 @@ class ImitatorCmdGenerator:
 class UploadImitatorDataCmdGenerator:
     def __init__(self, username: str, host: str, path_generator: ImitatorDataPathGenerator):
         # Список ожидаемых файлов в архиве
-        self.expected_files: list = [Im_const.SANDBOX_TAGS, Im_const.SANDBOX_RULES]
+        self.expected_files: list = [Im_const.SANDBOX_RULES]
         self._username = username
         self._host = host
         self._ssh_key_name: str = os.environ.get(EnvKeyConstants.SSH_KEY_NAME)
@@ -229,14 +229,17 @@ class UploadImitatorDataCmdGenerator:
 
     def generate_check_remote_data_cmd(self) -> str:
         """
-        Создает команду проверки существования директории с данными и сопутствующих файлов
+        Создает команду проверки существования директории с данными и сопутствующих файлов.
+        Проверяет: data/, rules.txt, tags.txt (tags.txt копируется с сервера отдельно).
         :return: команда для выполнения в консоли
         """
         expected_dir = Im_const.SANDBOX_DATA
+        # Файлы для проверки после распаковки и копирования tags.txt
+        files_to_check = [Im_const.SANDBOX_RULES, Im_const.SANDBOX_TAGS]
 
         check_dir_part = f"[ -d '{self._remote_temp_dir_path}/{expected_dir}' ]"
         check_parts = [check_dir_part]
-        for file in self.expected_files:
+        for file in files_to_check:
             check_parts.append(f"[ -f '{self._remote_temp_dir_path}/{file}' ]")
 
         condition = " && ".join(check_parts)
@@ -278,4 +281,12 @@ class UploadImitatorDataCmdGenerator:
         Генерирует команду проверки архива на удаленном сервере
         """
         return f"tar -tzf {self._full_remote_tar_path}"
-    
+
+    def generate_copy_tags_cmd(self, tu_id: int) -> str:
+        """
+        Генерирует команду копирования tags.txt с сервера во временную директорию.
+        Файл tn{tu_id}_tags.txt копируется как tags.txt.
+        """
+        source_path = f"{Im_const.TAGS_CONFIG_PATH}/tn{tu_id}_tags.txt"
+        target_path = f"{self._remote_temp_dir_path}/{Im_const.SANDBOX_TAGS}"
+        return f"cp {source_path} {target_path}"
