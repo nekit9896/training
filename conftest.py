@@ -215,7 +215,10 @@ def pytest_collection_modifyitems(session, config, items):
     # Заменяем список тестов на отфильтрованный
     items[:] = selected_items
 
-    # Сортировка тестов по test_suite_name и offset 
+    # Сортировка тестов по test_suite_name и offset.
+    # Цель: обеспечить запуск тестов строго по offset внутри набора.
+    # При равных offset сохраняем исходный порядок коллекции,
+    # чтобы порядок параметризации не перескакивал.
     def suite_offset_key(item):
         """
         Сортировка тестов по test_suite_name и offset (без падения на None).
@@ -233,13 +236,19 @@ def pytest_collection_modifyitems(session, config, items):
             offset_value = float("inf")
 
         original_index = getattr(item, "_collection_index", 0)
+        # Возвращаем тройку ключей сортировки:
+        # 1) suite_name — группировка по набору,
+        # 2) offset_value — порядок внутри набора по времени,
+        # 3) original_index — стабильность при равных offset.
         return suite_name, offset_value, original_index
 
+    # Сохраняем исходный порядок коллекции для стабильной сортировки
     for index, item in enumerate(items):
         item._collection_index = index
 
     items.sort(key=suite_offset_key)
 
+    # Убираем временный атрибут после сортировки
     for item in items:
         if hasattr(item, "_collection_index"):
             delattr(item, "_collection_index")
