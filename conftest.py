@@ -356,11 +356,15 @@ def pytest_runtest_setup(item):
 
         data_id = item.get_closest_marker("test_suite_data_id").args[0]
         test_data_name = item.get_closest_marker("test_data_name").args[0]
+        tu_id = item.get_closest_marker("technological_unit_id").args[0]
 
         imitator_duration = compute_imitator_duration(item, current_test_suite)
 
         stand_manager = StandSetupManager(
-            duration_m=imitator_duration, test_data_id=data_id, test_data_name=test_data_name
+            duration_m=imitator_duration,
+            test_data_id=data_id,
+            test_data_name=test_data_name,
+            technological_unit_id=tu_id,
         )
         cfg["stand_manager"] = stand_manager
         try:
