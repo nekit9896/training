@@ -120,3 +120,4 @@ class ImitatorManager:
             raise
         finally:
             self.stop_imitator()
+            

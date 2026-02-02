@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 from clients.subprocess_client import SubprocessClient
 from constants.architecture_constants import EnvKeyConstants
 from constants.architecture_constants import ImitatorConstants as Im_const
+from infra.clickhouse_manager import ClickHouseManager
 from infra.cmd_generator import ImitatorCmdGenerator
 from infra.docker_manager import DockerContainerManager
 from infra.imitator_data_uploader import ImitatorDataUploader
@@ -35,14 +36,14 @@ class StandSetupManager:
         duration_m: float,  # Максимальное время работы имитатора в минутах
         test_data_id: int,  # id тест кейса из которого будут загружены данные
         test_data_name: str,  # Название архива данных имитатора для загрузки из TestOps
-        technological_unit_id: int,  # id технологического участка для получения tags.txt с сервера
+        tu_id: int,
         username: str = os.environ.get(EnvKeyConstants.SSH_USER_DEV),
         stand_name: str = os.environ.get(EnvKeyConstants.STAND_NAME),
     ) -> None:
         self._duration_m = duration_m
         self._test_data_id = test_data_id
         self._test_data_name = test_data_name
-        self._technological_unit_id = technological_unit_id
+        self._tu_id = tu_id
         self._username = username
         self._stand_name = stand_name
         self._server_ip = self._get_server_ip()  # Получает ip сервера из словаря
@@ -64,6 +65,8 @@ class StandSetupManager:
 
     def setup_stand_for_imitator_run(self) -> None:
         try:
+            # Копирование файла конфигурации на runner
+            self._clickhouse_manager.copy_configuration_file_from_stand()
             if not os.environ.get("RUN_WITHOUT_TESTOPS", "False").lower() == "true":
                 # При запуске с TestOps загружает данные для прогона
                 self._uploader.upload_with_confirm()
@@ -71,6 +74,8 @@ class StandSetupManager:
             self._docker_manager.stop_all_lds_containers()
             # Чистка ключей Redis
             self._redis_cleaner.delete_keys_with_check()
+            # Чистка ключей ClickHouse
+            self._clickhouse_manager.delete_clickhouse_keys_with_check()
             # Запуск lds-layer-builder
             self._docker_manager.start_lds_layer_builder_containers()
             # Запуск lds-journals
@@ -105,13 +110,13 @@ class StandSetupManager:
         except RuntimeError:
             logger.exception("[SETUP] [ERROR] Ошибка запуска CORE")
 
-    def stop_imitator_wrapper(self):
+    def stop_imitator_wrapper(self) -> None:
         """
-        В teardown может вызываться даже если имитатор не успел стартовать.
+        В teardown может вызываться даже если имитатор не запущен
         """
         try:
             if not self._imitator_manager.imitator_process:
-                logger.info("[TEARDOWN] [SKIP] Имитатор не был запущен (process=None)")
+                logger.info("[TEARDOWN] [SKIP] Имитатор не был запущен")
                 return
             self._imitator_manager.wait_and_stop_imitator()
             logger.info("[TEARDOWN] [OK] Имитатор остановлен")
@@ -120,19 +125,19 @@ class StandSetupManager:
 
     def server_test_data_remover(self):
         """
-        Может вызываться в teardown даже если загрузка не успела выполниться.
+        Может вызваться в teardown если загрузка не была выполнена
         """
         uploader = getattr(self, "_uploader", None)
         if uploader is None:
             logger.info("[TEARDOWN] [SKIP] uploader не инициализирован, удаление данных со стенда пропущено")
             return
-
         try:
             uploader.delete_with_confirm()
-        except Exception:
+        except RuntimeError:
             logger.exception("[TEARDOWN] [ERROR] Не удалось удалить данные с сервера")
 
-    def _parse_opc_target(self) -> tuple[str, int]:
+    @staticmethod
+    def _parse_opc_target() -> tuple[str, int]:
         """
         Извлекает хост и порт OPC из переменной окружения OPC_URL.
         """
@@ -142,9 +147,7 @@ class StandSetupManager:
 
         parsed = urlparse(opc_url)
         if not parsed.hostname or not parsed.port:
-            raise RuntimeError(
-                f"Некорректное значение OPC_URL: '{opc_url}'. Ожидается формат вида opc.tcp://host:port"
-            )
+            raise RuntimeError(f"Некорректное значение OPC_URL: '{opc_url}'. Ожидается формат вида opc.tcp://host:port")
 
         return parsed.hostname, parsed.port
 
@@ -184,7 +187,7 @@ class StandSetupManager:
             return ImitatorCmdGenerator(self._test_data_name, self._stand_name, self._duration_m)
         else:
             self._uploader = ImitatorDataUploader(
-                self._stand_client, self._test_data_id, self._test_data_name, self._technological_unit_id
+                self._stand_client, self._test_data_id, self._test_data_name, self._tu_id
             )
             self._data_path = self._uploader.remote_temp_dir_path
             return ImitatorCmdGenerator(self._data_path, self._stand_name, self._duration_m)
@@ -194,6 +197,7 @@ class StandSetupManager:
         Создает экземпляры необходимых для запуска клиентов
         """
         self._stand_client = SubprocessClient(self._username, self._server_ip)
-        self._redis_client = SubprocessClient(self._username, Im_const.REDIS_STAND_ADDRESS)
-        self._redis_cleaner = RedisCleaner(self._redis_client, self._stand_name)
+        self._infra_client = SubprocessClient(self._username, Im_const.REDIS_STAND_ADDRESS)
+        self._clickhouse_manager = ClickHouseManager(self._stand_client, self._infra_client)
         self._docker_manager = DockerContainerManager(self._stand_client)
+        self._redis_cleaner = RedisCleaner(self._infra_client, self._stand_name)

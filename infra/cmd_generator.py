@@ -2,14 +2,32 @@ import logging
 import os
 from datetime import datetime, timedelta
 from pathlib import PurePosixPath
+from typing import List
 
 import allure
 
+from constants.architecture_constants import ClickhouseConstants as CH_const
 from constants.architecture_constants import EnvKeyConstants
 from constants.architecture_constants import ImitatorConstants as Im_const
 from infra.path_generator import ImitatorDataPathGenerator
 
 logger = logging.getLogger(__name__)
+
+
+class BaseCmdGenerator:
+    def __init__(self, username: str, host: str) -> None:
+        self._username = username
+        self._host = host
+        self._ssh_key_name: str = os.environ.get(EnvKeyConstants.SSH_KEY_NAME)
+        self._scp_cmd: str = ""
+        self._choose_scp_cmd_by_os()
+
+    def _choose_scp_cmd_by_os(self):
+        if os.name == Im_const.OS_NAME_WIN:
+            scp_cmd = f"scp -i {self._ssh_key_name}"
+        else:
+            scp_cmd = "scp"
+        self._scp_cmd = scp_cmd
 
 
 class TimeProcessor:
@@ -213,12 +231,11 @@ class ImitatorCmdGenerator:
             raise
 
 
-class UploadImitatorDataCmdGenerator:
-    def __init__(self, username: str, host: str, path_generator: ImitatorDataPathGenerator):
+class UploadImitatorDataCmdGenerator(BaseCmdGenerator):
+    def __init__(self, username: str, host: str, path_generator: ImitatorDataPathGenerator) -> None:
+        super().__init__(username=username, host=host)
         # Список ожидаемых файлов в архиве
         self.expected_files: list = [Im_const.SANDBOX_RULES]
-        self._username = username
-        self._host = host
         self._ssh_key_name: str = os.environ.get(EnvKeyConstants.SSH_KEY_NAME)
         self._os_is_windows: bool = os.name == Im_const.OS_NAME_WIN
         self._path_generator = path_generator
@@ -229,11 +246,11 @@ class UploadImitatorDataCmdGenerator:
 
     def generate_check_remote_data_cmd(self) -> str:
         """
-        Создает команду проверки существования директории с данными и сопутствующих файлов.
-        Проверяет: data/, rules.txt, tags.txt (tags.txt копируется с сервера отдельно).
+        Создает команду проверки существования директории с данными и сопутствующих файлов
         :return: команда для выполнения в консоли
         """
         expected_dir = Im_const.SANDBOX_DATA
+
         # Файлы для проверки после распаковки и копирования tags.txt
         files_to_check = [Im_const.SANDBOX_RULES, Im_const.SANDBOX_TAGS]
 
@@ -262,13 +279,8 @@ class UploadImitatorDataCmdGenerator:
         """
         Генерирует команду копирования данных на удаленный сервер
         """
-        if self._os_is_windows:
-            return (
-                f"scp -i {self._ssh_key_name} {self._tar_package_name} "
-                f"{self._username}@{self._host}:{self._remote_temp_dir_path}/"
-            )
-        else:
-            return f"scp {self._tar_package_name} {self._username}@{self._host}:{self._remote_temp_dir_path}/"
+
+        return f"{self._scp_cmd} {self._tar_package_name} {self._username}@{self._host}:{self._remote_temp_dir_path}/"
 
     def generate_unpack_tar_cmd(self) -> str:
         """
@@ -284,9 +296,58 @@ class UploadImitatorDataCmdGenerator:
 
     def generate_copy_tags_cmd(self, tu_id: int) -> str:
         """
-        Генерирует команду копирования tags.txt с сервера во временную директорию.
-        Файл tn{tu_id}_tags.txt копируется как tags.txt.
+        Генерирует команду для копирования tags.txt с сервера во временную директорию текущего набора данных
+        Файл tn{tu_id}_tags.txt копируется как tags.txt
         """
-        source_path = f"{Im_const.TAGS_CONFIG_PATH}/tn{tu_id}_tags.txt"
+        source_path = f"{Im_const.CONFIG_PATH}/tn{tu_id}_tags.txt"
         target_path = f"{self._remote_temp_dir_path}/{Im_const.SANDBOX_TAGS}"
         return f"cp {source_path} {target_path}"
+
+
+class ClickHouseCmdGenerator(BaseCmdGenerator):
+    def __init__(self, username: str, host: str, configuration_file_name: str) -> None:
+        super().__init__(username=username, host=host)
+        self._configuration_file_name = configuration_file_name
+
+    def generate_scp_config_file_cmd(self) -> str:
+        """
+        Генерирует команду копирования файла конфигурации со стенда
+        """
+        path_to_remote_configuration = self._generate_path_to_remote_configuration()
+        return f"{self._scp_cmd} {self._username}@{self._host}:{path_to_remote_configuration} ."
+
+    def generate_check_sensor_data_click_cmd(self, evo_id_pairs: List[tuple]) -> str:
+        """
+        Генерирует команду проверки данных в ClickHouse по паре значений objectId и parameterId
+        """
+        sql_evo_id_pairs = self._generate_sql_evo_id_pairs(evo_id_pairs)
+        return (
+            f"echo \'SELECT * FROM {CH_const.LAST_VALUE_TABLE_NAME} WHERE "
+            f"({CH_const.OBJECT_ID_KEY_NAME}, {CH_const.PARAMETER_ID_KEY_NAME}) IN ({sql_evo_id_pairs})\' "
+            "| docker exec -i clickhouse clickhouse-client"
+        )
+
+    def generate_delete_clickhouse_keys_cmd(self, evo_id_pairs: List[tuple]) -> str:
+        """
+        Генерирует команду удаления данных в ClickHouse по парам значений objectId и parameterId
+        """
+        sql_evo_id_pairs = self._generate_sql_evo_id_pairs(evo_id_pairs)
+        return (
+            f"echo \'DELETE FROM {CH_const.LAST_VALUE_TABLE_NAME} WHERE "
+            f"({CH_const.OBJECT_ID_KEY_NAME}, {CH_const.PARAMETER_ID_KEY_NAME}) IN ({sql_evo_id_pairs})\' "
+            "| docker exec -i clickhouse clickhouse-client"
+        )
+
+    @staticmethod
+    def _generate_sql_evo_id_pairs(evo_id_pairs: List[tuple]) -> str:
+        """
+        Создает строку из списка пар значений evoObjectId и evoParameterId
+        """
+        return ", ".join("({}, {})".format(object_id, param_id) for object_id, param_id in evo_id_pairs)
+
+    def _generate_path_to_remote_configuration(self) -> PurePosixPath:
+        """
+        Создает путь к файлу конфигурации конкретного стенда
+        """
+        return PurePosixPath(CH_const.CONFIG_PATH) / self._configuration_file_name
+        

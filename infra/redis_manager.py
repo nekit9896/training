@@ -90,4 +90,3 @@ class RedisCleaner:
                 return
         except RuntimeError:
             logger.exception(f"[REDIS] [ERROR] Ошибка при проверке ключей в Redis: {keyword}")
-            

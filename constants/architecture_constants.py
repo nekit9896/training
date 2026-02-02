@@ -1,3 +1,6 @@
+import os
+
+
 class ImitatorConstants:
     TEST_SETTINGS_KEY_NAME: str = "test_settings"
     IMITATOR_FLAGS_KEY_NAME: str = "imitator_flags"
@@ -15,7 +18,8 @@ class ImitatorConstants:
     SANDBOX_DATA: str = "data"
     SANDBOX_RULES: str = "rules.txt"
     SANDBOX_TAGS: str = "tags.txt"
-    TAGS_CONFIG_PATH: str = "/data/test/configs"
+    STAND_ENV_NAMING: str = os.environ.get("STAND_NAME")[:-1]
+    CONFIG_PATH: str = f"/data/{STAND_ENV_NAMING}/configs"
     SOURCE_TYPE_DEF_VALUE: str = "inflow"
     SPEED_DEF_VALUE: int = 1
     NS_DEF_VALUE: int = 2
@@ -28,22 +32,35 @@ class ImitatorConstants:
     LONG_PROCESS_TIMEOUT_S: int = 20
     CMD_STATUS_OK: str = "OK"
     CMD_STATUS_FAIL: str = "FAIL"
-    REDIS_STAND_ADDRESS: str = "secret"
+    REDIS_STAND_ADDRESS: str = "10.7.49.210"
     CORE_START_DELAY_S: int = IMITATOR_START_DELAY_S + 20
     ENCODING_UTF_8: str = "utf-8"
+    ENCODING_UTF_8_SIG: str = "utf-8-sig"
+    ENCODING_LATIN_1: str = "latin-1"
     WIN_ENCODING_CP866: str = "cp866"  # Нужна только для запуска под WIN
     WIN_ENCODING_CP1251: str = "cp1251"  # Нужна только для запуска под WIN
     OS_NAME_WIN: str = 'nt'
+    DEFAULT_ENCODINGS = [ENCODING_UTF_8_SIG, ENCODING_UTF_8, WIN_ENCODING_CP866, WIN_ENCODING_CP1251, ENCODING_LATIN_1]
 
     HOST_MAP = {
-        "dev1": {IMITATOR_KEY_NAME: "DEV1_", SERVER_IP_KEY_NAME: "secret"},
-        "dev2": {IMITATOR_KEY_NAME: "DEV2_", SERVER_IP_KEY_NAME: "secret"},
-        "dev3": {IMITATOR_KEY_NAME: "DEV3_", SERVER_IP_KEY_NAME: "secret"},
-        "test1": {IMITATOR_KEY_NAME: "TEST1_", SERVER_IP_KEY_NAME: "secret"},
-        "test2": {IMITATOR_KEY_NAME: "TEST2_", SERVER_IP_KEY_NAME: "secret"},
-        "test3": {IMITATOR_KEY_NAME: "TEST3_", SERVER_IP_KEY_NAME: "secret"},
-        "test4": {IMITATOR_KEY_NAME: "TEST4_", SERVER_IP_KEY_NAME: "secret"},
+        "dev1": {IMITATOR_KEY_NAME: "DEV1_", SERVER_IP_KEY_NAME: "10.7.49.37"},
+        "dev2": {IMITATOR_KEY_NAME: "DEV2_", SERVER_IP_KEY_NAME: "10.7.49.38"},
+        "dev3": {IMITATOR_KEY_NAME: "DEV3_", SERVER_IP_KEY_NAME: "10.7.49.205"},
+        "test1": {IMITATOR_KEY_NAME: "TEST1_", SERVER_IP_KEY_NAME: "10.7.49.206"},
+        "test2": {IMITATOR_KEY_NAME: "TEST2_", SERVER_IP_KEY_NAME: "10.7.49.207"},
+        "test3": {IMITATOR_KEY_NAME: "TEST3_", SERVER_IP_KEY_NAME: "10.7.49.208"},
+        "test4": {IMITATOR_KEY_NAME: "TEST4_", SERVER_IP_KEY_NAME: "10.7.49.209"},
     }
+
+
+class ClickhouseConstants(ImitatorConstants):
+    TN_3_JSON_FILE_NAME: str = "tn3.json"
+    LAST_VALUE_TABLE_NAME: str = "lds.records_lastvalue"
+    EVO_OBJECT_ID_KEY_NAME: str = "evoObjectId"
+    EVO_PARAMETER_ID_KEY_NAME: str = "evoParameterId"
+    OBJECT_ID_KEY_NAME: str = "objectId"
+    PARAMETER_ID_KEY_NAME: str = "parameterId"
+    EVO_ID_PAIRS_CHUNK_SIZE: int = 450
 
 
 class DockerConstants:
@@ -53,12 +70,12 @@ class DockerConstants:
     CHECK_STATUS_CMD: str = "docker inspect -f '{{.State.Status}}'"
     RUNNING_STATUS: str = "running"
     EXITED_STATUS: str = "exited"
-    CORE_CONTAINERS_GROUP: list = ["secret-node1", "secret-node2", "secret-node3"]
-    LB_CONTAINERS_GROUP: list = ["secret-node1", "secret-node2", "secret-node3"]
-    JOURNAL_CONTAINERS_GROUP: list = ["secret-node1", "secret-node2", "secret-node3"]
-    WEB_APP_CONTAINERS_GROUP: list = ["secret-node1", "secret-node2", "secret-node3"]
-    API_GW_CONTAINERS_GROUP: list = ["secret-node1", "secret-node2", "secret-node3"]
-    REPORTS_CONTAINERS_GROUP: list = ["secret-node1", "secret-node2", "secret-node3"]
+    CORE_CONTAINERS_GROUP: list = ["lds-core-node1", "lds-core-node2", "lds-core-node3"]
+    LB_CONTAINERS_GROUP: list = ["lds-layer-builder-node1", "lds-layer-builder-node2", "lds-layer-builder-node3"]
+    JOURNAL_CONTAINERS_GROUP: list = ["lds-journals-node1", "lds-journals-node2", "lds-journals-node3"]
+    WEB_APP_CONTAINERS_GROUP: list = ["lds-web-app-node1", "lds-web-app-node2", "lds-web-app-node3"]
+    API_GW_CONTAINERS_GROUP: list = ["lds-api-gw-node1", "lds-api-gw-node2", "lds-api-gw-node3"]
+    REPORTS_CONTAINERS_GROUP: list = ["lds-reports-node1", "lds-reports-node2", "lds-reports-node3"]
 
 
 class RedisConstants:
@@ -116,7 +133,7 @@ class WebSocketClientConstants:
     INVOCATION_ID_INDEX = 2
     SERVICE_NAME = "web-app"
     COMPONENT = "lds"
-    ROOT_DOMAIN = "secret"
+    ROOT_DOMAIN = "tn.tngrp.ru"
 
 
 class EnvKeyConstants:
