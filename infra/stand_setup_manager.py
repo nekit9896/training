@@ -18,7 +18,7 @@ class StandSetupManager:
     """
     Подготовка стенда к запуску автотестов
     Для запуска имитатора:
-    setup_manager = StandSetupManager(test_duration(minutes), test_data_id, test_data_name)
+    setup_manager = StandSetupManager(test_duration(minutes), test_data_id, test_data_name, tu_id)
     setup_manager.setup_stand_for_imitator_run()
     imitator_thread = threading.Thread(target=stand_manager.start_imitator, daemon=True)
     core_thread = threading.Thread(target=stand_manager.start_core)
@@ -35,12 +35,14 @@ class StandSetupManager:
         duration_m: float,  # Максимальное время работы имитатора в минутах
         test_data_id: int,  # id тест кейса из которого будут загружены данные
         test_data_name: str,  # Название архива данных имитатора для загрузки из TestOps
+        technological_unit_id: int,  # id технологического участка для получения tags.txt с сервера
         username: str = os.environ.get(EnvKeyConstants.SSH_USER_DEV),
         stand_name: str = os.environ.get(EnvKeyConstants.STAND_NAME),
     ) -> None:
         self._duration_m = duration_m
         self._test_data_id = test_data_id
         self._test_data_name = test_data_name
+        self._technological_unit_id = technological_unit_id
         self._username = username
         self._stand_name = stand_name
         self._server_ip = self._get_server_ip()  # Получает ip сервера из словаря
@@ -181,7 +183,9 @@ class StandSetupManager:
             # Запуск без TestOps
             return ImitatorCmdGenerator(self._test_data_name, self._stand_name, self._duration_m)
         else:
-            self._uploader = ImitatorDataUploader(self._stand_client, self._test_data_id, self._test_data_name)
+            self._uploader = ImitatorDataUploader(
+                self._stand_client, self._test_data_id, self._test_data_name, self._technological_unit_id
+            )
             self._data_path = self._uploader.remote_temp_dir_path
             return ImitatorCmdGenerator(self._data_path, self._stand_name, self._duration_m)
 

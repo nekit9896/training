@@ -15,6 +15,7 @@ class ImitatorConstants:
     SANDBOX_DATA: str = "data"
     SANDBOX_RULES: str = "rules.txt"
     SANDBOX_TAGS: str = "tags.txt"
+    TAGS_CONFIG_PATH: str = "/data/test/configs"
     SOURCE_TYPE_DEF_VALUE: str = "inflow"
     SPEED_DEF_VALUE: int = 1
     NS_DEF_VALUE: int = 2
