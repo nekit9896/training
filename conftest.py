@@ -42,17 +42,17 @@ def _find_config_by_suite_name(suite_name: str):
 def allure_suite_hierarchy(request):
     """
     Автоматически устанавливает иерархию Allure для группировки тестов по наборам данных.
-    
+
     В Allure отчёте тесты группируются:
     - Parent Suite: SingleLeakSuite / MultiLeakSuite (тип набора)
     - Suite: select_4 / select_6 / ... (имя набора данных)
-    
+
     Работает как с параметризованными тестами (config в параметрах),
     так и с обычными тестами (через маркер test_suite_name).
     """
     config = None
     suite_name = None
-    
+
     # Пробуем получить конфиг из параметризации
     if hasattr(request, 'fixturenames') and 'config' in request.fixturenames:
         try:
@@ -60,14 +60,14 @@ def allure_suite_hierarchy(request):
             suite_name = config.suite_name
         except Exception:
             pass
-    
+
     # Если не нашли, пробуем найти конфиг по маркеру test_suite_name
     if not config:
         marker = request.node.get_closest_marker('test_suite_name')
         if marker:
             suite_name = marker.args[0]
             config = _find_config_by_suite_name(suite_name)
-    
+
     if config and suite_name:
         parent_suite = "MultiLeakSuite" if config.has_multiple_leaks else "SingleLeakSuite"
         allure.dynamic.parent_suite(parent_suite)
@@ -78,10 +78,7 @@ def pytest_configure(config):
     """
     Храним состояние сессии
     """
-    config.addinivalue_line(
-        "markers",
-        "critical_stop: если тест упал, останавливаем дальнейшее выполнение сессии (session.shouldstop)",
-    )
+    config.addinivalue_line("markers", "critical_stop: если тест упал, останавливаем дальнейшее выполнение сессии")
     config.group_state = {
         "current_suite": None,
         "suite_start_time": None,
@@ -93,9 +90,9 @@ def pytest_configure(config):
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
     """
-    Делает падение критического теста (marker critical_stop) однозначным:
-    - сам тест будет FAILED (pytest.fail)
-    - после него прекращаем запуск остальных тестов (session.shouldstop)
+    Делает падение критического теста с маркировкой critical_stop однозначным:
+    - рисуем fail для теста
+    - после него прекращаем запуск остальных тестов
     """
     outcome = yield
     report = outcome.get_result()
@@ -129,33 +126,32 @@ LEAK_LEVEL_TEST_MAPPING = {
 }
 
 
-
 def _get_test_markers_config(item, test_name):
     """
     Получает конфигурацию с маркерами для теста.
-    
+
     Для leak-level тестов: маркеры берутся из параметра leak
     Для suite-level тестов: маркеры берутся из config
-    
+
     :return: CaseMarkers объект или None
     """
     if not hasattr(item, 'callspec'):
         return None
-    
+
     params = item.callspec.params
-    
+
     # Проверяем, есть ли параметр leak (для leak-level тестов)
     if 'leak' in params and test_name in LEAK_LEVEL_TEST_MAPPING:
         leak = params['leak']
         attr_name = LEAK_LEVEL_TEST_MAPPING[test_name]
         return getattr(leak, attr_name, None)
-    
+
     # Для suite-level тестов берём из config
     if 'config' in params and test_name in SUITE_LEVEL_TEST_MAPPING:
         suite_config = params['config']
         attr_name = SUITE_LEVEL_TEST_MAPPING[test_name]
         return getattr(suite_config, attr_name, None)
-    
+
     return None
 
 
@@ -172,10 +168,10 @@ def pytest_collection_modifyitems(session, config, items):
     if suites_option:
         # Парсим список наборов: "select_4,select_19_20" -> ["select_4", "select_19_20"]
         selected_suites = [s.strip().lower() for s in suites_option.split(",")]
-    
+
     selected_items = []
     deselected_items = []
-    
+
     for item in items:
         # Фильтрация по --suites
         if selected_suites:
@@ -186,18 +182,18 @@ def pytest_collection_modifyitems(session, config, items):
                 if not any(selected in suite_name for selected in selected_suites):
                     deselected_items.append(item)
                     continue
-        
+
         # Получаем имя функции теста (без параметров)
         test_name = item.originalname or item.name.split('[')[0]
-        
+
         # Получаем конфиг с маркерами для теста
         test_config = _get_test_markers_config(item, test_name)
-        
+
         if test_config is not None:
             # Добавляем маркер offset
             if hasattr(test_config, 'offset') and test_config.offset is not None:
                 item.add_marker(pytest.mark.offset(test_config.offset))
-            
+
             # Добавляем маркер test_case_id
             if hasattr(test_config, 'test_case_id') and test_config.test_case_id is not None:
                 item.add_marker(pytest.mark.test_case_id(test_config.test_case_id))
@@ -205,26 +201,25 @@ def pytest_collection_modifyitems(session, config, items):
             # Конфиг теста = None - исключаем тест из прогона
             deselected_items.append(item)
             continue
-        
+
         selected_items.append(item)
-    
+
     # Уведомляем pytest об исключённых тестах
     if deselected_items:
         config.hook.pytest_deselected(items=deselected_items)
-    
+
     # Заменяем список тестов на отфильтрованный
     items[:] = selected_items
 
-    # Сортировка тестов по test_suite_name и offset.
-    # Цель: обеспечить запуск тестов строго по offset внутри набора.
-    # При равных offset сохраняем исходный порядок коллекции,
-    # чтобы порядок параметризации не перескакивал.
+    # Сортировка тестов по test_suite_name и offset
+    # Цель: обеспечить запуск тестов строго по offset строго внутри набора данных
+    # При равных offset сохраняем исходный порядок коллекции, чтобы порядок параметризации не перескакивал
     def suite_offset_key(item):
         """
         Сортировка тестов по test_suite_name и offset (без падения на None).
         """
         test_suite_name_marker = item.get_closest_marker("test_suite_name")
-        suite_name = test_suite_name_marker.args[0] if test_suite_name_marker else ""
+        test_suite_name = test_suite_name_marker.args[0] if test_suite_name_marker else ""
 
         offset_marker = item.get_closest_marker("offset")
         if offset_marker:
@@ -236,19 +231,19 @@ def pytest_collection_modifyitems(session, config, items):
             offset_value = float("inf")
 
         original_index = getattr(item, "_collection_index", 0)
-        # Возвращаем тройку ключей сортировки:
-        # 1) suite_name — группировка по набору,
-        # 2) offset_value — порядок внутри набора по времени,
-        # 3) original_index — стабильность при равных offset.
-        return suite_name, offset_value, original_index
+        # Возвращаем тройку ключей сортировки
+        # 1) test_suite_name - группировка по набору
+        # 2) offset_value - порядок внутри набора по времени
+        # 3) original_index - стабильность при равных offset
+        return test_suite_name, offset_value, original_index
 
     # Сохраняем исходный порядок коллекции для стабильной сортировки
     for index, item in enumerate(items):
         item._collection_index = index
 
+    # по кортежу питон сортирует слева направо, благодаря этому сортировка по offset идет строго внутри test_suite_name
     items.sort(key=suite_offset_key)
 
-    # Убираем временный атрибут после сортировки
     for item in items:
         if hasattr(item, "_collection_index"):
             delattr(item, "_collection_index")
@@ -356,15 +351,12 @@ def pytest_runtest_setup(item):
 
         data_id = item.get_closest_marker("test_suite_data_id").args[0]
         test_data_name = item.get_closest_marker("test_data_name").args[0]
-        tu_id = item.get_closest_marker("technological_unit_id").args[0]
+        tu_id = item.get_closest_marker("tu_id").args[0]
 
         imitator_duration = compute_imitator_duration(item, current_test_suite)
 
         stand_manager = StandSetupManager(
-            duration_m=imitator_duration,
-            test_data_id=data_id,
-            test_data_name=test_data_name,
-            technological_unit_id=tu_id,
+            duration_m=imitator_duration, test_data_id=data_id, test_data_name=test_data_name, tu_id=tu_id
         )
         cfg["stand_manager"] = stand_manager
         try:
@@ -378,7 +370,7 @@ def pytest_runtest_setup(item):
             pytest.exit(msg)
         try:
             stand_manager.setup_stand_for_imitator_run()
-        except RuntimeError as error:
+        except Exception as error:
             pytest.exit(f"[SETUP] [ERROR] ошибка при подготовке стенда: {error}")
 
         imitator_thread = threading.Thread(
@@ -387,13 +379,13 @@ def pytest_runtest_setup(item):
         core_thread = threading.Thread(target=stand_manager.start_core)
         try:
             imitator_thread.start()
-        except RuntimeError as error:
+        except Exception as error:
             pytest.exit(f"[SETUP] [ERROR] ошибка запуска имитатора: {error}")
         time.sleep(ImConst.CORE_START_DELAY_S)
         try:
             core_thread.start()
             core_thread.join(timeout=5)
-        except RuntimeError as error:
+        except Exception as error:
             pytest.exit(f"[SETUP] [ERROR] ошибка запуска СORE контейнеров: {error}")
 
         # Сохраняем время старта имитатора для расчёта интервалов утечек в тестах
@@ -507,41 +499,35 @@ def pytest_sessionfinish(session, exitstatus):
     """
     В завершении сессии — отправляем единый Allure‑отчёт в TestOps.
     """
-    # 1) teardown стенда: остановить имитатор и удалить временные данные на стенде.
-    # Делаем это здесь, потому что при pytest.exit/ошибках не всегда отрабатывают пер-suite teardown хуки.
+    # 1) teardown стенда: остановки имитатора и удаление временных папок на сервере
     try:
         stand_manager = getattr(session.config, "group_state", {}).get("stand_manager")
         if stand_manager:
             try:
                 stand_manager.stop_imitator_wrapper()
             except Exception:
-                logger.exception("[SESSIONFINISH] Ошибка при остановке имитатора")
+                logger.exception("[ERROR] [TEARDOWN] Ошибка при остановке имитатора")
             try:
                 stand_manager.server_test_data_remover()
             except Exception:
-                logger.exception("[SESSIONFINISH] Ошибка при удалении временных данных на стенде")
+                logger.exception("[ERROR] [TEARDOWN] Ошибка при удалении тестового набора данных со стенда")
     except Exception:
-        logger.exception("[SESSIONFINISH] Ошибка при получении stand_manager из group_state")
+        logger.exception("[ERROR] [TEARDOWN] Ошибка при получении stand_manager из group_state")
 
     # 2) Выгрузка allure-results в TestOps
     try:
         uploader = AllureResultsUploader()
-        logger.info("Uploading Allure results to TestOps")
+        logger.info("[INFO] [TEARDOWN] Uploading Allure results to TestOps")
         uploader.upload_allure_results()
     except Exception:
-        logger.exception("[SESSIONFINISH] Ошибка при выгрузке allure-results в TestOps")
+        logger.exception("[ERROR] [TEARDOWN] Ошибка при выгрузке allure-results в TestOps")
 
-    try:
-        if os.path.isdir("allure-results"):
-            shutil.rmtree("allure-results")
-    except Exception:
-        logger.exception("[SESSIONFINISH] Ошибка при удалении allure-results")
-
-    # 3) Удаление локальных архивов с данными (runner)
+    # 3) Удаление локальных архивов с данными
+    shutil.rmtree("allure-results")
     project_root = os.path.dirname(os.path.abspath(__file__))
     files_for_drop = glob.glob(os.path.join(project_root, "*.tar.gz"))
     if not files_for_drop:
-        logger.warning("Не нашлось архивов .tar.gz с данным для удаления")
+        logger.warning("[WARNING] [TEARDOWN] Не нашлось архивов .tar.gz с данным для удаления")
     else:
         for file in files_for_drop:
             os.remove(file)
@@ -553,3 +539,4 @@ def ws_params(request):
     Передает параметры для websocket в тест
     """
     return request.param
+    

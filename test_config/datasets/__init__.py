@@ -15,7 +15,7 @@ import pkgutil
 from pathlib import Path
 from typing import Dict, List
 
-from test_config.models import SuiteConfig
+from test_config.models_for_tests import SuiteConfig
 
 # Путь к директории datasets
 _DATASETS_PATH = Path(__file__).parent
@@ -27,41 +27,38 @@ _CONFIG_CACHE: Dict[str, SuiteConfig] = {}
 def _discover_configs() -> tuple[List[SuiteConfig], List[SuiteConfig]]:
     """
     Автоматически находит все конфигурации в директории datasets.
-    
-    Returns:
-        tuple: (single_leak_configs, multi_leak_configs)
     """
     single_leak_configs = []
     multi_leak_configs = []
-    
+
     # Сканируем все .py файлы в директории
     for module_info in pkgutil.iter_modules([str(_DATASETS_PATH)]):
         if module_info.name.startswith('_'):
             continue  # Пропускаем __init__ и приватные модули
-            
+
         # Импортируем модуль
         module = importlib.import_module(f"test_config.datasets.{module_info.name}")
-        
+
         # Ищем переменные с суффиксом _CONFIG
         for attr_name in dir(module):
             if attr_name.endswith('_CONFIG'):
                 config = getattr(module, attr_name)
-                
+
                 # Проверяем что это SuiteConfig
                 if isinstance(config, SuiteConfig):
                     # Сохраняем в кэш для прямого доступа
                     _CONFIG_CACHE[attr_name] = config
-                    
+
                     # Разделяем на single/multi leak
                     if config.has_multiple_leaks:
                         multi_leak_configs.append(config)
                     else:
                         single_leak_configs.append(config)
-    
+
     # Сортируем по имени для стабильного порядка
-    single_leak_configs.sort(key=lambda c: c.suite_name)
-    multi_leak_configs.sort(key=lambda c: c.suite_name)
-    
+    single_leak_configs.sort(key=lambda name: name.suite_name)
+    multi_leak_configs.sort(key=lambda name: name.suite_name)
+
     return single_leak_configs, multi_leak_configs
 
 
@@ -102,7 +99,7 @@ def __dir__():
 
 __all__ = [
     "SINGLE_LEAK_CONFIGS",
-    "MULTI_LEAK_CONFIGS", 
+    "MULTI_LEAK_CONFIGS",
     "ALL_CONFIGS",
     "get_config_by_name",
 ] + list(_CONFIG_CACHE.keys())

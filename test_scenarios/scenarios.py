@@ -10,25 +10,10 @@ import time
 import allure
 import pytest
 
-from constants.enums import ConfirmationStatus, LdsStatus, ReplyStatus, StationaryStatus
-from constants.test_constants import (
-    ADDRESS_SUFFIX_ACK_LEAK,
-    ADDRESS_SUFFIX_LEAK,
-    ADDRESS_SUFFIX_MASK,
-    ADDRESS_SUFFIX_POINT_LEAK,
-    ADDRESS_SUFFIX_Q_LEAK,
-    ADDRESS_SUFFIX_TIME_LEAK,
-    COLUMN_SELECTION_DEF,
-    FLOW_SIGNAL_TYPE,
-    FLOWMETER_OBJECT_TYPE,
-    LEAK_LINEAR_PART_ID_KEY,
-    OUTPUT_IS_ACK_LEAK,
-    OUTPUT_IS_LEAK,
-    OUTPUT_IS_NOT_MASK,
-    PRESSURE_SENSOR_OBJECT_TYPE,
-    PRESSURE_SIGNAL_TYPE,
-)
-from test_config.models import LeakTestConfig, SuiteConfig
+from constants.enums import Direction, LdsStatus, MessageType, ReplyStatus, StationaryStatus
+from constants.test_constants import BaseTN3Constants as TestConst
+from models.get_messages_model import Filtering, Pagination
+from test_config.models_for_tests import LeakTestConfig, SuiteConfig
 from utils.helpers import ws_test_utils as t_utils
 from utils.helpers.asserts import SoftAssertions, StepCheck
 from utils.helpers.ws_message_parser import ws_message_parser as parser
@@ -42,11 +27,9 @@ async def basic_info(ws_client, cfg: SuiteConfig):
         payload = await t_utils.connect_and_get_msg(ws_client, "getBasicInfoRequest", [])
         parsed_payload = parser.parse_basic_info_msg(payload)
         expected_tu = [(cfg.tu_id, cfg.tu_name)]
-        actual_tu = [
-            (tu.tuId, tu.tuName) for tu in parsed_payload.replyContent.basicInfo.tus if tu.tuId == cfg.tu_id
-        ]
+        actual_tu = [(tu.tuId, tu.tuName) for tu in parsed_payload.replyContent.basicInfo.tus if tu.tuId == cfg.tu_id]
 
-    with allure.step("Поверка ТУ в списке доступных ТУ на сервере"):
+    with allure.step(f"Поверка наличия {cfg.tu_name} в списке доступных ТУ на сервере"):
         # Критическая проверка: если нужного ТУ нет в BasicInfoContent — считаем что ТУ отключен (через Zookeeper)
         # и прерываем весь прогон.
         if expected_tu[0] not in actual_tu:
@@ -54,7 +37,6 @@ async def basic_info(ws_client, cfg: SuiteConfig):
                 f"ТУ отключен: в BasicInfoContent отсутствует ТУ для запущенного набора данных: "
                 f"tuId={cfg.tu_id}, tuName='{cfg.tu_name}', suite={cfg.suite_name}. "
                 f"Необходимо убедиться, что ТУ включен (Zookeeper) и перезапустить прогон."
-                # ;configurations / tn3.json
             )
             allure.attach(
                 f"Ожидаемый ТУ: {expected_tu}\nПолученные ТУ: {actual_tu}",
@@ -64,9 +46,9 @@ async def basic_info(ws_client, cfg: SuiteConfig):
             pytest.fail(msg, pytrace=False)
 
     with SoftAssertions() as soft_failures:
-        StepCheck("Проверка статуса ответа", "replyStatus", soft_failures).actual(
-            parsed_payload.replyStatus
-        ).expected(ReplyStatus.OK.value).equal_to()
+        StepCheck("Проверка статуса ответа", "replyStatus", soft_failures).actual(parsed_payload.replyStatus).expected(
+            ReplyStatus.OK.value
+        ).equal_to()
 
         StepCheck("Проверка наличия объектов в списке ТУ", "tus", soft_failures).actual(
             parsed_payload.replyContent.basicInfo.tus
@@ -76,23 +58,18 @@ async def basic_info(ws_client, cfg: SuiteConfig):
             f"Проверка наличия ТУ: {cfg.tu_name} в списке ТУ ",
             "(tuId, tuName)",
             soft_failures,
-        ).actual(actual_tu).expected(expected_tu).equal_to()
+        ).actual(
+            actual_tu
+        ).expected(expected_tu).equal_to()
 
 
-async def journal_info(ws_client, cfg: SuiteConfig):
+async def journal_info(ws_client):
     """
     Проверка наличия сообщений в журнале.
     """
     with allure.step("Подключение по ws, получение и обработка сообщения типа: MessagesInfoContent"):
-        payload = await t_utils.connect_and_get_msg(
-            ws_client,
-            "GetMessagesRequest",
-            {
-                'pagination': {'limit': 50, 'direction': 3},
-                'sorting': {'sortingParam': 1, 'sortingType': 2},
-                'columnsSelection': COLUMN_SELECTION_DEF,
-            },
-        )
+        request_body = t_utils.create_journal_req_body()
+        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
         parsed_payload = parser.parse_journal_msg(payload)
 
     StepCheck("Проверка наличия сообщений в журнале", "messagesInfo").actual(
@@ -112,15 +89,20 @@ async def lds_status_initialization(ws_client, cfg: SuiteConfig):
             {'tuId': cfg.tu_id, 'additionalProperties': None},
         )
         parsed_payload = parser.parse_common_scheme_info_msg(payload)
+        # Получает список участков карты течения
         flow_areas = parsed_payload.replyContent.flowAreas
+        # Получает самый протяженный участок карты течения
         longest_flow_area = t_utils.get_longest_flow_area(flow_areas)
+        # Получает список ДУ
         diagnostic_areas = longest_flow_area.diagnosticAreas
         allure.attach(
-            f"Cамый протяженный участок карты течений: {longest_flow_area}",
+            f"Самый протяженный участок карты течений: {longest_flow_area}",
             name="flowArea. Инициализация",
             attachment_type=allure.attachment_type.TEXT,
         )
+        # Получает коллекцию статусов списка ДУ
         lds_status_set = {diagnostic_area.ldsStatus for diagnostic_area in diagnostic_areas}
+        # Определяет режим работы СОУ по приоритету
         lds_status = t_utils.determine_lds_status_by_priority(lds_status_set)
 
     StepCheck("Проверка режима работы СОУ", "ldsStatus").actual(lds_status).expected(
@@ -130,7 +112,7 @@ async def lds_status_initialization(ws_client, cfg: SuiteConfig):
 
 async def main_page_info(ws_client, cfg: SuiteConfig):
     """
-    Проверка установки режима стационара/остановленной перекачки.
+    Проверка установки режима МТ.
     """
     with allure.step("Подключение по ws, получение и обработка сообщения типа: MainPageInfoContent"):
         payload = await t_utils.connect_and_subscribe_msg(
@@ -150,9 +132,9 @@ async def main_page_info(ws_client, cfg: SuiteConfig):
             f"Проверка установки стационара для ТУ {cfg.tu_name}",
             "stationary_status",
             soft_failures,
-        ).actual(parsed_payload.replyContent.tuInfo.stationaryStatus).expected(
-            cfg.expected_stationary_status
-        ).equal_to()
+        ).actual(
+            parsed_payload.replyContent.tuInfo.stationaryStatus
+        ).expected(cfg.expected_stationary_status).equal_to()
 
 
 async def main_page_info_unstationary(ws_client, cfg: SuiteConfig):
@@ -200,17 +182,22 @@ async def mask_signal_msg(ws_client, cfg: SuiteConfig):
                 'additionalProperties': None,
             },
         )
+
         parsed_payload = parser.parse_input_signals_msg(payload)
+        # Получает список датчиков давления
         pressure_sensor_list = [
             sensor
             for sensor in parsed_payload.replyContent
-            if sensor.signalType == PRESSURE_SIGNAL_TYPE and sensor.objectType == PRESSURE_SENSOR_OBJECT_TYPE
+            if sensor.signalType == TestConst.PRESSURE_SIGNAL_TYPE
+            and sensor.objectType == TestConst.PRESSURE_SENSOR_OBJECT_TYPE
         ]
+        # Получает список расходомеров
         flowmeter_list = [
             sensor
             for sensor in parsed_payload.replyContent
-            if sensor.signalType == FLOW_SIGNAL_TYPE and sensor.objectType == FLOWMETER_OBJECT_TYPE
+            if sensor.signalType == TestConst.FLOW_SIGNAL_TYPE and sensor.objectType == TestConst.FLOWMETER_OBJECT_TYPE
         ]
+        # Случайно выбирает 1 расходомер и 1 датчик давления
         pressure_sensor = t_utils.get_random_item(pressure_sensor_list)
         flowmeter = t_utils.get_random_item(flowmeter_list)
 
@@ -225,6 +212,7 @@ async def mask_signal_msg(ws_client, cfg: SuiteConfig):
             )
             parsed_payload = parser.parse_mask_signal_msg(payload)
             pressure_sensor_mask_reply_status = parsed_payload.replyStatus
+
             StepCheck("Проверка кода ответа на запрос о маскировании", "replyStatus").actual(
                 pressure_sensor_mask_reply_status
             ).expected(ReplyStatus.OK.value).equal_to()
@@ -237,6 +225,7 @@ async def mask_signal_msg(ws_client, cfg: SuiteConfig):
             )
             parsed_payload = parser.parse_mask_signal_msg(payload)
             flowmeter_mask_reply_status = parsed_payload.replyStatus
+
             StepCheck("Проверка кода ответа на запрос о маскировании", "replyStatus").actual(
                 flowmeter_mask_reply_status
             ).expected(ReplyStatus.OK.value).equal_to()
@@ -271,6 +260,7 @@ async def mask_signal_msg(ws_client, cfg: SuiteConfig):
             )
             parsed_payload = parser.parse_unmask_signal_msg(payload)
             pressure_sensor_unmask_reply_status = parsed_payload.replyStatus
+
             StepCheck("Проверка кода ответа на запрос о снятии маскирования", "replyStatus").actual(
                 pressure_sensor_unmask_reply_status
             ).expected(ReplyStatus.OK.value).equal_to()
@@ -285,6 +275,7 @@ async def mask_signal_msg(ws_client, cfg: SuiteConfig):
             )
             parsed_payload = parser.parse_unmask_signal_msg(payload)
             flowmeter_unmask_reply_status = parsed_payload.replyStatus
+
             StepCheck("Проверка кода ответа на запрос о маскировании", "replyStatus").actual(
                 flowmeter_unmask_reply_status
             ).expected(ReplyStatus.OK.value).equal_to()
@@ -335,22 +326,24 @@ async def lds_status_initialization_out(ws_client, cfg: SuiteConfig):
             {'tuId': cfg.tu_id, 'additionalProperties': None},
         )
 
-    parsed_payload = parser.parse_common_scheme_info_msg(payload)
-    flow_areas = parsed_payload.replyContent.flowAreas
-    longest_flow_area = t_utils.get_longest_flow_area(flow_areas)
-    diagnostic_areas = longest_flow_area.diagnosticAreas
-    allure.attach(
-        f"Самый протяженный участок карты течений: {longest_flow_area}",
-        name="flowArea. Выход из Инициализации",
-        attachment_type=allure.attachment_type.TEXT,
-    )
-    lds_status_set = {diagnostic_area.ldsStatus for diagnostic_area in diagnostic_areas}
-    lds_status = t_utils.determine_lds_status_by_priority(lds_status_set)
+        parsed_payload = parser.parse_common_scheme_info_msg(payload)
+        flow_areas = parsed_payload.replyContent.flowAreas
+        longest_flow_area = t_utils.get_longest_flow_area(flow_areas)
+        diagnostic_areas = longest_flow_area.diagnosticAreas
+        allure.attach(
+            f"Самый протяженный участок карты течений: {longest_flow_area}",
+            name="flowArea. Выход из Инициализации",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+        lds_status_set = {diagnostic_area.ldsStatus for diagnostic_area in diagnostic_areas}
+        lds_status = t_utils.determine_lds_status_by_priority(lds_status_set)
 
     StepCheck(
         "Проверка: СОУ находится не в режиме 'Инициализация'",
         "ldsStatus",
-    ).actual(lds_status).expected(LdsStatus.INITIALIZATION.value).is_not_equal_to()
+    ).actual(
+        lds_status
+    ).expected(LdsStatus.INITIALIZATION.value).is_not_equal_to()
 
 
 async def leaks_content(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imitator_start_time):
@@ -369,22 +362,25 @@ async def leaks_content(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imita
 
         # Ищем утечку по имени ДУ или берём первую
         if leak.diagnostic_area_name:
-            leak_info = t_utils.find_object_by_field(
+            first_leak_info = t_utils.find_object_by_field(
                 leaks_list_info, "diagnosticAreaName", leak.diagnostic_area_name
             )
         else:
-            leak_info = leaks_list_info[0]
-
+            first_leak_info = leaks_list_info[0]
+            StepCheck(
+                "Проверка: пришла хотя бы одна утечка",
+                "leak",
+            ).actual(first_leak_info).is_not_none()
         # Конвертируем время обнаружения в московское время
-        leak_detected_at = t_utils.ensure_moscow_timezone(leak_info.detectedAt)
+        leak_detected_at = t_utils.ensure_moscow_timezone(first_leak_info.detectedAt)
         leak_wait_start_time, leak_wait_end_time = t_utils.get_leak_time_window(
             imitator_start_time,
             leak.leak_start_interval_seconds,
             leak.allowed_time_diff_seconds,
             detected_at_tz=leak_detected_at.tzinfo,
         )
-        leak_volume_m3 = t_utils.convert_leak_volume_m3(leak_info.leakVolume)
-        leak_coordinate_round = round(leak_info.leakCoordinate, cfg.precision)
+        leak_volume_m3 = t_utils.convert_leak_volume_m3(first_leak_info.leakVolume)
+        leak_coordinate_round = round(first_leak_info.leakCoordinate, cfg.precision)
 
     with SoftAssertions() as soft_failures:
         StepCheck("Проверка id полученного ТУ", "tu_id", soft_failures).actual(
@@ -393,22 +389,81 @@ async def leaks_content(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imita
 
         if leak.diagnostic_area_name:
             StepCheck("Проверка названия диагностического участка утечки", "diagnosticAreaName", soft_failures).actual(
-                leak_info.diagnosticAreaName
+                first_leak_info.diagnosticAreaName
             ).expected(leak.diagnostic_area_name).equal_to()
         else:
             StepCheck("Проверка наличия названия участка утечки", "diagnosticAreaName", soft_failures).actual(
-                leak_info.diagnosticAreaName
+                first_leak_info.diagnosticAreaName
             ).is_not_none()
 
         StepCheck("Проверка статуса утечки", "confirmationStatus", soft_failures).actual(
-            leak_info.confirmationStatus
-        ).expected(ConfirmationStatus.CONFIRMED.value).equal_to()
+            first_leak_info.confirmationStatus
+        ).expected(leak.expected_leak_status).equal_to()
 
-        StepCheck("Проверка источника события (алгоритм)", "type", soft_failures).actual(
-            leak_info.type
-        ).expected(leak.expected_type).equal_to()
+        StepCheck("Проверка источника события (алгоритм)", "type", soft_failures).actual(first_leak_info.type).expected(
+            leak.expected_algorithm_type
+        ).equal_to()
 
-        StepCheck("Проверка наличия id утечки", "id", soft_failures).actual(leak_info.id).is_not_none()
+        StepCheck("Проверка наличия id утечки", "id", soft_failures).actual(first_leak_info.id).is_not_none()
+
+        StepCheck("Проверка координаты утечки", "leakCoordinate", soft_failures).actual(
+            leak_coordinate_round
+        ).is_close_to(
+            leak.coordinate_meters,
+            cfg.allowed_distance_diff_meters,
+            f"значение допустимой погрешности координаты {cfg.allowed_distance_diff_meters}",
+        )
+
+        StepCheck("Проверка времени обнаружения утечки", "leakDetectedAt", soft_failures).actual(
+            leak_detected_at
+        ).is_between(leak_wait_start_time, leak_wait_end_time)
+
+        StepCheck("Проверка объема утечки", "volume", soft_failures).actual(leak_volume_m3).is_close_to(
+            leak.volume_m3,
+            leak.allowed_volume_m3,
+            f"значение допустимой погрешности по объему {leak.allowed_volume_m3}",
+        )
+
+
+async def leak_info_in_journal(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imitator_start_time):
+    with allure.step("Подключение по ws, получение и обработка сообщения типа: MessagesInfoContent"):
+        request_body = t_utils.create_journal_req_body(
+            pagination=Pagination(limit=1, direction=Direction.FIRST.value),
+            filtering=Filtering(messageTypes=int(MessageType.LEAKS)),
+        )
+        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        parsed_payload = parser.parse_journal_msg(payload)
+        messages_info = parsed_payload.replyContent.messagesInfo
+
+        StepCheck("Проверка наличия сообщений в журнале", "messagesInfo").actual(
+            parsed_payload.replyContent.messagesInfo
+        ).is_not_empty()
+        if leak.technological_object:
+            leak_message = t_utils.find_object_by_field(messages_info, 'technologicalObject', leak.technological_object)
+        else:
+            leak_message = parsed_payload.replyContent.messagesInfo[0]
+        leak_coordinate_km, leak_volume_m3 = t_utils.parse_journal_msg_value(leak_message.value)
+        leak_detected_at = t_utils.ensure_moscow_timezone(leak_message.time)
+        leak_wait_start_time, leak_wait_end_time = t_utils.get_leak_time_window(
+            imitator_start_time,
+            leak.leak_start_interval_seconds,
+            leak.allowed_time_diff_seconds,
+            detected_at_tz=leak_detected_at.tzinfo,
+        )
+        leak_coordinate_round = round(leak_coordinate_km * TestConst.KM_TO_METERS, TestConst.PRECISION)
+
+    with SoftAssertions() as soft_failures:
+        StepCheck("Проверка полученного ТУ", "technologicalSection", soft_failures).actual(
+            leak_message.technologicalSection
+        ).expected(cfg.tu_name).equal_to()
+        if leak.technological_object:
+            StepCheck("Проверка имени ДУ", "technologicalObject", soft_failures).actual(
+                leak_message.technologicalObject
+            ).expected(leak.technological_object).equal_to()
+        else:
+            StepCheck("Проверка имени ДУ", "technologicalObject", soft_failures).actual(
+                leak_message.technologicalObject
+            ).is_not_none()
 
         StepCheck("Проверка координаты утечки", "leakCoordinate", soft_failures).actual(
             leak_coordinate_round
@@ -442,19 +497,21 @@ async def all_leaks_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imit
             [],
         )
 
-    StepCheck("Проверка наличия сообщения об утечке типа AllLeaksInfoContent", "leaksInfo").actual(
-        parsed_payload.replyContent.leaksInfo
-    ).is_not_empty()
+        StepCheck("Проверка наличия сообщения об утечке типа AllLeaksInfoContent", "leaksInfo").actual(
+            parsed_payload.replyContent.leaksInfo
+        ).is_not_empty()
 
     with allure.step("Обработка сообщения об утечке типа AllLeaksInfoContent"):
         leaks_info = parsed_payload.replyContent.leaksInfo
         # Если у утечки указано имя ДУ - ищем по нему, иначе берём первую
         if leak.diagnostic_area_name:
-            first_leak_info = t_utils.find_object_by_field(
-                leaks_info, "diagnosticAreaName", leak.diagnostic_area_name
-            )
+            first_leak_info = t_utils.find_object_by_field(leaks_info, "diagnosticAreaName", leak.diagnostic_area_name)
         else:
             first_leak_info = leaks_info[0]
+            StepCheck(
+                "Проверка: пришла хотя бы одна утечка",
+                "leakInfo",
+            ).actual(first_leak_info).is_not_none()
 
         # Конвертируем время обнаружения в московское время
         leak_detected_at = t_utils.ensure_moscow_timezone(first_leak_info.leakDetectedAt)
@@ -529,21 +586,23 @@ async def tu_leaks_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imita
             "subscribeTuLeaksInfoRequest",
             {'tuId': cfg.tu_id},
         )
-    parsed_payload = parser.parse_tu_leaks_info_msg(payload)
+        parsed_payload = parser.parse_tu_leaks_info_msg(payload)
 
-    StepCheck("Проверка наличия сообщения об утечке типа TuLeaksInfoContent", "leaksInfo").actual(
-        parsed_payload.replyContent.leaksInfo
-    ).is_not_empty()
+        StepCheck("Проверка наличия сообщения об утечке типа TuLeaksInfoContent", "leaksInfo").actual(
+            parsed_payload.replyContent.leaksInfo
+        ).is_not_empty()
 
     with allure.step("Обработка сообщения об утечке типа TuLeaksInfoContent"):
         tu_leaks_info_list = parsed_payload.replyContent.leaksInfo
         # Если у утечки указан controlledSiteId - ищем по нему, иначе берём первую
         if leak.control_site_id:
-            first_leak_info = t_utils.find_object_by_field(
-                tu_leaks_info_list, "controlledSiteId", leak.control_site_id
-            )
+            first_leak_info = t_utils.find_object_by_field(tu_leaks_info_list, "controlledSiteId", leak.control_site_id)
         else:
             first_leak_info = tu_leaks_info_list[0]
+            StepCheck(
+                "Проверка: пришла хотя бы одна утечка",
+                "tuLeakInfo",
+            ).actual(first_leak_info).is_not_none()
 
         # Конвертируем время обнаружения в московское время
         leak_detected_at = t_utils.ensure_moscow_timezone(first_leak_info.leakDetectedAt)
@@ -656,15 +715,13 @@ async def lds_status_during_leak(ws_client, cfg: SuiteConfig):
                 f"Проверка режима работы СОУ на соседнем ДУ, id ДУ: {status_config.out_neighbor_2_id}",
                 "ldsStatus",
                 soft_failures,
-            ).actual(out_neighbor_2_diagnostic_area.ldsStatus).expected(
-                status_config.out_neighbor_2_status
-            ).equal_to()
+            ).actual(out_neighbor_2_diagnostic_area.ldsStatus).expected(status_config.out_neighbor_2_status).equal_to()
 
 
 async def acknowledge_leak_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfig = None):
     """
     Проверка квитирования утечки.
-    
+
     Для multi-leak наборов: после квитирования проверяется что утечка удалена из списка.
     Для single-leak наборов: проверяется что список утечек пуст.
     """
@@ -684,19 +741,16 @@ async def acknowledge_leak_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfi
             ).is_not_empty()
 
             leaks_info = parsed_payload.replyContent.leaksInfo
-            
+
             # Для multi-leak ищем по control_site_id или diagnostic_area_name
             if leak and leak.control_site_id:
-                leak_to_ack = t_utils.find_object_by_field(
-                    leaks_info, "controlledSiteId", leak.control_site_id
-                )
-            elif leak and leak.diagnostic_area_name:
-                # Fallback: поиск по имени ДУ
-                leak_to_ack = t_utils.find_object_by_field(
-                    leaks_info, "diagnosticAreaName", leak.diagnostic_area_name
-                )
+                leak_to_ack = t_utils.find_object_by_field(leaks_info, "controlledSiteId", leak.control_site_id)
             else:
                 leak_to_ack = leaks_info[0]
+                StepCheck(
+                    "Проверка: пришла хотя бы одна утечка",
+                    "leakInfo",
+                ).actual(leak_to_ack).is_not_none()
 
             acknowledged_leak_id = leak_to_ack.id
 
@@ -727,14 +781,14 @@ async def acknowledge_leak_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfi
         remaining_leaks = parsed_payload.replyContent.leaksInfo
         remaining_leak_ids = [leak.id for leak in remaining_leaks] if remaining_leaks else []
 
-    StepCheck("Проверка кода ответа на запрос о квитировании", "replyStatus").actual(
-        acknowledge_reply_status
-    ).expected(ReplyStatus.OK.value).equal_to()
+    StepCheck("Проверка кода ответа на запрос о квитировании", "replyStatus").actual(acknowledge_reply_status).expected(
+        ReplyStatus.OK.value
+    ).equal_to()
 
     # Проверяем что квитированная утечка исчезла из списка
-    StepCheck(
-        "Проверка отсутствия квитированной утечки в списке AllLeaksInfo", "id"
-    ).does_not_contain(remaining_leak_ids, acknowledged_leak_id)
+    StepCheck("Проверка отсутствия квитированной утечки в списке AllLeaksInfo", "id").does_not_contain(
+        remaining_leak_ids, acknowledged_leak_id
+    )
 
 
 async def output_signals(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imitator_start_time):
@@ -756,27 +810,32 @@ async def output_signals(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imit
             },
         )
         parsed_payload = parser.parse_output_signals_msg(payload)
+        # Получение данных линейного участка утечки по id
         leak_linear_part = t_utils.find_object_by_field(
             parsed_payload.replyContent.linearPartSignals,
-            LEAK_LINEAR_PART_ID_KEY,
+            TestConst.LEAK_LINEAR_PART_ID_KEY,
             linear_part_id,
         )
 
         with allure.step("Получение типов выходных сигналов из обработанных данных"):
             leak_signals_list = leak_linear_part.signals
             ack_leak_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, ADDRESS_SUFFIX_ACK_LEAK
+                leak_signals_list, TestConst.ADDRESS_SUFFIX_ACK_LEAK
             )
-            leak_signal_type = t_utils.find_signal_type_by_address_suffix(leak_signals_list, ADDRESS_SUFFIX_LEAK)
-            mask_signal_type = t_utils.find_signal_type_by_address_suffix(leak_signals_list, ADDRESS_SUFFIX_MASK)
+            leak_signal_type = t_utils.find_signal_type_by_address_suffix(
+                leak_signals_list, TestConst.ADDRESS_SUFFIX_LEAK
+            )
+            mask_signal_type = t_utils.find_signal_type_by_address_suffix(
+                leak_signals_list, TestConst.ADDRESS_SUFFIX_MASK
+            )
             point_leak_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, ADDRESS_SUFFIX_POINT_LEAK
+                leak_signals_list, TestConst.ADDRESS_SUFFIX_POINT_LEAK
             )
             q_leak_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, ADDRESS_SUFFIX_Q_LEAK
+                leak_signals_list, TestConst.ADDRESS_SUFFIX_Q_LEAK
             )
             time_leak_signal_type = t_utils.find_signal_type_by_address_suffix(
-                leak_signals_list, ADDRESS_SUFFIX_TIME_LEAK
+                leak_signals_list, TestConst.ADDRESS_SUFFIX_TIME_LEAK
             )
 
     with allure.step(f"Получение данных выходных сигналов для линейного участка с id: {linear_part_id}"):
@@ -798,7 +857,7 @@ async def output_signals(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imit
             parsed_payload = parser.parse_output_signals_info_msg(payload)
             leak_linear_part = t_utils.find_object_by_field(
                 parsed_payload.replyContent.linearPartSignals,
-                LEAK_LINEAR_PART_ID_KEY,
+                TestConst.LEAK_LINEAR_PART_ID_KEY,
                 linear_part_id,
             )
 
@@ -809,9 +868,9 @@ async def output_signals(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imit
             mask_leak_value = t_utils.find_signal_val_by_signal_type(leak_signals_list, mask_signal_type)
             point_leak_value = t_utils.find_signal_val_by_signal_type(leak_signals_list, point_leak_signal_type)
             q_leak_leak_value = t_utils.find_signal_val_by_signal_type(leak_signals_list, q_leak_signal_type)
-            time_leak_value = t_utils.find_signal_val_by_signal_type(leak_signals_list, time_leak_signal_type)
+            time_leak_value = t_utils.find_signal_val_by_signal_type(leak_signals_list, time_leak_signal_type).strip()
 
-            StepCheck("Проверка наличия времени утечки", ADDRESS_SUFFIX_TIME_LEAK).actual(
+            StepCheck("Проверка наличия времени утечки", TestConst.ADDRESS_SUFFIX_TIME_LEAK).actual(
                 time_leak_value
             ).is_not_none()
 
@@ -826,19 +885,19 @@ async def output_signals(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imit
             point_leak_value_round = round(float(point_leak_value), cfg.precision)
 
     with SoftAssertions() as soft_failures:
-        StepCheck("Проверка сигнала квитирования утечки", ADDRESS_SUFFIX_ACK_LEAK, soft_failures).actual(
+        StepCheck("Проверка сигнала квитирования утечки", TestConst.ADDRESS_SUFFIX_ACK_LEAK, soft_failures).actual(
             ack_leak_value
-        ).expected(OUTPUT_IS_ACK_LEAK).equal_to()
+        ).expected(TestConst.OUTPUT_IS_ACK_LEAK).equal_to()
 
-        StepCheck("Проверка сигнала наличия утечки", ADDRESS_SUFFIX_LEAK, soft_failures).actual(
+        StepCheck("Проверка сигнала наличия утечки", TestConst.ADDRESS_SUFFIX_LEAK, soft_failures).actual(
             leak_value
-        ).expected(OUTPUT_IS_LEAK).equal_to()
+        ).expected(TestConst.OUTPUT_IS_LEAK).equal_to()
 
-        StepCheck("Проверка сигнала маскирования утечки", ADDRESS_SUFFIX_MASK, soft_failures).actual(
+        StepCheck("Проверка сигнала маскирования утечки", TestConst.ADDRESS_SUFFIX_MASK, soft_failures).actual(
             mask_leak_value
-        ).expected(OUTPUT_IS_NOT_MASK).equal_to()
+        ).expected(TestConst.OUTPUT_IS_NOT_MASK).equal_to()
 
-        StepCheck("Проверка сигнала координаты утечки", ADDRESS_SUFFIX_POINT_LEAK, soft_failures).actual(
+        StepCheck("Проверка сигнала координаты утечки", TestConst.ADDRESS_SUFFIX_POINT_LEAK, soft_failures).actual(
             point_leak_value_round
         ).is_close_to(
             leak.coordinate_meters,
@@ -846,7 +905,7 @@ async def output_signals(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imit
             f"значение допустимой погрешности координаты {cfg.allowed_distance_diff_meters}",
         )
 
-        StepCheck("Проверка сигнала объема утечки", ADDRESS_SUFFIX_Q_LEAK, soft_failures).actual(
+        StepCheck("Проверка сигнала объема утечки", TestConst.ADDRESS_SUFFIX_Q_LEAK, soft_failures).actual(
             q_leak_value_m3
         ).is_close_to(
             leak.volume_m3,
@@ -854,7 +913,6 @@ async def output_signals(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imit
             f"значение допустимой погрешности по объему {leak.allowed_volume_m3}",
         )
 
-        StepCheck("Проверка времени обнаружения утечки", ADDRESS_SUFFIX_TIME_LEAK, soft_failures).actual(
+        StepCheck("Проверка времени обнаружения утечки", TestConst.ADDRESS_SUFFIX_TIME_LEAK, soft_failures).actual(
             time_leak_value_datetime
         ).is_between(leak_wait_start_time, leak_wait_end_time)
-

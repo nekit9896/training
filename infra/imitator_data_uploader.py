@@ -24,14 +24,13 @@ class ImitatorDataUploader:
     uploader.delete_with_confirm() - для удаления данных на удаленном сервере
     """
 
-    def __init__(
-        self, stand_client: SubprocessClient, test_data_id: int, test_data_name: str, tu_id: int
-    ) -> None:
+    def __init__(self, stand_client: SubprocessClient, test_data_id: int, test_data_name: str, tu_id: int) -> None:
+
         self._username = stand_client.username
         self._host = stand_client.host
         self._test_data_id = test_data_id
         self._test_data_name = test_data_name
-        self._tu_id = tu_id  # ID технологического участка для получения tags.txt с сервера
+        self._tu_id = tu_id  # ID ТУ для получения tags.txt с сервера
         self._http_client = HttpClient()
         self._stand_client = stand_client
         self._path_generator = ImitatorDataPathGenerator(test_data_id)
@@ -64,7 +63,7 @@ class ImitatorDataUploader:
             raise ValueError("[DATA UPLOADER] [ERROR] При проверке архива на удаленном сервере")
         # 7. Распаковка архива
         self._subprocess_client.unpack_remote_package()
-        # 8. Копирование tags.txt с сервера во временную директорию
+        # 8. Копирование tags.txt с сервера во временную директорию текущего набора данных
         self._subprocess_client.copy_tags_from_server()
         # 9. Проверка данных
         if not self._subprocess_client.check_remote_unpack_data():
@@ -188,11 +187,8 @@ class UploadDataSubprocessClient:
         self._client.run_cmd(unpack_cmd, timeout=Im_const.LONG_PROCESS_TIMEOUT_S)
 
     def copy_tags_from_server(self) -> None:
-        """
-        Копирует tags.txt с сервера из /data/test/configs/tn{tu_id}_tags.txt
-        во временную директорию как tags.txt
-        """
-        source_path = f"{Im_const.TAGS_CONFIG_PATH}/tn{self._tu_id}_tags.txt"
+        """ """
+        source_path = f"{Im_const.CONFIG_PATH}/tn{self._tu_id}_tags.txt"
         copy_tags_cmd = self._cmd_generator.generate_copy_tags_cmd(self._tu_id)
         try:
             self._client.run_cmd(copy_tags_cmd)
@@ -200,8 +196,7 @@ class UploadDataSubprocessClient:
         except Exception as e:
             logging.error(f"[DATA UPLOADER] [ERROR] Не удалось скопировать {source_path}: {e}")
             raise RuntimeError(
-                f"Не удалось скопировать tags.txt с сервера. "
-                f"Проверьте наличие файла {source_path}"
+                f"Не удалось скопировать tags.txt с сервера. Проверьте наличие файла {source_path}"
             ) from e
 
     def is_remote_tar_valid(self) -> bool:
@@ -226,4 +221,3 @@ class UploadDataSubprocessClient:
         check_cmd = self._cmd_generator.generate_check_remote_data_cmd()
         result = self._client.run_cmd(check_cmd, need_output=True)
         return result == Im_const.CMD_STATUS_OK
-
