@@ -89,6 +89,7 @@ class StandSetupManager:
             logger.info("[SETUP] [OK] Подготовка стенда для запуска имитатора прошла успешно")
         except RuntimeError:
             logger.exception("[SETUP] [ERROR] Ошибка при подготовке стенда к запуску имитатора")
+            raise
 
     def start_imitator(self) -> None:
         """

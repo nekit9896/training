@@ -322,7 +322,7 @@ class ClickHouseCmdGenerator(BaseCmdGenerator):
         """
         sql_evo_id_pairs = self._generate_sql_evo_id_pairs(evo_id_pairs)
         return (
-            f"echo \'SELECT * FROM {CH_const.LAST_VALUE_TABLE_NAME} WHERE "
+            f"echo \'SELECT count() FROM {CH_const.LAST_VALUE_TABLE_NAME} WHERE "
             f"({CH_const.OBJECT_ID_KEY_NAME}, {CH_const.PARAMETER_ID_KEY_NAME}) IN ({sql_evo_id_pairs})\' "
             "| docker exec -i clickhouse clickhouse-client"
         )
