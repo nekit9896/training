@@ -123,6 +123,7 @@ LEAK_LEVEL_TEST_MAPPING = {
     'test_leak_info_in_journal': 'leak_info_in_journal',
     'test_acknowledge_leak_info': 'acknowledge_leak_test',
     'test_output_signals': 'output_signals_test',
+     'expected_leak_completed_status': "leak_completed_status_test",
 }
 
 

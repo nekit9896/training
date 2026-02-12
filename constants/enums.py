@@ -1,16 +1,27 @@
-from enum import Enum
+from enum import Enum, IntFlag
 
 
 class TU(Enum):
-    YAROSLAVL_MOSCOW = (1, "Ярославль - Москва")
-    TIKHORETSK_NOVOROSSIYSK_3 = (3, "Тихорецк-Новороссийск-3")
+    YAROSLAVL_MOSCOW = (1, "Ярославль - Москва", "volga.json")
+    TIKHORETSK_NOVOROSSIYSK_2 = (2, "Тихорецк-Новороссийск-2", "tn2.json")
+    TIKHORETSK_NOVOROSSIYSK_3 = (3, "Тихорецк-Новороссийск-3", "tn3.json")
+    RODIONOVSKAYA_TIKHORETSKAYA = (4, "Родионовская–Тихорецкая", "lt3_rt.json")
+    TIKHORETSKAYA_GRUSHEVAYA = (5, "Тихорецкая-6-Грушовая", "tn4_t6g.json")
 
-    def __init__(self, tu_id: int, description: str) -> None:
+    def __init__(self, tu_id: int, description: str, file_name: str) -> None:
         self.id = tu_id
         self.description = description
+        self.file_name = file_name
 
     def __str__(self):
         return f"{self.id} - {self.description}"
+
+    @classmethod
+    def get_file_name_by_id(cls, target_id: int) -> str:
+        for item in cls:
+            if item.id == target_id:
+                return item.file_name
+        raise ValueError(f"ТУ с id = {target_id} не найден")
 
 
 class ReplyStatus(Enum):
@@ -38,7 +49,7 @@ class StationaryStatus(Enum):
 
 
 class LeakStatus(Enum):
-    CONFIRMED = 1
+    CONFIRMED = 1  # Подтверждена
     WAITING = 2
     POSSIBLE = 3
 
@@ -89,6 +100,15 @@ class SortingType(Enum):
     DESCENDING = "descending"
 
 
+class Direction(Enum):
+    """Направление прокрутки"""
+
+    PREV = 1
+    NEXT = 2
+    FIRST = 3
+    LAST = 4
+
+
 class LdsStatus(Enum):
     FAULTY = 1  # Неисправность
     INITIALIZATION = 2  # Инициализация
@@ -96,15 +116,39 @@ class LdsStatus(Enum):
     SERVICEABLE = 4  # Исправность
 
 
-class ReservedType(Enum):
-    """Тип источника события (алгоритм обнаружения утечки)"""
-    UNSTATIONARY_FLOW = 1  # Нестационарный поток
-    WAVE_DETECTION = 2  # Волновой метод
-    STATIONARY_BALANCE = 3  # Стационарный баланс
-
-
 class ConfirmationStatus(Enum):
-    """Статус подтверждения утечки"""
-    CONFIRMED = 1  # Подтверждена
-    WAITING = 2  # Ожидание подтверждения
-    POSSIBLE = 3  # Возможная
+    FAULTY = 0  # Неисправность
+    AWAITING = 1  # Предварительная
+    NOT_CONFIRMED = 2  # Не подтверждена
+    CONFIRMED = 3  # Подтверждена
+    CONFIRMED_AND_LEAK_CLOSED = 4  # Завершена
+
+
+class ReservedType(Enum):
+    FAULTY = 0  # Неисправность
+    STOP = 1  # Дифференциальный
+    STATIONARY_FLOW = 2  # Стационарный
+    UNSTATIONARY_FLOW = 3  # Модельный
+    BALANCE_IN_NPS = 4  # Баланс внутри НПС
+    CHANGED_IN_DECISION_MAKING = 5  # Стационарный + Изменено в АПР
+    CREATED_IN_DECISION_MAKING = 6  # Создано в АПР
+
+
+class MessageType(IntFlag):
+    AUTHENTICATION = 1  # Вход в систему
+    REJECTION = 1 << 2  # Отбраковка сигналов
+    LDS_STATUS = 1 << 3  # Режим работы СОУ
+    INPUT_SIGNALS = 1 << 6  # Входные сигналы
+    PUMPING_STATUS = 1 << 7  # Режим работы МТ
+    MASKING_LDS = 1 << 8  # Маскирование СОУ
+    FREE_FLOWS = 1 << 9  # Самотечное течение
+    LEAKS = 1 << 10  # Утечка
+
+
+class MessagePriority(IntFlag):
+    LOW = 1  # Прочее
+    COMMON = 1 << 1  # Информационное
+    MEDIUM = 1 << 2  # Значительное
+    HIGH = 1 << 3  # Важное
+    VERY_HIGH = 1 << 4  # Особой важности
+    

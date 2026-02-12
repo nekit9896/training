@@ -305,6 +305,30 @@ class TestLeakScenarios:
         await scenarios.leaks_content(ws_client, config, leak, imitator_start_time)
 
     @pytest.mark.asyncio
+    async def test_leaks_content_end(
+        self,
+        ws_client: WebSocketClient,
+        config: SuiteConfig,
+        leak: LeakTestConfig,
+        leak_number: int,
+        imitator_start_time: datetime,
+    ) -> None:
+        """[LeaksContent] Проверка сообщения об утечке в таблице КГ"""
+        tag = "LeaksContent"
+        title = f"[{tag}] Проверка сообщения о завершенной утечке. ЭФ: КГ.Табличное представление"
+        description = (
+            f"Проверка сообщения об утечке в таблице КГ на наборе данных {config.suite_name}, \n"
+            f"на технологическом участке {config.technological_unit.description}\n"
+            f"Время проведения проверки: {leak.leaks_content_test.offset} мин.\n"
+            "Подписка на сообщения типа: LeaksContent\n"
+        )
+        _apply_allure_markers(leak.leaks_content_test, tag, title, description)
+        # Добавляем номер утечки в title для multi-leak
+        if config.has_multiple_leaks:
+            allure.dynamic.title(f"{title} (утечка #{leak_number})")
+        await scenarios.leaks_content(ws_client, config, leak, imitator_start_time)
+
+    @pytest.mark.asyncio
     async def test_leak_info_in_journal(
         self,
         ws_client: WebSocketClient,

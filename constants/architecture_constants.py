@@ -54,13 +54,18 @@ class ImitatorConstants:
 
 
 class ClickhouseConstants(ImitatorConstants):
-    TN_3_JSON_FILE_NAME: str = "tn3.json"
     LAST_VALUE_TABLE_NAME: str = "lds.records_lastvalue"
     EVO_OBJECT_ID_KEY_NAME: str = "evoObjectId"
     EVO_PARAMETER_ID_KEY_NAME: str = "evoParameterId"
     OBJECT_ID_KEY_NAME: str = "objectId"
     PARAMETER_ID_KEY_NAME: str = "parameterId"
     EVO_ID_PAIRS_CHUNK_SIZE: int = 450
+
+
+class MockConstants:
+    MOCK_DURATION: int = 60
+    MOCK_TEST_DATA_ID: int = 1
+    MOCK_TEST_DATA_NAME: str = "mock.tar.gz"
 
 
 class DockerConstants:

@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 from clients.subprocess_client import SubprocessClient
 from constants.architecture_constants import EnvKeyConstants
 from constants.architecture_constants import ImitatorConstants as Im_const
+from constants.enums import TU
 from infra.clickhouse_manager import ClickHouseManager
 from infra.cmd_generator import ImitatorCmdGenerator
 from infra.docker_manager import DockerContainerManager
@@ -46,6 +47,7 @@ class StandSetupManager:
         self._tu_id = tu_id
         self._username = username
         self._stand_name = stand_name
+        self._configuration_file_name = self._get_configuration_file_name()
         self._server_ip = self._get_server_ip()  # Получает ip сервера из словаря
         self._init_clients()
         self._cmd_generator = self._choose_cmd_generator()
@@ -64,32 +66,53 @@ class StandSetupManager:
         return self._cmd_generator.start_time
 
     def setup_stand_for_imitator_run(self) -> None:
+        """
+        Обертка, в которой проходит полная подготовка стенда
+        """
         try:
-            # Копирование файла конфигурации на runner
-            self._clickhouse_manager.copy_configuration_file_from_stand()
             if not os.environ.get("RUN_WITHOUT_TESTOPS", "False").lower() == "true":
                 # При запуске с TestOps загружает данные для прогона
                 self._uploader.upload_with_confirm()
-            # Остановка всех контейнеров lds
-            self._docker_manager.stop_all_lds_containers()
-            # Чистка ключей Redis
-            self._redis_cleaner.delete_keys_with_check()
-            # Чистка ключей ClickHouse
-            self._clickhouse_manager.delete_clickhouse_keys_with_check()
-            # Запуск lds-layer-builder
-            self._docker_manager.start_lds_layer_builder_containers()
-            # Запуск lds-journals
-            self._docker_manager.start_lds_journals_containers()
-            # Запуск lds-web-app
-            self._docker_manager.start_lds_web_app_containers()
-            # Запуск lds-api-gw
-            self._docker_manager.start_lds_api_gw_containers()
-            # Запуск lds-reports
-            self._docker_manager.start_lds_reports_containers()
-            logger.info("[SETUP] [OK] Подготовка стенда для запуска имитатора прошла успешно")
-        except RuntimeError:
-            logger.exception("[SETUP] [ERROR] Ошибка при подготовке стенда к запуску имитатора")
-            raise
+
+            self.stop_all_containers()
+            self.clean_redis_and_clickhouse()
+            self.start_containers_without_core()
+        except Exception as error:
+            error_msg = "[SETUP] [ERROR] Ошибка подготовки стенда к запуску имитатора"
+            logger.exception(error_msg)
+            raise RuntimeError(error_msg) from error
+
+    def clean_redis_and_clickhouse(self):
+        """
+        Чистит БД: Clickhouse и Redis
+        """
+        # Копирование файла конфигурации на runner
+        self._clickhouse_manager.copy_configuration_file_from_stand()
+        # Чистка ключей Redis
+        self._redis_cleaner.delete_keys_with_check()
+        # Чистка ключей ClickHouse
+        self._clickhouse_manager.delete_clickhouse_keys_with_check()
+
+    def stop_all_containers(self):
+        """
+        Останавливает все контейнеры и чистит БД: Clickhouse и Redis
+        """
+        self._docker_manager.stop_all_lds_containers()
+
+    def start_containers_without_core(self):
+        """
+        Запускает все контейнеры кроме core
+        """
+        # Запуск lds-layer-builder
+        self._docker_manager.start_lds_layer_builder_containers()
+        # Запуск lds-journals
+        self._docker_manager.start_lds_journals_containers()
+        # Запуск lds-web-app
+        self._docker_manager.start_lds_web_app_containers()
+        # Запуск lds-api-gw
+        self._docker_manager.start_lds_api_gw_containers()
+        # Запуск lds-reports
+        self._docker_manager.start_lds_reports_containers()
 
     def start_imitator(self) -> None:
         """
@@ -98,18 +121,22 @@ class StandSetupManager:
         try:
             self._imitator_manager.run_imitator()
             self._imitator_manager.log_imitator_stdout()
-        except RuntimeError:
-            logger.exception("[SETUP] [ERROR] Ошибка запуска имитатора")
+        except Exception as error:
+            error_msg = "[SETUP] [ERROR] Ошибка запуска имитатора"
+            logger.exception(error_msg)
+            raise RuntimeError(error_msg) from error
 
     def start_core(self) -> None:
         """
-        Запускает core сервисы
+        Запускает core контейнеры
         """
         try:
             # Запуск CORE
             self._docker_manager.start_lds_core_containers()
-        except RuntimeError:
-            logger.exception("[SETUP] [ERROR] Ошибка запуска CORE")
+        except Exception as error:
+            error_msg = "[SETUP] [ERROR] Ошибка запуска CORE"
+            logger.exception(error_msg)
+            raise RuntimeError(error_msg) from error
 
     def stop_imitator_wrapper(self) -> None:
         """
@@ -121,8 +148,10 @@ class StandSetupManager:
                 return
             self._imitator_manager.wait_and_stop_imitator()
             logger.info("[TEARDOWN] [OK] Имитатор остановлен")
-        except Exception:
-            logger.exception("[TEARDOWN] [ERROR] Не удалось остановить имитатор")
+        except Exception as error:
+            error_msg = "[TEARDOWN] [ERROR] Не удалось остановить имитатор"
+            logger.exception(error_msg)
+            raise RuntimeError(error_msg) from error
 
     def server_test_data_remover(self):
         """
@@ -134,8 +163,10 @@ class StandSetupManager:
             return
         try:
             uploader.delete_with_confirm()
-        except RuntimeError:
-            logger.exception("[TEARDOWN] [ERROR] Не удалось удалить данные с сервера")
+        except Exception as error:
+            error_msg = "[TEARDOWN] [ERROR] Не удалось удалить данные с сервера"
+            logger.exception(error_msg)
+            raise RuntimeError(error_msg) from error
 
     @staticmethod
     def _parse_opc_target() -> tuple[str, int]:
@@ -144,11 +175,13 @@ class StandSetupManager:
         """
         opc_url = os.environ.get(EnvKeyConstants.OPC_URL)
         if not opc_url:
-            raise RuntimeError(f"Переменная окружения {EnvKeyConstants.OPC_URL} не задана")
+            raise RuntimeError(f"[SETUP] [ERROR] Переменная окружения {EnvKeyConstants.OPC_URL} не задана")
 
         parsed = urlparse(opc_url)
         if not parsed.hostname or not parsed.port:
-            raise RuntimeError(f"Некорректное значение OPC_URL: '{opc_url}'. Ожидается формат вида opc.tcp://host:port")
+            raise RuntimeError(
+                f"[SETUP] [ERROR] Некорректное значение OPC_URL: '{opc_url}'. Ожидается формат вида opc.tcp://host:port"
+            )
 
         return parsed.hostname, parsed.port
 
@@ -163,7 +196,7 @@ class StandSetupManager:
         )
         result = self._stand_client.run_cmd(check_cmd, need_output=True)
         if result != Im_const.CMD_STATUS_OK:
-            raise RuntimeError(f"OPC сервер {host}:{port} недоступен с сервера стенда")
+            raise RuntimeError(f"[SETUP] [ERROR] OPC сервер {host}:{port} недоступен с сервера стенда")
 
         logger.info(f"[SETUP] [OK] OPC сервер {host}:{port} доступен")
 
@@ -175,30 +208,49 @@ class StandSetupManager:
         try:
             return Im_const.HOST_MAP.get(self._stand_name, {}).get(Im_const.SERVER_IP_KEY_NAME)
 
-        except KeyError:
-            logger.exception(f"[ERROR] Не удалось получить server ip для стенда: {self._stand_name}")
-            raise
+        except Exception as error:
+            error_msg = f"[SETUP] [ERROR] Не удалось получить server ip для стенда: {self._stand_name}"
+            logger.exception(error_msg)
+            raise ValueError(error_msg) from error
+
+    def _get_configuration_file_name(self) -> str:
+        """
+        Получает имя файла конфигурации
+        """
+        return TU.get_file_name_by_id(self._tu_id)
 
     def _choose_cmd_generator(self) -> ImitatorCmdGenerator:
         """
         Выбирает вариант генерации команды запуска имитатора, в зависимости от типа запуска
         """
-        if os.environ.get("RUN_WITHOUT_TESTOPS", "False").lower() == "true":
-            # Запуск без TestOps
-            return ImitatorCmdGenerator(self._test_data_name, self._stand_name, self._duration_m)
-        else:
-            self._uploader = ImitatorDataUploader(
-                self._stand_client, self._test_data_id, self._test_data_name, self._tu_id
-            )
-            self._data_path = self._uploader.remote_temp_dir_path
-            return ImitatorCmdGenerator(self._data_path, self._stand_name, self._duration_m)
+        try:
+            if os.environ.get("RUN_WITHOUT_TESTOPS", "False").lower() == "true":
+                # Запуск без TestOps
+                return ImitatorCmdGenerator(self._test_data_name, self._stand_name, self._duration_m)
+            else:
+                self._uploader = ImitatorDataUploader(
+                    self._stand_client, self._test_data_id, self._test_data_name, self._tu_id
+                )
+                self._data_path = self._uploader.remote_temp_dir_path
+                return ImitatorCmdGenerator(self._data_path, self._stand_name, self._duration_m)
+        except Exception as error:
+            error_msg = "[SETUP] [ERROR] Ошибка при выборе варианта генерации команды запуска имитатора"
+            logger.exception(error_msg)
+            raise RuntimeError(error_msg) from error
 
     def _init_clients(self) -> None:
         """
         Создает экземпляры необходимых для запуска клиентов
         """
-        self._stand_client = SubprocessClient(self._username, self._server_ip)
-        self._infra_client = SubprocessClient(self._username, Im_const.REDIS_STAND_ADDRESS)
-        self._clickhouse_manager = ClickHouseManager(self._stand_client, self._infra_client)
-        self._docker_manager = DockerContainerManager(self._stand_client)
-        self._redis_cleaner = RedisCleaner(self._infra_client, self._stand_name)
+        try:
+            self._stand_client = SubprocessClient(self._username, self._server_ip)
+            self._infra_client = SubprocessClient(self._username, Im_const.REDIS_STAND_ADDRESS)
+            self._clickhouse_manager = ClickHouseManager(
+                self._stand_client, self._infra_client, self._configuration_file_name
+            )
+            self._docker_manager = DockerContainerManager(self._stand_client)
+            self._redis_cleaner = RedisCleaner(self._infra_client, self._stand_name)
+        except Exception as error:
+            error_msg = "[SETUP] [ERROR] Ошибка инициализации клиентов"
+            logger.exception(error_msg)
+            raise RuntimeError(error_msg) from error
