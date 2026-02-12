@@ -916,3 +916,37 @@ async def output_signals(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imit
         StepCheck("Проверка времени обнаружения утечки", TestConst.ADDRESS_SUFFIX_TIME_LEAK, soft_failures).actual(
             time_leak_value_datetime
         ).is_between(leak_wait_start_time, leak_wait_end_time)
+
+
+async def leaks_content_end(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imitator_start_time):
+    """
+    Проверка завершенной утечки через сообщение LeaksContent.
+    Проверяется только confirmationStatus на значения confirmed и closed.
+    """
+    with allure.step("Подключение по ws и получение сообщения об утечке типа: LeaksContent"):
+        payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "LeaksContent",
+            "SubscribeLeaksRequest",
+            {'tuId': cfg.tu_id},
+        )
+        parsed_payload = parser.parse_leaks_content_msg(payload)
+        leaks_list_info = parsed_payload.replyContent.leaksListInfo
+
+        # Ищем утечку по имени ДУ или берём первую
+        if leak.diagnostic_area_name:
+            first_leak_info = t_utils.find_object_by_field(
+                leaks_list_info, "diagnosticAreaName", leak.diagnostic_area_name
+            )
+        else:
+            first_leak_info = leaks_list_info[0]
+            StepCheck(
+                "Проверка: пришла хотя бы одна утечка",
+                "leak",
+            ).actual(first_leak_info).is_not_none()
+
+    with SoftAssertions() as soft_failures:
+        # Проверка confirmationStatus
+        StepCheck(
+            "Проверка статуса утечки: должен быть подтверждена и завершена", "confirmationStatus", soft_failures
+        ).actual(first_leak_info.confirmationStatus).expected(leak.expected_leak_completed_status).equal_to()

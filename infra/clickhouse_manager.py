@@ -1,5 +1,6 @@
 import json
 import logging
+from pathlib import Path
 from typing import Any, List, Optional
 
 from clients.subprocess_client import SubprocessClient
@@ -22,7 +23,7 @@ class ClickHouseManager:
         self,
         stand_client: SubprocessClient,
         infra_client: SubprocessClient,
-        configuration_file_name: str = CH_const.TN_3_JSON_FILE_NAME,
+        configuration_file_name: str,
     ) -> None:
         self._stand_client = stand_client
         self._infra_client = infra_client
@@ -38,14 +39,16 @@ class ClickHouseManager:
         Копирует файл конфигурации со стенда в корень проекта
         """
         copy_cmd = self._cmd_generator.generate_scp_config_file_cmd()
-        try:
-            self._stand_client.run_cmd(copy_cmd, timeout=CH_const.LONG_PROCESS_TIMEOUT_S, use_ssh=False)
-            logger.info(f"[CLICKHOUSE] [OK] файл: {self._configuration_file_name} успешно сохранен на runner")
+        configuration_file_path = Path(self._configuration_file_name)
+        if not configuration_file_path.exists():
+            try:
+                self._stand_client.run_cmd(copy_cmd, timeout=CH_const.LONG_PROCESS_TIMEOUT_S, use_ssh=False)
+                logger.info(f"[CLICKHOUSE] [OK] файл: {self._configuration_file_name} успешно сохранен на runner")
 
-        except Exception as error:
-            error_msg = f"[CLICKHOUSE] [ERROR] При сохранении файла: {self._configuration_file_name} на runner"
-            logger.exception(error_msg)
-            raise RuntimeError(error_msg) from error
+            except Exception as error:
+                error_msg = f"[CLICKHOUSE] [ERROR] При сохранении файла: {self._configuration_file_name} на runner"
+                logger.exception(error_msg)
+                raise RuntimeError(error_msg) from error
 
     def delete_clickhouse_keys_with_check(self) -> None:
         """
