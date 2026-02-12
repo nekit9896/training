@@ -13,6 +13,7 @@ __all__ = [
     scenarios.journal_info,
     scenarios.lds_status_initialization,
     scenarios.main_page_info,
+    scenarios.main_page_info_signals,
     scenarios.mask_signal_msg,
     scenarios.lds_status_initialization_out,
     scenarios.all_leaks_info,

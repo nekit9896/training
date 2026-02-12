@@ -9,11 +9,12 @@
 Принцип: один файл конфига select_xx.py в папке datasets = один набор данных.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Optional
 
 from constants.enums import TU, ConfirmationStatus, LdsStatus, ReservedType, StationaryStatus
 from constants.test_constants import BaseTN3Constants
+from models.subscribe_main_page_signals_info_model import SignalsInfo
 
 
 @dataclass
@@ -79,11 +80,9 @@ class LeakTestConfig:
     expected_stationary_status: int = StationaryStatus.UNSTATIONARY.value
     expected_algorithm_type: int = ReservedType.UNSTATIONARY_FLOW.value
     expected_leak_status: int = ConfirmationStatus.CONFIRMED.value
-    expected_leak_completed_status: int = ConfirmationStatus.CONFIRMED_AND_LEAK_CLOSED.value
 
     # ===== Тест-кейсы для этой утечки =====
     leaks_content_test: Optional[CaseMarkers] = None
-    leaks_content_end_test: Optional[CaseMarkers] = None
     all_leaks_info_test: Optional[CaseMarkers] = None
     tu_leaks_info_test: Optional[CaseMarkers] = None
     leak_info_in_journal: Optional[CaseMarkers] = None
@@ -136,12 +135,14 @@ class SuiteConfig:
 
     # ===== Ожидаемый статус стационара (для main_page_info) =====
     expected_stationary_status: int = StationaryStatus.STATIONARY.value
+    expected_main_page_signals: dict = field(default_factory=lambda: asdict(SignalsInfo()))
 
     # ===== Базовые тесты =====
     basic_info_test: Optional[CaseMarkers] = None
     journal_info_test: Optional[CaseMarkers] = None
     lds_status_initialization_test: Optional[CaseMarkers] = None
     main_page_info_test: Optional[CaseMarkers] = None
+    main_page_info_signals_test: Optional[CaseMarkers] = None
     mask_signal_test: Optional[CaseMarkers] = None
     lds_status_initialization_out_test: Optional[CaseMarkers] = None
     lds_status_during_leak_test: Optional[CaseMarkers] = None
@@ -192,4 +193,3 @@ class SuiteConfig:
     def allowed_volume_diff(self) -> float:
         """Относительная погрешность по объёму"""
         return BaseTN3Constants.ALLOWED_VOLUME_DIFF
-        

@@ -109,6 +109,7 @@ SUITE_LEVEL_TEST_MAPPING = {
     'test_journal_info': 'journal_info_test',
     'test_lds_status_initialization': 'lds_status_initialization_test',
     'test_main_page_info': 'main_page_info_test',
+    'test_main_page_info_signals': 'main_page_info_signals_test',
     'test_mask_signal_msg': 'mask_signal_test',
     'test_lds_status_initialization_out': 'lds_status_initialization_out_test',
     'test_main_page_info_unstationary': 'main_page_info_unstationary_test',
