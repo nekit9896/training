@@ -177,7 +177,7 @@ class TestSuiteScenarios:
         description = (
             f"Проверка счетчиков состояния сигналов на данных {config.suite_name}, \n"
             f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: {config.main_page_info_test.offset} мин.\n"
+            f"Время проведения проверки: {config.main_page_info_signals_test.offset} мин.\n"
             "Подписка на сообщения типа: MainPageSignalsInfo\n"
         )
         _apply_allure_markers(config.main_page_info_signals_test, tag, title, description)
@@ -237,23 +237,6 @@ class TestSuiteScenarios:
         _apply_allure_markers(config.main_page_info_unstationary_test, tag, title, description)
         await scenarios.main_page_info_unstationary(ws_client, config)
 
-    @pytest.mark.asyncio
-    async def test_lds_status_during_leak(self, ws_client: WebSocketClient, config: SuiteConfig) -> None:
-        """[CommonScheme] Проверка режима работы СОУ во время утечки"""
-        tag = "CommonScheme"
-        title = f"[{tag}] Проверка режима работы СОУ во время утечки. ЭФ: Схема"
-        description = (
-            f"Проверка режима работы СОУ во время утечки наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: {config.lds_status_during_leak_test.offset} мин.\n"
-            "Подписка на сообщения типа: CommonScheme\n"
-            "Примечание: проверка режимов СОУ во время утечки должна выполняться раньше теста на квитирование\n"
-            "В рамках данного теста проверяется режим СОУ на ДУ с утечкой и на соседних ДУ"
-        )
-        _apply_allure_markers(config.lds_status_during_leak_test, tag, title, description)
-        await scenarios.lds_status_during_leak(ws_client, config)
-
-
 # ===== ТЕСТЫ УРОВНЯ УТЕЧКИ =====
 # Запускаются для каждой утечки в конфиге
 
@@ -293,6 +276,30 @@ class TestLeakScenarios:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.all_leaks_info(ws_client, config, leak, imitator_start_time)
 
+    @pytest.mark.asyncio
+    async def test_lds_status_during_leak(
+        self,
+        ws_client: WebSocketClient,
+        config: SuiteConfig,
+        leak: LeakTestConfig,
+        leak_number: int,
+    ) -> None:
+        """[CommonScheme] Проверка режима работы СОУ во время утечки"""
+        tag = "CommonScheme"
+        title = f"[{tag}] Проверка режима работы СОУ во время утечки. ЭФ: Схема"
+        description = (
+            f"Проверка режима работы СОУ во время утечки на наборе данных {config.suite_name}, \n"
+            f"на технологическом участке {config.technological_unit.description}\n"
+            f"Время проведения проверки: {leak.lds_status_during_leak_test.offset} мин.\n"
+            "Подписка на сообщения типа: CommonScheme\n"
+            "Примечание: проверка режимов СОУ во время утечки должна выполняться раньше теста на квитирование\n"
+            "В рамках данного теста проверяется режим СОУ на ДУ с утечкой и на соседних ДУ"
+        )
+        _apply_allure_markers(leak.lds_status_during_leak_test, tag, title, description)
+        if config.has_multiple_leaks:
+            allure.dynamic.title(f"{title} (утечка #{leak_number})")
+        await scenarios.lds_status_during_leak(ws_client, config, leak)
+        
     @pytest.mark.asyncio
     async def test_leaks_content(
         self,
