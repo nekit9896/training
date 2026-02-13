@@ -168,6 +168,22 @@ class TestSuiteScenarios:
         _apply_allure_markers(config.main_page_info_test, tag, title, description)
         await scenarios.main_page_info(ws_client, config)
 
+
+    @pytest.mark.asyncio
+    async def test_main_page_info_signals(self, ws_client: WebSocketClient, config: SuiteConfig) -> None:
+        """[MainPageSignalsInfo] Проверка счетчиков состояния сигналов"""
+        tag = "MainPageSignalsInfo"
+        title = f"[{tag}] Проверка счетчиков состояния сигналов. ЭФ: Главная страница.Контент таблица по ТУ"
+        description = (
+            f"Проверка счетчиков состояния сигналов на данных {config.suite_name}, \n"
+            f"на технологическом участке {config.technological_unit.description}\n"
+            f"Время проведения проверки: {config.main_page_info_test.offset} мин.\n"
+            "Подписка на сообщения типа: MainPageSignalsInfo\n"
+        )
+        _apply_allure_markers(config.main_page_info_signals_test, tag, title, description)
+        await scenarios.main_page_info_signals(ws_client, config)
+
+        
     @pytest.mark.asyncio
     async def test_mask_signal_msg(self, ws_client: WebSocketClient, config: SuiteConfig) -> None:
         """[MaskSignal] Проверка маскирования датчиков"""

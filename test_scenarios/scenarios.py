@@ -137,6 +137,48 @@ async def main_page_info(ws_client, cfg: SuiteConfig):
         ).expected(cfg.expected_stationary_status).equal_to()
 
 
+async def main_page_info_signals(ws_client, cfg: SuiteConfig):
+    """
+    Проверка счетчиков состояния сигналов
+    """
+    with allure.step("Подключение по ws, получение и обработка сообщения типа: MainPageSignalsInfoContent"):
+        payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "MainPageSignalsInfoContent",
+            "subscribeMainPageSignalsInfoRequest",
+            {'tuIds': [cfg.tu_id], 'additionalProperties': None},
+        )
+        parsed_payload = parser.parse_main_page_signals_msg(payload)
+    with SoftAssertions() as soft_failures:
+        StepCheck("Проверка id полученного ТУ", "tu_id", soft_failures).actual(
+            parsed_payload.replyContent.tuId
+        ).expected(cfg.tu_id).equal_to()
+        field_name = "numberOfRejectedSignals"
+        StepCheck(
+            f"Проверка количества отбракованных сигналов ТУ {cfg.tu_name}",
+            field_name,
+            soft_failures,
+        ).actual(
+            parsed_payload.replyContent.signalsInfo.numberOfRejectedSignals
+        ).expected(cfg.expected_stationary_status).equal_to(cfg.expected_main_page_signals[field_name])
+        field_name = "numberOfMaskedSignals"
+        StepCheck(
+            f"Проверка количества маскированных сигналов ТУ {cfg.tu_name}",
+            field_name,
+            soft_failures,
+        ).actual(
+            parsed_payload.replyContent.signalsInfo.numberOfMaskedSignals
+        ).expected(cfg.expected_stationary_status).equal_to(cfg.expected_main_page_signals[field_name])
+        field_name = "numberOfImitatedSignals"
+        StepCheck(
+            f"Проверка количества имитированных сигналов ТУ {cfg.tu_name}",
+            field_name,
+            soft_failures,
+        ).actual(
+            parsed_payload.replyContent.signalsInfo.numberOfImitatedSignals
+        ).expected(cfg.expected_stationary_status).equal_to(cfg.expected_main_page_signals[field_name])
+
+
 async def main_page_info_unstationary(ws_client, cfg: SuiteConfig):
     """
     Проверка установки режима Нестационар (для наборов с несколькими утечками).

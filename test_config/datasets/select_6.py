@@ -7,7 +7,10 @@
 - Объём утечки 113.6 м³
 """
 
+from dataclasses import asdict
+
 from constants.enums import TU, ConfirmationStatus, LdsStatus, ReservedType, StationaryStatus
+from models.subscribe_main_page_signals_info_model import SignalsInfo
 from test_config.models_for_tests import CaseMarkers, DiagnosticAreaStatusConfig, LeakTestConfig, SuiteConfig
 
 # ===== Константы набора =====
@@ -34,6 +37,8 @@ OUT_NEIGHBOR_DIAGNOSTIC_AREA_ID = 3
 # ID линейного участка
 LINEAR_PART_ID = 407
 
+# ===== Значения сигналов для main page signals =====
+MAIN_PAGE_SIGNALS = asdict(SignalsInfo(numberOfRejectedSignals=10))
 
 # ===== Конфигурация набора =====
 SELECT_6_CONFIG = SuiteConfig(
@@ -44,11 +49,13 @@ SELECT_6_CONFIG = SuiteConfig(
     technological_unit=TECHNOLOGICAL_UNIT,
     # ===== Ожидаемый статус стационара =====
     expected_stationary_status=StationaryStatus.STATIONARY.value,
+    expected_main_page_signals=MAIN_PAGE_SIGNALS,
     # ===== БАЗОВЫЕ ТЕСТЫ =====
     basic_info_test=CaseMarkers(test_case_id="1", offset=5),
     journal_info_test=CaseMarkers(test_case_id="2", offset=5),
     lds_status_initialization_test=CaseMarkers(test_case_id="29", offset=5),
     main_page_info_test=CaseMarkers(test_case_id="3", offset=7),
+    main_page_info_signals_test=CaseMarkers(test_case_id="120", offset=7),
     mask_signal_test=CaseMarkers(test_case_id="32", offset=8),
     lds_status_initialization_out_test=CaseMarkers(test_case_id="30", offset=30),
     lds_status_during_leak_test=CaseMarkers(test_case_id="31", offset=59.5),
@@ -82,7 +89,7 @@ SELECT_6_CONFIG = SuiteConfig(
         # ----- Тест LeaksContent -----
         leaks_content_test=CaseMarkers(test_case_id="97", offset=59),
         # ----- Тест MessageInfo -----
-        leak_info_in_journal=CaseMarkers(test_case_id="97", offset=59),
+        leak_info_in_journal=CaseMarkers(test_case_id="119", offset=59),
         # ----- Тест TuLeaksInfo -----
         tu_leaks_info_test=CaseMarkers(test_case_id="5", offset=59),
         # ----- Тест AcknowledgeLeak -----
