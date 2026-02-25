@@ -103,8 +103,8 @@ def pytest_runtest_makereport(item, call):
 # ===== Маппинг имён тестов на атрибуты конфига для получения маркеров =====
 # Используется для добавления offset и test_case_id маркеров во время сбора тестов
 
-# Тесты уровня набора (маркеры из SmokeSuiteConfig)
-SUITE_LEVEL_TEST_MAPPING = {
+# Smoke-тесты уровня набора (маркеры из SmokeSuiteConfig)
+SMOKE_SUITE_LEVEL_MAPPING = {
     'test_basic_info': 'basic_info_test',
     'test_journal_info': 'journal_info_test',
     'test_lds_status_initialization': 'lds_status_initialization_test',
@@ -114,6 +114,15 @@ SUITE_LEVEL_TEST_MAPPING = {
     'test_lds_status_initialization_out': 'lds_status_initialization_out_test',
     'test_main_page_info_unstationary': 'main_page_info_unstationary_test',
 }
+
+# Regress-тесты режимов СОУ (маркеры из LDSStatusConfig)
+LDS_STATUS_SUITE_LEVEL_MAPPING = {
+    'test_basic_info_mode_sou': 'basic_info_test',
+    'test_lds_status_initialization_mode_sou': 'lds_status_initialization_test',
+}
+
+# Объединённый маппинг для логики conftest
+SUITE_LEVEL_TEST_MAPPING = {**SMOKE_SUITE_LEVEL_MAPPING, **LDS_STATUS_SUITE_LEVEL_MAPPING}
 
 # Тесты уровня утечки (маркеры из LeakTestConfig - параметр leak)
 LEAK_LEVEL_TEST_MAPPING = {

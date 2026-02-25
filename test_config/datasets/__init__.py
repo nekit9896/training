@@ -78,8 +78,7 @@ ALL_CONFIGS = ALL_SMOKE_CONFIGS
 
 def get_config_by_name(name: str) -> BaseSuiteConfig:
     """Получить конфиг по имени suite_name"""
-    all_configs = list[BaseSuiteConfig](_CONFIG_CACHE.values())
-    for config in all_configs:
+    for config in _CONFIG_CACHE.values():
         if config.suite_name == name:
             return config
     raise ValueError(f"Конфиг с именем '{name}' не найден")
@@ -97,7 +96,7 @@ def __getattr__(name: str):
 
 def __dir__():
     """Для автодополнения в IDE"""
-    return list[str](_CONFIG_CACHE.keys()) + [
+    return list(_CONFIG_CACHE.keys()) + [
         "SINGLE_LEAK_CONFIGS",
         "MULTI_LEAK_CONFIGS",
         "ALL_CONFIGS",

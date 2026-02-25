@@ -1,18 +1,17 @@
 """
-Единый тестовый модуль для всех наборов данных (single-leak и multi-leak).
 
 Архитектура параметризации:
-- SUITE_PARAMS: тесты уровня набора (один раз на набор данных)
-- LEAK_PARAMS: тесты уровня утечки (один раз на каждую утечку)
+- SUITE_PARAMS: тесты уровня набора (один раз на набор данных LDSStatusConfig)
 
 Для добавления нового набора:
-1. Создать файл в test_config/datasets/
-2. Тесты подхватятся автоматически
+1. Создать файл в test_config/datasets/ с LDSStatusConfig
+2. Добавить маппинг новых тестов в conftest.py -> LDS_STATUS_SUITE_LEVEL_MAPPING
+3. Тесты подхватятся автоматически
 
 Запуск:
-- Все тесты: pytest tests/test_smoke.py
-- Один набор: pytest tests/test_smoke.py --suites=select_4
-- Несколько наборов: pytest tests/test_smoke.py --suites=select_4,select_19_20
+- Все тесты: pytest tests/test_lds_status_regress.py
+- Один набор: pytest tests/test_lds_status_regress.py --suites=sou_mode_inflow
+- Несколько наборов: pytest tests/test_lds_status_regress.py --suites=sou_mode_inflow,sou_mode_stopped,sou_mode_biks
 """
 
 from typing import Any, List, Optional
@@ -82,7 +81,7 @@ class TestSuiteScenarios:
 
     @pytest.mark.asyncio
     @pytest.mark.critical_stop
-    async def test_basic_info(self, ws_client: WebSocketClient, config: LDSStatusConfig) -> None:
+    async def test_basic_info_mode_sou(self, ws_client: WebSocketClient, config: LDSStatusConfig) -> None:
         """[BasicInfo] Проверка базовой информации СОУ: список ТУ"""
         tag = "BasicInfo"
         title = f"[{tag}] Проверка списка ТУ. ЭФ: Главная страница"
@@ -90,7 +89,7 @@ class TestSuiteScenarios:
         await scenarios.basic_info(ws_client, config)
 
     @pytest.mark.asyncio
-    async def test_lds_status_initialization(self, ws_client: WebSocketClient, config: LDSStatusConfig) -> None:
+    async def test_lds_status_initialization_mode_sou(self, ws_client: WebSocketClient, config: LDSStatusConfig) -> None:
         """[CommonScheme] Проверка режима работы СОУ: Инициализация"""
         tag = "CommonScheme"
         title = f"[{tag}] Проверка режима работы СОУ: 'Инициализация', по причине: 'Холодный пуск'. ЭФ: Схема"
