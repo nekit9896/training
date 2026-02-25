@@ -51,21 +51,20 @@ SELECT_7_CONFIG = SuiteConfig(
     main_page_info_test=CaseMarkers(test_case_id="12", offset=7),
     mask_signal_test=CaseMarkers(test_case_id="37", offset=8),
     lds_status_initialization_out_test=CaseMarkers(test_case_id="35", offset=30),
-    lds_status_during_leak_test=CaseMarkers(test_case_id="36", offset=59.5),
-    # ===== КОНФИГУРАЦИЯ СТАТУСОВ СОУ ВО ВРЕМЯ УТЕЧКИ =====
-    # 4 соседних ДУ (in, out, out_2)
-    lds_status_during_leak_config=DiagnosticAreaStatusConfig(
-        diagnostic_area_id=LEAK_DIAGNOSTIC_AREA_ID,
-        expected_lds_status=LdsStatus.INITIALIZATION.value,
-        in_neighbor_id=IN_NEIGHBOR_DIAGNOSTIC_AREA_ID,
-        in_neighbor_status=LdsStatus.DEGRADATION.value,
-        out_neighbor_id=OUT_NEIGHBOR_DIAGNOSTIC_AREA_ID,
-        out_neighbor_status=LdsStatus.DEGRADATION.value,
-        out_neighbor_2_id=OUT_NEIGHBOR_2_DIAGNOSTIC_AREA_ID,
-        out_neighbor_2_status=LdsStatus.DEGRADATION.value,
-    ),
     # ===== КОНФИГУРАЦИЯ УТЕЧКИ =====
     leak=LeakTestConfig(
+        # ----- Конфигурация статусов СОУ во время утечки 4 соседних ДУ (in, out, out_2) -----
+        lds_status_during_leak_config=DiagnosticAreaStatusConfig(
+            diagnostic_area_id=LEAK_DIAGNOSTIC_AREA_ID,
+            expected_lds_status=LdsStatus.INITIALIZATION.value,
+            in_neighbors={
+                IN_NEIGHBOR_DIAGNOSTIC_AREA_ID: LdsStatus.DEGRADATION.value,
+            },
+            out_neighbors={
+                OUT_NEIGHBOR_DIAGNOSTIC_AREA_ID: LdsStatus.DEGRADATION.value,
+                OUT_NEIGHBOR_2_DIAGNOSTIC_AREA_ID: LdsStatus.DEGRADATION.value,
+            },
+        ),
         # ----- Параметры утечки -----
         coordinate_meters=LEAK_COORDINATE_METERS,
         volume_m3=LEAK_VOLUME_M3,
@@ -84,6 +83,8 @@ SELECT_7_CONFIG = SuiteConfig(
         leaks_content_test=CaseMarkers(test_case_id="101", offset=59),
         # ----- Тест TuLeaksInfo -----
         tu_leaks_info_test=CaseMarkers(test_case_id="14", offset=59),
+        # ----- Тест CommonSchemeContent -----
+        lds_status_during_leak_test=CaseMarkers(test_case_id="36", offset=59.5),
         # ----- Тест AcknowledgeLeak -----
         acknowledge_leak_test=CaseMarkers(test_case_id="15", offset=60),
         # ----- Тест OutputSignals -----

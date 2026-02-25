@@ -65,20 +65,21 @@ SELECT_19_20_CONFIG = SuiteConfig(
     main_page_info_unstationary_test=CaseMarkers(test_case_id="79", offset=40),
     mask_signal_test=CaseMarkers(test_case_id="32", offset=8),
     lds_status_initialization_out_test=CaseMarkers(test_case_id="30", offset=30),
-    lds_status_during_leak_test=CaseMarkers(test_case_id="80", offset=47),
-    # ===== КОНФИГУРАЦИЯ СТАТУСОВ СОУ ВО ВРЕМЯ УТЕЧКИ =====
-    lds_status_during_leak_config=DiagnosticAreaStatusConfig(
-        diagnostic_area_id=LEAK_1_DIAGNOSTIC_AREA_ID,
-        expected_lds_status=LdsStatus.INITIALIZATION.value,
-        in_neighbor_id=IN_NEIGHBOR_DIAGNOSTIC_AREA_ID,
-        in_neighbor_status=LdsStatus.DEGRADATION.value,
-        out_neighbor_id=OUT_NEIGHBOR_DIAGNOSTIC_AREA_ID,
-        out_neighbor_status=LdsStatus.DEGRADATION.value,
-    ),
     # ===== Конфигурации утечек =====
     leaks=[
         # ===== ПЕРВАЯ УТЕЧКА (75 км) =====
         LeakTestConfig(
+            # ----- Конфигурация статусов СОУ во время утечки -----
+            lds_status_during_leak_config=DiagnosticAreaStatusConfig(
+                diagnostic_area_id=LEAK_1_DIAGNOSTIC_AREA_ID,
+                expected_lds_status=LdsStatus.INITIALIZATION.value,
+                in_neighbors={
+                    IN_NEIGHBOR_DIAGNOSTIC_AREA_ID: LdsStatus.DEGRADATION.value,
+                },
+                out_neighbors={
+                    OUT_NEIGHBOR_DIAGNOSTIC_AREA_ID: LdsStatus.DEGRADATION.value,
+                },
+            ),
             # ----- Идентификаторы -----
             diagnostic_area_name=LEAK_1_DIAGNOSTIC_AREA_NAME,
             diagnostic_area_id=LEAK_1_DIAGNOSTIC_AREA_ID,
@@ -102,6 +103,8 @@ SELECT_19_20_CONFIG = SuiteConfig(
             all_leaks_info_test=CaseMarkers(test_case_id="66", offset=47),
             # ----- Тест TuLeaksInfo (первая утечка) -----
             tu_leaks_info_test=CaseMarkers(test_case_id="70", offset=47),
+            # ----- Тест CommonSchemeContent -----
+            lds_status_during_leak_test=CaseMarkers(test_case_id="80", offset=47),
             # ----- Тест AcknowledgeLeak (первая утечка) -----
             acknowledge_leak_test=CaseMarkers(test_case_id="74", offset=62),
             # ----- Тест OutputSignals (первая утечка) -----
@@ -132,6 +135,8 @@ SELECT_19_20_CONFIG = SuiteConfig(
             all_leaks_info_test=CaseMarkers(test_case_id="69", offset=61),
             # ----- Тест TuLeaksInfo (вторая утечка) -----
             tu_leaks_info_test=CaseMarkers(test_case_id="71", offset=61.0),
+            # ----- Тест CommonSchemeContent -----
+            lds_status_during_leak_test=CaseMarkers(test_case_id="80", offset=47),
             # ----- Тест AcknowledgeLeak (вторая утечка) -----
             acknowledge_leak_test=CaseMarkers(test_case_id="75", offset=62.5),
             # ----- Тест OutputSignals (вторая утечка) -----

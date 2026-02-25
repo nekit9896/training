@@ -38,13 +38,14 @@ class DiagnosticAreaStatusConfig:
     diagnostic_area_id: int
     expected_lds_status: int
 
-    # Соседние ДУ и их статусы
-    in_neighbor_id: Optional[int] = None
-    in_neighbor_status: Optional[int] = None
-    out_neighbor_id: Optional[int] = None
-    out_neighbor_status: Optional[int] = None
-    out_neighbor_2_id: Optional[int] = None
-    out_neighbor_2_status: Optional[int] = None
+    # Соседние ДУ и их статусы: словари {diagnostic_area_id: expected_lds_status}
+    # Позволяет указывать 0..N соседей независимо от in/out.
+    #
+    # Пример:
+    #   in_neighbors={1: LdsStatus.DEGRADATION.value}
+    #   out_neighbors={3: LdsStatus.DEGRADATION.value, 4: LdsStatus.DEGRADATION.value}
+    in_neighbors: dict[int, int] = field(default_factory=dict)
+    out_neighbors: dict[int, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -69,6 +70,7 @@ class LeakTestConfig:
     # ===== Параметры утечки =====
     coordinate_meters: float = None
     volume_m3: float = None
+    max_pumping_m3: int = 2500  # Производительность(максимальная перекачка)
 
     # ===== Временные интервалы (секунды) =====
     leak_start_interval_seconds: int = BaseTN3Constants.LEAK_START_INTERVAL
@@ -81,6 +83,9 @@ class LeakTestConfig:
     expected_algorithm_type: int = ReservedType.UNSTATIONARY_FLOW.value
     expected_leak_status: int = ConfirmationStatus.CONFIRMED.value
 
+    # ===== Конфигурация статусов СОУ во время утечки =====
+    lds_status_during_leak_config: Optional[DiagnosticAreaStatusConfig] = None
+
     # ===== Тест-кейсы для этой утечки =====
     leaks_content_test: Optional[CaseMarkers] = None
     all_leaks_info_test: Optional[CaseMarkers] = None
@@ -88,6 +93,7 @@ class LeakTestConfig:
     leak_info_in_journal: Optional[CaseMarkers] = None
     acknowledge_leak_test: Optional[CaseMarkers] = None
     output_signals_test: Optional[CaseMarkers] = None
+    lds_status_during_leak_test: Optional[CaseMarkers] = None
 
     @property
     def allowed_volume_m3(self) -> float:
@@ -97,7 +103,7 @@ class LeakTestConfig:
     @property
     def leak_rate_percentages(self) -> float:
         """Интенсивность утечки в процентах"""
-        return round((self.volume_m3 / BaseTN3Constants.MAX_PUMPING) * 100, 2)
+        return round((self.volume_m3 / self.max_pumping_m3) * 100, 2)
 
     @property
     def allowed_time_diff_minutes(self) -> float:
@@ -145,10 +151,6 @@ class SuiteConfig:
     main_page_info_signals_test: Optional[CaseMarkers] = None
     mask_signal_test: Optional[CaseMarkers] = None
     lds_status_initialization_out_test: Optional[CaseMarkers] = None
-    lds_status_during_leak_test: Optional[CaseMarkers] = None
-
-    # ===== Конфигурация статусов СОУ во время утечки =====
-    lds_status_during_leak_config: Optional[DiagnosticAreaStatusConfig] = None
 
     # ===== Конфигурации утечек =====
     # Для наборов с одной утечкой

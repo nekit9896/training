@@ -708,7 +708,7 @@ async def tu_leaks_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imita
         ).expected(leak.expected_stationary_status).equal_to()
 
 
-async def lds_status_during_leak(ws_client, cfg: SuiteConfig):
+async def lds_status_during_leak(ws_client, cfg: SuiteConfig, leak: LeakTestConfig):
     """
     Проверка режима работы СОУ во время утечки.
     """
@@ -723,11 +723,11 @@ async def lds_status_during_leak(ws_client, cfg: SuiteConfig):
     parsed_payload = parser.parse_common_scheme_info_msg(payload)
     flow_areas = parsed_payload.replyContent.flowAreas
 
-    status_config = cfg.lds_status_during_leak_config
+    status_config = leak.lds_status_during_leak_config
+    if status_config is None:
+        pytest.fail("Не задан leak.lds_status_during_leak_config для теста lds_status_during_leak")
 
     leak_diagnostic_area = t_utils.find_diagnostic_area_by_id(flow_areas, status_config.diagnostic_area_id)
-    in_neighbor_diagnostic_area = t_utils.find_diagnostic_area_by_id(flow_areas, status_config.in_neighbor_id)
-    out_neighbor_diagnostic_area = t_utils.find_diagnostic_area_by_id(flow_areas, status_config.out_neighbor_id)
 
     with SoftAssertions() as soft_failures:
         StepCheck(
@@ -736,28 +736,27 @@ async def lds_status_during_leak(ws_client, cfg: SuiteConfig):
             soft_failures,
         ).actual(leak_diagnostic_area.ldsStatus).expected(status_config.expected_lds_status).equal_to()
 
-        StepCheck(
-            f"Проверка режима работы СОУ на соседнем ДУ, id ДУ: {status_config.in_neighbor_id}",
-            "ldsStatus",
-            soft_failures,
-        ).actual(in_neighbor_diagnostic_area.ldsStatus).expected(status_config.in_neighbor_status).equal_to()
+        # Проверки соседних ДУ: поддерживаются 0..N соседей отдельно для in/out.
+        # Формат конфига: status_config.in_neighbors / status_config.out_neighbors (dict[id] = expected_status)
+        in_neighbors: dict[int, int] = status_config.in_neighbors or {}
+        out_neighbors: dict[int, int] = status_config.out_neighbors or {}
 
-        StepCheck(
-            f"Проверка режима работы СОУ на соседнем ДУ, id ДУ: {status_config.out_neighbor_id}",
-            "ldsStatus",
-            soft_failures,
-        ).actual(out_neighbor_diagnostic_area.ldsStatus).expected(status_config.out_neighbor_status).equal_to()
-
-        # Для select_7 есть дополнительный 4-й ДУ
-        if status_config.out_neighbor_2_id and status_config.out_neighbor_2_status:
-            out_neighbor_2_diagnostic_area = t_utils.find_diagnostic_area_by_id(
-                flow_areas, status_config.out_neighbor_2_id
-            )
+        # --- проверки ---
+        for neighbor_id, expected_status in sorted(in_neighbors.items()):
+            diagnostic_area = t_utils.find_diagnostic_area_by_id(flow_areas, neighbor_id)
             StepCheck(
-                f"Проверка режима работы СОУ на соседнем ДУ, id ДУ: {status_config.out_neighbor_2_id}",
+                f"Проверка режима работы СОУ на соседнем ДУ (in_neighbor), id ДУ: {neighbor_id}",
                 "ldsStatus",
                 soft_failures,
-            ).actual(out_neighbor_2_diagnostic_area.ldsStatus).expected(status_config.out_neighbor_2_status).equal_to()
+            ).actual(diagnostic_area.ldsStatus).expected(expected_status).equal_to()
+
+        for neighbor_id, expected_status in sorted(out_neighbors.items()):
+            diagnostic_area = t_utils.find_diagnostic_area_by_id(flow_areas, neighbor_id)
+            StepCheck(
+                f"Проверка режима работы СОУ на соседнем ДУ (out_neighbor), id ДУ: {neighbor_id}",
+                "ldsStatus",
+                soft_failures,
+            ).actual(diagnostic_area.ldsStatus).expected(expected_status).equal_to()
 
 
 async def acknowledge_leak_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfig = None):

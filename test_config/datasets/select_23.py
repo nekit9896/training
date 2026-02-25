@@ -45,18 +45,19 @@ SELECT_23_CONFIG = SuiteConfig(
     main_page_info_test=CaseMarkers(test_case_id="3", offset=7),
     mask_signal_test=CaseMarkers(test_case_id="95", offset=8.0),
     lds_status_initialization_out_test=CaseMarkers(test_case_id="93", offset=23),
-    lds_status_during_leak_test=CaseMarkers(test_case_id="96", offset=28.0),
-    # ===== КОНФИГУРАЦИЯ СТАТУСОВ СОУ ВО ВРЕМЯ УТЕЧКИ =====
-    lds_status_during_leak_config=DiagnosticAreaStatusConfig(
-        diagnostic_area_id=LEAK_DIAGNOSTIC_AREA_ID,
-        expected_lds_status=LdsStatus.DEGRADATION.value,
-        in_neighbor_id=IN_NEIGHBOR_DIAGNOSTIC_AREA_ID,
-        in_neighbor_status=LdsStatus.DEGRADATION.value,
-        out_neighbor_id=OUT_NEIGHBOR_DIAGNOSTIC_AREA_ID,
-        out_neighbor_status=LdsStatus.DEGRADATION.value,
-    ),
     # ===== Конфигурации утечки =====
     leak=LeakTestConfig(
+        # ----- Конфигурация статусов СОУ во время утечки -----
+        lds_status_during_leak_config=DiagnosticAreaStatusConfig(
+            diagnostic_area_id=LEAK_DIAGNOSTIC_AREA_ID,
+            expected_lds_status=LdsStatus.DEGRADATION.value,
+            in_neighbors={
+                IN_NEIGHBOR_DIAGNOSTIC_AREA_ID: LdsStatus.DEGRADATION.value,
+            },
+            out_neighbors={
+                OUT_NEIGHBOR_DIAGNOSTIC_AREA_ID: LdsStatus.DEGRADATION.value,
+            },
+        ),
         # ----- Идентификаторы -----
         diagnostic_area_name=LEAK_DIAGNOSTIC_AREA_NAME,
         diagnostic_area_id=LEAK_DIAGNOSTIC_AREA_ID,
@@ -82,6 +83,8 @@ SELECT_23_CONFIG = SuiteConfig(
         all_leaks_info_test=CaseMarkers(test_case_id="92", offset=27.0),
         # ----- Тест TuLeaksInfo  -----
         tu_leaks_info_test=CaseMarkers(test_case_id="96", offset=27.0),
+        # ----- Тест CommonSchemeContent -----
+        lds_status_during_leak_test=CaseMarkers(test_case_id="96", offset=28.0),
         # ----- Тест AcknowledgeLeak -----
         acknowledge_leak_test=CaseMarkers(test_case_id="99", offset=30.0),
         # ----- Тест OutputSignals -----

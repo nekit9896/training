@@ -113,7 +113,6 @@ SUITE_LEVEL_TEST_MAPPING = {
     'test_mask_signal_msg': 'mask_signal_test',
     'test_lds_status_initialization_out': 'lds_status_initialization_out_test',
     'test_main_page_info_unstationary': 'main_page_info_unstationary_test',
-    'test_lds_status_during_leak': 'lds_status_during_leak_test',
 }
 
 # Тесты уровня утечки (маркеры из LeakTestConfig - параметр leak)
@@ -124,6 +123,7 @@ LEAK_LEVEL_TEST_MAPPING = {
     'test_leak_info_in_journal': 'leak_info_in_journal',
     'test_acknowledge_leak_info': 'acknowledge_leak_test',
     'test_output_signals': 'output_signals_test',
+    'test_lds_status_during_leak': 'lds_status_during_leak_test',
      'expected_leak_completed_status': "leak_completed_status_test",
 }
 
