@@ -23,13 +23,13 @@ import pytest
 
 from clients.websocket_client import WebSocketClient
 from test_config.datasets import ALL_CONFIGS
-from test_config.models_for_tests import CaseMarkers, LeakTestConfig, SuiteConfig
+from test_config.models_for_tests import CaseMarkers, LeakTestConfig, SmokeSuiteConfig
 from test_scenarios import scenarios
 
 # ===== ГЕНЕРАЦИЯ ПАРАМЕТРОВ =====
 
 
-def _get_suite_markers(config: SuiteConfig) -> List[pytest.MarkDecorator]:
+def _get_suite_markers(config: SmokeSuiteConfig) -> List[pytest.MarkDecorator]:
     """Маркеры для тестового набора."""
     return [
         pytest.mark.test_suite_name(config.suite_name),
@@ -122,7 +122,7 @@ class TestSuiteScenarios:
 
     @pytest.mark.asyncio
     @pytest.mark.critical_stop
-    async def test_basic_info(self, ws_client: WebSocketClient, config: SuiteConfig) -> None:
+    async def test_basic_info(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
         """[BasicInfo] Проверка базовой информации СОУ: список ТУ"""
         tag = "BasicInfo"
         title = f"[{tag}] Проверка списка ТУ. ЭФ: Главная страница"
@@ -130,7 +130,7 @@ class TestSuiteScenarios:
         await scenarios.basic_info(ws_client, config)
 
     @pytest.mark.asyncio
-    async def test_journal_info(self, ws_client: WebSocketClient, config: SuiteConfig) -> None:
+    async def test_journal_info(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
         """[MessagesInfo] Проверка наличия сообщений в журнале"""
         tag = "MessagesInfo"
         title = f"[{tag}] Проверка наличия сообщений в журнале. ЭФ: Журнал.Реальное время"
@@ -139,7 +139,7 @@ class TestSuiteScenarios:
         await scenarios.journal_info(ws_client)
 
     @pytest.mark.asyncio
-    async def test_lds_status_initialization(self, ws_client: WebSocketClient, config: SuiteConfig) -> None:
+    async def test_lds_status_initialization(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
         """[CommonScheme] Проверка режима работы СОУ: Инициализация"""
         tag = "CommonScheme"
         title = f"[{tag}] Проверка режима работы СОУ: 'Инициализация'. ЭФ: Схема"
@@ -154,7 +154,7 @@ class TestSuiteScenarios:
         await scenarios.lds_status_initialization(ws_client, config)
 
     @pytest.mark.asyncio
-    async def test_main_page_info(self, ws_client: WebSocketClient, config: SuiteConfig) -> None:
+    async def test_main_page_info(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
         """[MainPageInfo] Проверка установки режима МТ"""
         tag = "MainPageInfo"
         title = f"[{tag}] Проверка установки режима работы МТ: стационарный. ЭФ: Главная страница.Контент таблица по ТУ"
@@ -170,7 +170,7 @@ class TestSuiteScenarios:
 
 
     @pytest.mark.asyncio
-    async def test_main_page_info_signals(self, ws_client: WebSocketClient, config: SuiteConfig) -> None:
+    async def test_main_page_info_signals(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
         """[MainPageSignalsInfo] Проверка счетчиков состояния сигналов"""
         tag = "MainPageSignalsInfo"
         title = f"[{tag}] Проверка счетчиков состояния сигналов. ЭФ: Главная страница.Контент таблица по ТУ"
@@ -185,7 +185,7 @@ class TestSuiteScenarios:
 
         
     @pytest.mark.asyncio
-    async def test_mask_signal_msg(self, ws_client: WebSocketClient, config: SuiteConfig) -> None:
+    async def test_mask_signal_msg(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
         """[MaskSignal] Проверка маскирования датчиков"""
         tag = "MaskSignal"
         title = f"[{tag}] проверка маскирования датчиков. ЭФ: Схема"
@@ -206,7 +206,7 @@ class TestSuiteScenarios:
         await scenarios.mask_signal_msg(ws_client, config)
 
     @pytest.mark.asyncio
-    async def test_lds_status_initialization_out(self, ws_client: WebSocketClient, config: SuiteConfig) -> None:
+    async def test_lds_status_initialization_out(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
         """[CommonScheme] Проверка выхода СОУ из Инициализации"""
         tag = "CommonScheme"
         title = f"[{tag}] Проверка выхода СОУ из Инициализации. ЭФ: Схема"
@@ -221,7 +221,7 @@ class TestSuiteScenarios:
         await scenarios.lds_status_initialization_out(ws_client, config)
 
     @pytest.mark.asyncio
-    async def test_main_page_info_unstationary(self, ws_client: WebSocketClient, config: SuiteConfig) -> None:
+    async def test_main_page_info_unstationary(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
         """[MainPageInfo] Проверка установки режима Нестационарный (для multi-leak)"""
         tag = "MainPageInfo"
         title = (
@@ -253,7 +253,7 @@ class TestLeakScenarios:
     async def test_all_leaks_info(
         self,
         ws_client: WebSocketClient,
-        config: SuiteConfig,
+        config: SmokeSuiteConfig,
         leak: LeakTestConfig,
         leak_number: int,
         imitator_start_time: datetime,
@@ -280,7 +280,7 @@ class TestLeakScenarios:
     async def test_lds_status_during_leak(
         self,
         ws_client: WebSocketClient,
-        config: SuiteConfig,
+        config: SmokeSuiteConfig,
         leak: LeakTestConfig,
         leak_number: int,
     ) -> None:
@@ -304,7 +304,7 @@ class TestLeakScenarios:
     async def test_leaks_content(
         self,
         ws_client: WebSocketClient,
-        config: SuiteConfig,
+        config: SmokeSuiteConfig,
         leak: LeakTestConfig,
         leak_number: int,
         imitator_start_time: datetime,
@@ -331,7 +331,7 @@ class TestLeakScenarios:
     async def test_leaks_content_end(
         self,
         ws_client: WebSocketClient,
-        config: SuiteConfig,
+        config: SmokeSuiteConfig,
         leak: LeakTestConfig,
         leak_number: int,
         imitator_start_time: datetime,
@@ -355,7 +355,7 @@ class TestLeakScenarios:
     async def test_leak_info_in_journal(
         self,
         ws_client: WebSocketClient,
-        config: SuiteConfig,
+        config: SmokeSuiteConfig,
         leak: LeakTestConfig,
         leak_number: int,
         imitator_start_time: datetime,
@@ -382,7 +382,7 @@ class TestLeakScenarios:
     async def test_tu_leaks_info(
         self,
         ws_client: WebSocketClient,
-        config: SuiteConfig,
+        config: SmokeSuiteConfig,
         leak: LeakTestConfig,
         leak_number: int,
         imitator_start_time: datetime,
@@ -406,7 +406,7 @@ class TestLeakScenarios:
 
     @pytest.mark.asyncio
     async def test_acknowledge_leak_info(
-        self, ws_client: WebSocketClient, config: SuiteConfig, leak: LeakTestConfig, leak_number: int
+        self, ws_client: WebSocketClient, config: SmokeSuiteConfig, leak: LeakTestConfig, leak_number: int
     ) -> None:
         """[AcknowledgeLeak] Проверка квитирования утечки"""
         tag = "AcknowledgeLeak"
@@ -430,7 +430,7 @@ class TestLeakScenarios:
     async def test_output_signals(
         self,
         ws_client: WebSocketClient,
-        config: SuiteConfig,
+        config: SmokeSuiteConfig,
         leak: LeakTestConfig,
         leak_number: int,
         imitator_start_time: datetime,

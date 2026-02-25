@@ -152,6 +152,13 @@ class StepMessageBuilder:
         ]
         return self._build_message(message_parts)
 
+    def contains(self, objects_list: List[ObjectType], expected_object: ObjectType) -> str:
+        message_parts = [
+            f"Ожидаемый результат: Список элементов: {objects_list}",
+            f"Содержит элемент: {expected_object}",
+        ]
+        return self._build_message(message_parts)
+
 
 class StepCheck:
     """
@@ -330,5 +337,18 @@ class StepCheck:
         try:
             with allure.step(msg):
                 assert_that(objects_list).described_as(msg).does_not_contain(forbidden_object)
+        except AssertionError as exc:
+            self._handle_assertion(exc)
+
+    def contains(self, objects_list: List[ObjectType], expected_object: ObjectType) -> None:
+        """
+        Выполняет проверку does_not_contain.
+        """
+
+        msg = self._msg_builder.contains(objects_list, expected_object)
+
+        try:
+            with allure.step(msg):
+                assert_that(objects_list).described_as(msg).contains(expected_object)
         except AssertionError as exc:
             self._handle_assertion(exc)

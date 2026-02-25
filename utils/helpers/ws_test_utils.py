@@ -7,12 +7,13 @@ from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, List, Set, Tuple, Type, TypeVar
 from zoneinfo import ZoneInfo
+from enum import IntEnum, IntFlag
 
 import allure
 from pytest import fail
 
 from clients.websocket_client import WebSocketClient
-from constants.enums import LdsStatus
+from constants.enums import LdsStatus, DegradationLdsStatusReasons, FaultyLdsStatusReasons, InitializationLdsStatusReasons
 from constants.test_constants import BaseTN3Constants as TestConst
 from models.get_messages_model import GetMessagesRequest
 from models.subscribe_all_leaks_info_model import SubscribeAllLeaksInfoReply
@@ -210,6 +211,13 @@ def find_diagnostic_area_by_id(flow_areas: List[FlowArea], id_value: int) -> Dia
     except (AttributeError, KeyError, RuntimeError, TypeError, ValueError):
         fail(f"Не найден ДУ по id: {id_value}.")
 
+def find_base_diagnostic_areas(flow_areas: List[FlowArea]) -> List[DiagnosticArea]:
+    base_diagnostic_areas = [
+        find_diagnostic_area_by_id(flow_areas, d_a_id)
+        for d_a_id in TestConst.DIAGNOSTIC_AREAS_BASE_IDS
+        if find_diagnostic_area_by_id(flow_areas, d_a_id) is not None
+    ]
+    return base_diagnostic_areas
 
 def to_moscow_timezone(date_str: str) -> datetime:
     """
@@ -255,6 +263,39 @@ def parse_journal_msg_value(value: str) -> Tuple[float, float]:
     except (TypeError, ValueError):
         fail("Ошибка распаковки данных из поля value в сообщении журнала")
 
+def parse_bite_flags(value: int, enum_cls: Type[IntEnum | IntFlag]) -> List[int]:
+    """
+    Распаковка битовых флагов
+    """
+    if not value:
+        fail("Пустое значение LdsStatusReasons")
+    flags = sorted([flag.value for flag in enum_cls if value & flag.value])  #
+    if sum(flags) != value:
+        unknown_bits = value ^ sum(flags)
+        fail(f"Неизвестные биты при распаковке {enum_cls.__name__}: {unknown_bits}")
+    return flags
+
+
+def get_reason_enum_by_lds_status(value: int) -> Type[IntFlag]:
+    reason_by_lds_status = {
+        1: FaultyLdsStatusReasons,
+        2: InitializationLdsStatusReasons,
+        3: DegradationLdsStatusReasons,
+    }
+    try:
+        class_name = reason_by_lds_status[value]
+        return class_name
+    except (KeyError, ValueError):
+        fail(f"Не найден класс для LdsStatus: {value}")
+
+
+def parse_lds_status_reasons(lds_status: int, lds_status_reasons: int):
+    """
+    Получение списка ldsStatusReasons, соответствующего ldsStatus
+    """
+    enum_cls = get_reason_enum_by_lds_status(lds_status)
+    flags = parse_bite_flags(lds_status_reasons, enum_cls)
+    return flags
 
 async def connect(ws_client: WebSocketClient, ws_invoke_type: str, ws_invoke_params: Any = None) -> None:
     """

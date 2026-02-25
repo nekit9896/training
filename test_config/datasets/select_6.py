@@ -11,7 +11,7 @@ from dataclasses import asdict
 
 from constants.enums import TU, ConfirmationStatus, LdsStatus, ReservedType, StationaryStatus
 from models.subscribe_main_page_signals_info_model import SignalsInfo
-from test_config.models_for_tests import CaseMarkers, DiagnosticAreaStatusConfig, LeakTestConfig, SuiteConfig
+from test_config.models_for_tests import CaseMarkers, DiagnosticAreaStatusConfig, LeakTestConfig, SmokeSuiteConfig
 
 # ===== Константы набора =====
 SUITE_NAME = "Select_6_tn3_56km_113"
@@ -41,7 +41,7 @@ LINEAR_PART_ID = 407
 MAIN_PAGE_SIGNALS = asdict(SignalsInfo(numberOfRejectedSignals=10))
 
 # ===== Конфигурация набора =====
-SELECT_6_CONFIG = SuiteConfig(
+SELECT_6_CONFIG = SmokeSuiteConfig(
     # ===== Метаданные =====
     suite_name=SUITE_NAME,
     suite_data_id=SUITE_DATA_ID,
