@@ -263,39 +263,53 @@ def parse_journal_msg_value(value: str) -> Tuple[float, float]:
     except (TypeError, ValueError):
         fail("Ошибка распаковки данных из поля value в сообщении журнала")
 
-def parse_bite_flags(value: int, enum_cls: Type[IntEnum | IntFlag]) -> List[int]:
+def parse_bit_flags(value: int, enum_cls: Type[IntFlag]) -> List[IntFlag]:
     """
     Распаковка битовых флагов
     """
-    if not value:
-        fail("Пустое значение LdsStatusReasons")
-    flags = sorted([flag.value for flag in enum_cls if value & flag.value])  #
-    if sum(flags) != value:
-        unknown_bits = value ^ sum(flags)
+    if value == 0:
+        return []
+
+    found_flags = [flag for flag in enum_cls if value & flag.value]
+
+    if sum(f.value for f in found_flags) != value:
+        unknown_bits = value ^ sum(f.value for f in found_flags)
         fail(f"Неизвестные биты при распаковке {enum_cls.__name__}: {unknown_bits}")
-    return flags
+
+    return sorted(found_flags, key=lambda f: f.value)
 
 
-def get_reason_enum_by_lds_status(value: int) -> Type[IntFlag]:
+def get_reason_enum_by_lds_status(lds_status: int | LdsStatus) -> Type[IntFlag]:
+    """
+    Получение класса причин по статусу СОУ.
+    """
+    if isinstance(lds_status, int):
+        try:
+            lds_status = LdsStatus(lds_status)
+        except ValueError:
+            fail(f"Неизвестный LdsStatus: {lds_status}")
+
     reason_by_lds_status = {
-        1: FaultyLdsStatusReasons,
-        2: InitializationLdsStatusReasons,
-        3: DegradationLdsStatusReasons,
+        LdsStatus.FAULTY: FaultyLdsStatusReasons,
+        LdsStatus.INITIALIZATION: InitializationLdsStatusReasons,
+        LdsStatus.DEGRADATION: DegradationLdsStatusReasons,
     }
-    try:
-        class_name = reason_by_lds_status[value]
-        return class_name
-    except (KeyError, ValueError):
-        fail(f"Не найден класс для LdsStatus: {value}")
+
+    enum_cls = reason_by_lds_status.get(lds_status)
+    if enum_cls is None:
+        fail(f"Для LdsStatus.{lds_status.name} не определены причины")
+    return enum_cls
 
 
-def parse_lds_status_reasons(lds_status: int, lds_status_reasons: int):
+def parse_lds_status_reasons(
+    lds_status: int | LdsStatus,
+    lds_status_reasons: int,
+) -> List[IntFlag]:
     """
     Получение списка ldsStatusReasons, соответствующего ldsStatus
     """
     enum_cls = get_reason_enum_by_lds_status(lds_status)
-    flags = parse_bite_flags(lds_status_reasons, enum_cls)
-    return flags
+    return parse_bit_flags(lds_status_reasons, enum_cls)
 
 async def connect(ws_client: WebSocketClient, ws_invoke_type: str, ws_invoke_params: Any = None) -> None:
     """

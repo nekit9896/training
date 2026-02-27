@@ -154,7 +154,21 @@ class MessagePriority(IntFlag):
     
 
 class DegradationLdsStatusReasons(IntFlag):
-    NEIGHBOUR_LEAK = 1 << 0  # Возникновение утечки на соседнем диагностическом участке
+    """Причины режима деградации СОУ (до 14 причин)."""
+    NEIGHBOUR_LEAK = 1 << 0                    # Утечка на соседнем ДУ
+    PRESSURE_SENSOR_FAULT = 1 << 1             # Неисправность датчика давления
+    FLOW_SENSOR_FAULT = 1 << 2                 # Неисправность расходомера
+    PRESSURE_OUT_OF_RANGE = 1 << 3             # Давление вне допустимого диапазона
+    FLOW_OUT_OF_RANGE = 1 << 4                 # Расход вне допустимого диапазона
+    PRESSURE_GRADIENT_EXCEEDED = 1 << 5        # Превышен градиент давления
+    FLOW_GRADIENT_EXCEEDED = 1 << 6            # Превышен градиент расхода
+    BALANCE_THRESHOLD_EXCEEDED = 1 << 7        # Превышен порог дебаланса
+    MASKED_SENSOR = 1 << 8                     # Маскированный датчик
+    COMMUNICATION_FAULT = 1 << 9               # Нарушение связи с датчиком
+    DATA_QUALITY_LOW = 1 << 10                 # Низкое качество данных
+    ALGORITHM_LIMITATION = 1 << 11             # Ограничение алгоритма
+    MANUAL_DEGRADATION = 1 << 12               # Ручной перевод в деградацию
+    OTHER = 1 << 13                            # Прочие причины
 
 
 class FaultyLdsStatusReasons(IntFlag):

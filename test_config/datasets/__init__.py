@@ -18,7 +18,7 @@
 import importlib
 import pkgutil
 from pathlib import Path
-from typing import Any, Dict, List, Type
+from typing import Dict, List, Type, TypeVar
 
 from test_config.models_for_tests import BaseSuiteConfig, LDSStatusConfig, SmokeSuiteConfig
 
@@ -29,11 +29,16 @@ _DATASETS_PATH = Path(__file__).parent
 _CONFIG_CACHE: Dict[str, BaseSuiteConfig] = {}
 
 
-def _discover_configs_by_type(config_type: Type[BaseSuiteConfig]) -> List[BaseSuiteConfig]:
+# TypeVar позволяет функции запомнить переданный тип и вернуть список того же типа. 
+# Сделано чтобы из-за аннотаий не писать свой _discover_configs для каждого нового добавляемого конфига в инфру
+type_var = TypeVar('type_var', bound=BaseSuiteConfig)
+
+
+def _discover_configs_by_type(config_type: Type[type_var]) -> List[type_var]:
     """
     Автоматически находит все конфигурации указанного типа в директории datasets.
     """
-    configs = []
+    configs: List[type_var] = []
 
     # Сканируем все .py файлы в директории
     for module_info in pkgutil.iter_modules([str(_DATASETS_PATH)]):
@@ -57,17 +62,8 @@ def _discover_configs_by_type(config_type: Type[BaseSuiteConfig]) -> List[BaseSu
     return configs
 
 
-def _split_smoke_configs(configs: List[SmokeSuiteConfig]) -> tuple[List[SmokeSuiteConfig], List[SmokeSuiteConfig]]:
-    """Разделяет smoke-конфиги на single-leak и multi-leak."""
-    single = [config for config in configs if not config.has_multiple_leaks]
-    multi = [config for config in configs if config.has_multiple_leaks]
-    return single, multi
-
-
 # ===== Smoke-тесты (утечки) =====
-_ALL_SMOKE_CONFIGS = _discover_configs_by_type(SmokeSuiteConfig)
-SINGLE_LEAK_CONFIGS, MULTI_LEAK_CONFIGS = _split_smoke_configs(_ALL_SMOKE_CONFIGS)
-ALL_SMOKE_CONFIGS = SINGLE_LEAK_CONFIGS + MULTI_LEAK_CONFIGS
+ALL_SMOKE_CONFIGS: List[SmokeSuiteConfig] = _discover_configs_by_type(SmokeSuiteConfig)
 
 # ===== Regress-тесты режимов СОУ =====
 ALL_LDS_STATUS_CONFIGS = _discover_configs_by_type(LDSStatusConfig)
@@ -97,8 +93,6 @@ def __getattr__(name: str):
 def __dir__():
     """Для автодополнения в IDE"""
     return list(_CONFIG_CACHE.keys()) + [
-        "SINGLE_LEAK_CONFIGS",
-        "MULTI_LEAK_CONFIGS",
         "ALL_CONFIGS",
         "ALL_SMOKE_CONFIGS",
         "ALL_LDS_STATUS_CONFIGS",
@@ -107,8 +101,6 @@ def __dir__():
 
 
 __all__ = [
-    "SINGLE_LEAK_CONFIGS",
-    "MULTI_LEAK_CONFIGS",
     "ALL_CONFIGS",
     "ALL_SMOKE_CONFIGS",
     "ALL_LDS_STATUS_CONFIGS",
