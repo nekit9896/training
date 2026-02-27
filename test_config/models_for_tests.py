@@ -10,7 +10,7 @@
 """
 
 from dataclasses import asdict, dataclass, field
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from constants.enums import TU, ConfirmationStatus, LdsStatus, ReservedType, StationaryStatus
 from constants.test_constants import BaseTN3Constants
@@ -18,10 +18,58 @@ from models.subscribe_main_page_signals_info_model import SignalsInfo
 
 
 @dataclass
+class BaseSuiteConfig:
+    """
+    Структура:
+    1. Метаданные набора (имя, id, архив)
+    2. Технологический участок (из enum TU)
+    """
+
+    # ===== Метаданные набора =====
+    suite_name: str
+    suite_data_id: int
+    archive_name: str = ""  # Автоматически вычисляется из suite_name
+
+    # ===== Технологический участок =====
+    technological_unit: TU = TU.TIKHORETSK_NOVOROSSIYSK_3
+
+    # ===== Общие константы (можно переопределить) =====
+    allowed_distance_diff_meters: int = BaseTN3Constants.ALLOWED_DISTANCE_DIFF_METERS
+    precision: int = BaseTN3Constants.PRECISION
+    basic_message_timeout: float = BaseTN3Constants.BASIC_MESSAGE_TIMEOUT
+
+    # ===== Свойства для удобства =====
+    @property
+    def tu_id(self) -> int:
+        """ID технологического участка"""
+        return self.technological_unit.id
+
+    @property
+    def tu_name(self) -> str:
+        """Название технологического участка"""
+        return self.technological_unit.description
+
+    @property
+    def has_multiple_leaks(self) -> bool:
+        return False
+
+
+@dataclass
+class CaseData:
+    """
+    Данные тест-кейса.
+    """
+
+    name: str = ""
+    params: Optional[Dict[str, Any]] = None
+    expected_result: Optional[Any] = None
+    description: str = ""
+
+
+@dataclass
 class CaseMarkers:
     """
     Маркеры тест-кейса для pytest и allure.
-
     """
 
     test_case_id: str
@@ -35,10 +83,10 @@ class DiagnosticAreaStatusConfig:
     Используется в тесте lds_status_during_leak.
     """
 
-    diagnostic_area_id: int
-    expected_lds_status: int
+    leak_diagnostic_area_id: int
+    leak_du_expected_lds_status: int
 
-    # Соседние ДУ и их статусы: словари {diagnostic_area_id: expected_lds_status}
+    # Соседние ДУ и их статусы: словари {diagnostic_area_id: leak_du_expected_lds_status}
     # Позволяет указывать 0..N соседей независимо от in/out.
     #
     # Пример:
@@ -117,27 +165,16 @@ class LeakTestConfig:
 
 
 @dataclass
-class SuiteConfig:
+class SmokeSuiteConfig(BaseSuiteConfig):
     """
     Полная конфигурация тестового набора.
 
     Один конфиг = один набор данных = один файл в test_config/datasets/
 
     Структура:
-    1. Метаданные набора (имя, id, архив)
-    2. Технологический участок (из enum TU)
-    3. Базовые тесты с маркерами
-    4. Конфигурация статусов СОУ во время утечки
-    5. Конфигурации утечек (LeakTestConfig)
+    1. Базовые тесты с маркерами
+    2. Конфигурации утечек (LeakTestConfig)
     """
-
-    # ===== Метаданные набора =====
-    suite_name: str
-    suite_data_id: int
-    archive_name: str = ""  # Автоматически вычисляется из suite_name
-
-    # ===== Технологический участок =====
-    technological_unit: TU = TU.TIKHORETSK_NOVOROSSIYSK_3
 
     # ===== Ожидаемый статус стационара (для main_page_info) =====
     expected_stationary_status: int = StationaryStatus.STATIONARY.value
@@ -162,22 +199,6 @@ class SuiteConfig:
     # ===== Дополнительные тесты для двух утечек =====
     main_page_info_unstationary_test: Optional[CaseMarkers] = None
 
-    # ===== Общие константы (можно переопределить) =====
-    allowed_distance_diff_meters: int = BaseTN3Constants.ALLOWED_DISTANCE_DIFF_METERS
-    precision: int = BaseTN3Constants.PRECISION
-    basic_message_timeout: float = BaseTN3Constants.BASIC_MESSAGE_TIMEOUT
-
-    # ===== Свойства для удобства =====
-    @property
-    def tu_id(self) -> int:
-        """ID технологического участка"""
-        return self.technological_unit.id
-
-    @property
-    def tu_name(self) -> str:
-        """Название технологического участка"""
-        return self.technological_unit.description
-
     def get_leak(self, index: int = 0) -> Optional[LeakTestConfig]:
         """Получить конфигурацию утечки по индексу"""
         if self.leak and index == 0:
@@ -195,3 +216,23 @@ class SuiteConfig:
     def allowed_volume_diff(self) -> float:
         """Относительная погрешность по объёму"""
         return BaseTN3Constants.ALLOWED_VOLUME_DIFF
+
+
+@dataclass
+class LDSStatusConfig(BaseSuiteConfig):
+    """
+    Полная конфигурация тестового набора.
+
+    Один конфиг = один набор данных = один файл в test_config/datasets/
+
+    Структура:
+    1. Данные для тестов(параметры и ожидаемый результат)
+    2. Тесты с маркерами
+    """
+
+    # ===== Данные для тестов =====
+    lds_status_initialization_test_data: Optional[CaseData] = None
+
+    # ===== Тесты =====
+    basic_info_test: Optional[CaseMarkers] = None
+    lds_status_initialization_test: Optional[CaseMarkers] = None

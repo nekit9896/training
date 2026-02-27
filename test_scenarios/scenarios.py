@@ -10,16 +10,16 @@ import time
 import allure
 import pytest
 
-from constants.enums import Direction, LdsStatus, MessageType, ReplyStatus, StationaryStatus
+from constants.enums import Direction, LdsStatus, MessageType, ReplyStatus, StationaryStatus, InitializationLdsStatusReasons
 from constants.test_constants import BaseTN3Constants as TestConst
 from models.get_messages_model import Filtering, Pagination
-from test_config.models_for_tests import LeakTestConfig, SuiteConfig
+from test_config.models_for_tests import LDSStatusConfig, LeakTestConfig, SmokeSuiteConfig
 from utils.helpers import ws_test_utils as t_utils
 from utils.helpers.asserts import SoftAssertions, StepCheck
 from utils.helpers.ws_message_parser import ws_message_parser as parser
 
 
-async def basic_info(ws_client, cfg: SuiteConfig):
+async def basic_info(ws_client, cfg: SmokeSuiteConfig):
     """
     Проверка базовой информации СОУ: список ТУ.
     """
@@ -77,7 +77,7 @@ async def journal_info(ws_client):
     ).is_not_empty()
 
 
-async def lds_status_initialization(ws_client, cfg: SuiteConfig):
+async def lds_status_initialization(ws_client, cfg: SmokeSuiteConfig):
     """
     Проверка режима работы СОУ: Инициализация.
     """
@@ -110,7 +110,7 @@ async def lds_status_initialization(ws_client, cfg: SuiteConfig):
     ).equal_to()
 
 
-async def main_page_info(ws_client, cfg: SuiteConfig):
+async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
     """
     Проверка установки режима МТ.
     """
@@ -137,7 +137,7 @@ async def main_page_info(ws_client, cfg: SuiteConfig):
         ).expected(cfg.expected_stationary_status).equal_to()
 
 
-async def main_page_info_signals(ws_client, cfg: SuiteConfig):
+async def main_page_info_signals(ws_client, cfg: SmokeSuiteConfig):
     """
     Проверка счетчиков состояния сигналов
     """
@@ -179,7 +179,7 @@ async def main_page_info_signals(ws_client, cfg: SuiteConfig):
         ).expected(cfg.expected_stationary_status).equal_to(cfg.expected_main_page_signals[field_name])
 
 
-async def main_page_info_unstationary(ws_client, cfg: SuiteConfig):
+async def main_page_info_unstationary(ws_client, cfg: SmokeSuiteConfig):
     """
     Проверка установки режима Нестационар (для наборов с несколькими утечками).
     Запускается после первой утечки, когда режим переходит в Нестационар.
@@ -207,7 +207,7 @@ async def main_page_info_unstationary(ws_client, cfg: SuiteConfig):
         ).equal_to()
 
 
-async def mask_signal_msg(ws_client, cfg: SuiteConfig):
+async def mask_signal_msg(ws_client, cfg: SmokeSuiteConfig):
     """
     Проверка маскирования датчиков.
     """
@@ -356,7 +356,7 @@ async def mask_signal_msg(ws_client, cfg: SuiteConfig):
         ).expected(False).equal_to()
 
 
-async def lds_status_initialization_out(ws_client, cfg: SuiteConfig):
+async def lds_status_initialization_out(ws_client, cfg: SmokeSuiteConfig):
     """
     Проверка выхода СОУ из Инициализации.
     """
@@ -388,7 +388,7 @@ async def lds_status_initialization_out(ws_client, cfg: SuiteConfig):
     ).expected(LdsStatus.INITIALIZATION.value).is_not_equal_to()
 
 
-async def leaks_content(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imitator_start_time):
+async def leaks_content(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
     """
     Проверка утечки через сообщение LeaksContent.
     """
@@ -467,7 +467,7 @@ async def leaks_content(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imita
         )
 
 
-async def leak_info_in_journal(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imitator_start_time):
+async def leak_info_in_journal(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
     with allure.step("Подключение по ws, получение и обработка сообщения типа: MessagesInfoContent"):
         request_body = t_utils.create_journal_req_body(
             pagination=Pagination(limit=1, direction=Direction.FIRST.value),
@@ -526,7 +526,7 @@ async def leak_info_in_journal(ws_client, cfg: SuiteConfig, leak: LeakTestConfig
         )
 
 
-async def all_leaks_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imitator_start_time):
+async def all_leaks_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
     """
     Проверка сообщения AllLeaksInfo об утечке.
     """
@@ -617,7 +617,7 @@ async def all_leaks_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imit
         ).expected(leak.expected_stationary_status).equal_to()
 
 
-async def tu_leaks_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imitator_start_time):
+async def tu_leaks_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
     """
     Проверка сообщения TuLeaksInfo об утечке.
     """
@@ -708,7 +708,7 @@ async def tu_leaks_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imita
         ).expected(leak.expected_stationary_status).equal_to()
 
 
-async def lds_status_during_leak(ws_client, cfg: SuiteConfig, leak: LeakTestConfig):
+async def lds_status_during_leak(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig):
     """
     Проверка режима работы СОУ во время утечки.
     """
@@ -759,7 +759,7 @@ async def lds_status_during_leak(ws_client, cfg: SuiteConfig, leak: LeakTestConf
             ).actual(diagnostic_area.ldsStatus).expected(expected_status).equal_to()
 
 
-async def acknowledge_leak_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfig = None):
+async def acknowledge_leak_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig = None):
     """
     Проверка квитирования утечки.
 
@@ -832,7 +832,7 @@ async def acknowledge_leak_info(ws_client, cfg: SuiteConfig, leak: LeakTestConfi
     )
 
 
-async def output_signals(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imitator_start_time):
+async def output_signals(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
     """
     Проверка наличия данных об утечке в выходных сигналах.
     """
@@ -959,7 +959,7 @@ async def output_signals(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imit
         ).is_between(leak_wait_start_time, leak_wait_end_time)
 
 
-async def leaks_content_end(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, imitator_start_time):
+async def leaks_content_end(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
     """
     Проверка завершенной утечки через сообщение LeaksContent.
     Проверяется только confirmationStatus на значения confirmed и closed.
@@ -991,3 +991,33 @@ async def leaks_content_end(ws_client, cfg: SuiteConfig, leak: LeakTestConfig, i
         StepCheck(
             "Проверка статуса утечки: должен быть подтверждена и завершена", "confirmationStatus", soft_failures
         ).actual(first_leak_info.confirmationStatus).expected(leak.expected_leak_completed_status).equal_to()
+
+
+async def lds_status_initialization_check_with_reasons(ws_client, cfg: LDSStatusConfig):
+    """
+    Проверка Инициализации и причины инициализации СОУ на базовых ДУ
+    """
+    with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
+        payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "CommonSchemeContent",
+            "SubscribeCommonSchemeRequest",
+            {'tuId': cfg.tu_id, 'additionalProperties': None},
+        )
+        parsed_payload = parser.parse_common_scheme_info_msg(payload)
+        # Получает список участков карты течения
+        flow_areas = parsed_payload.replyContent.flowAreas
+        # Получает самый протяженный участок карты течения
+        base_diagnostic_areas = t_utils.find_base_diagnostic_areas(flow_areas)
+        with allure.step(f"Причины режима СОУ{base_diagnostic_areas}"):
+            pass
+        for diagnostic_area in base_diagnostic_areas:
+            StepCheck(f"Проверка режима работы СОУ на ДУ с id:{diagnostic_area.id}", "ldsStatus").actual(
+                diagnostic_area.ldsStatus
+            ).expected(LdsStatus.INITIALIZATION.value).equal_to()
+            lds_status_reasons = t_utils.parse_lds_status_reasons(
+                diagnostic_area.ldsStatus, diagnostic_area.ldsStatusReasons
+            )
+            StepCheck(
+                f"Проверка причины режима работы СОУ на ДУ с id:{diagnostic_area.id}", "ldsStatusReasons"
+            ).contains(lds_status_reasons, InitializationLdsStatusReasons.LDS_COLD_START)

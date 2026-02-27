@@ -62,3 +62,4 @@ IS_ACKNOWLEDGED_FALSE = False
 # ===== Прочие константы =====
 BASIC_MESSAGE_TIMEOUT = 5.0  # Таймаут ожидания сообщений в секундах
 PRECISION = 3  # Точность округления для координат
+DIAGNOSTIC_AREAS_BASE_IDS = [1, 2, 3, 4, 5, 6, 7, 8]  # Список ДУ с isBase = true из конфигурации Тн-3

@@ -152,3 +152,35 @@ class MessagePriority(IntFlag):
     HIGH = 1 << 3  # Важное
     VERY_HIGH = 1 << 4  # Особой важности
     
+
+class DegradationLdsStatusReasons(IntFlag):
+    """Причины режима деградации СОУ (до 14 причин)."""
+    NEIGHBOUR_LEAK = 1 << 0                    # Утечка на соседнем ДУ
+    PRESSURE_SENSOR_FAULT = 1 << 1             # Неисправность датчика давления
+    FLOW_SENSOR_FAULT = 1 << 2                 # Неисправность расходомера
+    PRESSURE_OUT_OF_RANGE = 1 << 3             # Давление вне допустимого диапазона
+    FLOW_OUT_OF_RANGE = 1 << 4                 # Расход вне допустимого диапазона
+    PRESSURE_GRADIENT_EXCEEDED = 1 << 5        # Превышен градиент давления
+    FLOW_GRADIENT_EXCEEDED = 1 << 6            # Превышен градиент расхода
+    BALANCE_THRESHOLD_EXCEEDED = 1 << 7        # Превышен порог дебаланса
+    MASKED_SENSOR = 1 << 8                     # Маскированный датчик
+    COMMUNICATION_FAULT = 1 << 9               # Нарушение связи с датчиком
+    DATA_QUALITY_LOW = 1 << 10                 # Низкое качество данных
+    ALGORITHM_LIMITATION = 1 << 11             # Ограничение алгоритма
+    MANUAL_DEGRADATION = 1 << 12               # Ручной перевод в деградацию
+    OTHER = 1 << 13                            # Прочие причины
+
+
+class FaultyLdsStatusReasons(IntFlag):
+    NO_CONNECTION = 1 << 0  # Отсутствует связь серверного оборудования СОУ с источником «сырых» данных
+    MIN_NEED_SENSORS_WHEN_STOPPED = 1 << 1  # Менее настраиваемого количества исправных СИ давления на разных КП ЛЧ
+    BALANCE_ALGORITHM_FAULT = 1 << 2  # Алгоритм дебаланса неисправен
+
+
+class InitializationLdsStatusReasons(IntFlag):
+    DATA_STORAGE_PERIOD = 1 << 0  # В период накопления данных после выявленной утечки до момента окончания утечки
+    LDS_FAULTY_OUT = 1 << 1  # При выходе СОУ из режима «неисправна» устанавливается на время не более 30 мин
+    LDS_COLD_START = 1 << 2  # При «холодном» одновременном запуске основного и резервного серверов работы СОУ
+    BLOCK_VALVE_SWITCH = 1 << 3  # В режиме остановленной перекачки при наличии переключения запорной арматуры
+    REINITIALIZATION = 1 << 4  # После получения команды на переинициализацию от пользователя
+    

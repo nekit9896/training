@@ -6,7 +6,7 @@
 """
 
 from constants.enums import TU, ConfirmationStatus, LdsStatus, ReservedType, StationaryStatus
-from test_config.models_for_tests import CaseMarkers, DiagnosticAreaStatusConfig, LeakTestConfig, SuiteConfig
+from test_config.models_for_tests import CaseMarkers, DiagnosticAreaStatusConfig, LeakTestConfig, SmokeSuiteConfig
 
 # ===== Константы набора =====
 SUITE_NAME = "Select_25_tn3_6km_56"
@@ -33,7 +33,7 @@ LINEAR_PART_ID = 407
 
 
 # ===== Конфигурация набора =====
-SELECT_25_CONFIG = SuiteConfig(
+SELECT_25_CONFIG = SmokeSuiteConfig(
     # ===== Метаданные =====
     suite_name=SUITE_NAME,
     suite_data_id=SUITE_DATA_ID,
