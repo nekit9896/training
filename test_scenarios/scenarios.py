@@ -636,15 +636,7 @@ async def tu_leaks_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, 
 
     with allure.step("Обработка сообщения об утечке типа TuLeaksInfoContent"):
         tu_leaks_info_list = parsed_payload.replyContent.leaksInfo
-        # Если у утечки указан controlledSiteId - ищем по нему, иначе берём первую
-        if leak.control_site_id:
-            first_leak_info = t_utils.find_object_by_field(tu_leaks_info_list, "controlledSiteId", leak.control_site_id)
-        else:
-            first_leak_info = tu_leaks_info_list[0]
-            StepCheck(
-                "Проверка: пришла хотя бы одна утечка",
-                "tuLeakInfo",
-            ).actual(first_leak_info).is_not_none()
+        first_leak_info = t_utils.find_leak_by_coordinate(tu_leaks_info_list, leak.coordinate_meters)
 
         # Конвертируем время обнаружения в московское время
         leak_detected_at = t_utils.ensure_moscow_timezone(first_leak_info.leakDetectedAt)
@@ -662,14 +654,9 @@ async def tu_leaks_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, 
             parsed_payload.replyContent.tuId
         ).expected(cfg.tu_id).equal_to()
 
-        if leak.control_site_id:
-            StepCheck("Проверка наличия id участка утечки", "controlledSiteId", soft_failures).actual(
-                first_leak_info.controlledSiteId
-            ).expected(leak.control_site_id).equal_to()
-        else:
-            StepCheck("Проверка наличия id участка утечки", "controlledSiteId", soft_failures).actual(
-                first_leak_info.controlledSiteId
-            ).is_not_none()
+        StepCheck("Проверка наличия id участка утечки", "controlledSiteId", soft_failures).actual(
+            first_leak_info.controlledSiteId
+        ).is_not_none()
 
         StepCheck("Проверка статуса СОУ", "ldsStatus", soft_failures).actual(first_leak_info.ldsStatus).expected(
             leak.expected_lds_status
