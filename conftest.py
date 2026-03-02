@@ -134,6 +134,7 @@ LEAK_LEVEL_TEST_MAPPING = {
     'test_output_signals': 'output_signals_test',
     'test_lds_status_during_leak': 'lds_status_during_leak_test',
     'test_leak_completed_status': 'leak_completed_status_test',
+    'test_balance_algorithm_leak_waiting': 'balance_algorithm_leak_waiting_test',
 }
 
 

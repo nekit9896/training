@@ -5,7 +5,9 @@
 Pytest маркеры и allure декораторы применяются в тестовых файлах.
 """
 
+import asyncio
 import time
+from datetime import datetime, timedelta
 
 import allure
 import pytest
@@ -1008,3 +1010,90 @@ async def lds_status_initialization_check_with_reasons(ws_client, cfg: LDSStatus
             StepCheck(
                 f"Проверка причины режима работы СОУ на ДУ с id:{diagnostic_area.id}", "ldsStatusReasons"
             ).contains(lds_status_reasons, InitializationLdsStatusReasons.LDS_COLD_START)
+
+async def balance_algorithm_leak_waiting(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
+    """
+    Проверка подозрения утечки через сообщение BalanceAlgorithmResults
+
+    Логика:
+    1. Раз в BALANCE_ALGORITHM_POLL_INTERVAL секунд подписываемся на BalanceAlgorithmResultsContent
+    2. Собираем все diagnosticAreas (только из flowAreas с непустым списком)
+    3. Проверяем, что на ДУ с утечкой хотя бы раз пришёл isLeakPossible=True
+    4. Проверяем, что на всех остальных ДУ isLeakPossible всегда False
+    5. Проверяем дебаланс на ДУ с утечкой через is_between (плюс минус DEBALANCE_TOLERANCE от порога)
+    """
+    poll_interval = TestConst.BALANCE_ALGORITHM_POLL_INTERVAL
+    total_wait = TestConst.BALANCE_ALGORITHM_TOTAL_WAIT
+    end_time = imitator_start_time + timedelta(seconds=leak.leak_start_interval_seconds + total_wait)
+
+    collected_diagnostic_areas = []
+
+    with allure.step(
+        f"Опрос BalanceAlgorithmResults каждые {poll_interval} с "
+        f"в течение {total_wait} с после начала утечки"
+    ):
+        while datetime.now(tz=imitator_start_time.tzinfo) < end_time:
+            payload = await t_utils.connect_and_subscribe_msg(
+                ws_client,
+                "BalanceAlgorithmResultsContent",
+                "SubscribeBalanceAlgorithmResultsRequest",
+                {'tuId': cfg.tu_id, 'additionalProperties': None},
+            )
+            parsed_payload = parser.parse_balance_algorithm_msg(payload)
+
+            reply_content = parsed_payload.replyContent
+            if reply_content and reply_content.flowAreas:
+                for flow_area in reply_content.flowAreas:
+                    if flow_area.diagnosticAreas:
+                        collected_diagnostic_areas.extend(flow_area.diagnosticAreas)
+
+            await asyncio.sleep(poll_interval)
+
+    if not collected_diagnostic_areas:
+        pytest.fail(
+            f"За {total_wait} секунд не пришло ни одной diagnosticArea "
+            f"в BalanceAlgorithmResultsContent"
+        )
+
+    leak_diagnostic_area_id = leak.leak_diagnostic_area_id
+    if leak_diagnostic_area_id is None:
+        pytest.fail("В конфигурации утечки не задан leak_diagnostic_area_id (проверьте lds_status_during_leak_config)")
+
+    leak_diagnostic_area_samples = [diagnostic_area for diagnostic_area in collected_diagnostic_areas if diagnostic_area.id == leak_diagnostic_area_id]
+    if not leak_diagnostic_area_samples:
+        pytest.fail(
+            f"За {total_wait} секунд не пришло ни одного сообщения "
+            f"для ДУ с id={leak_diagnostic_area_id}."
+        )
+
+    with SoftAssertions() as soft_failures:
+        is_leak_possible_seen = any(diagnostic_area.isLeakPossible for diagnostic_area in leak_diagnostic_area_samples)
+        StepCheck(
+            f"Проверка: на ДУ id={leak_diagnostic_area_id} с будущей утечкой хотя бы раз за 10 минут приходил статус 'подозрение на утечку': isLeakPossible=True",
+            "isLeakPossible",
+            soft_failures,
+        ).actual(is_leak_possible_seen).expected(True).equal_to()
+
+        foreign_with_possible = [
+            diagnostic_area for diagnostic_area in collected_diagnostic_areas if diagnostic_area.id != leak_diagnostic_area_id and diagnostic_area.isLeakPossible
+        ]
+        StepCheck(
+            "Проверка: на остальных ДУ isLeakPossible всегда False",
+            "isLeakPossible_other",
+            soft_failures,
+        ).actual(len(foreign_with_possible)).expected(0).equal_to()
+
+        if leak.flow_rate_settings_threshold is not None:
+            threshold = leak.flow_rate_settings_threshold
+            tolerance = TestConst.DEBALANCE_TOLERANCE
+            lower_bound = threshold * (1 - tolerance)
+            upper_bound = threshold * (1 + tolerance)
+
+            for diagnostic_area in leak_diagnostic_area_samples:
+                if diagnostic_area.isLeakPossible:
+                    StepCheck(
+                        f"Проверка дебаланса на ДУ id={leak_diagnostic_area_id} "
+                        f"(±{int(tolerance * 100)}% от порога {threshold})",
+                        "debalance",
+                        soft_failures,
+                    ).actual(abs(diagnostic_area.debalance)).is_between(lower_bound, upper_bound)

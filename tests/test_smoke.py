@@ -458,3 +458,27 @@ class TestLeakScenarios:
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.output_signals(ws_client, config, leak, imitator_start_time)
+
+    @pytest.mark.asyncio
+    async def test_balance_algorithm_leak_waiting(
+        self,
+        ws_client: WebSocketClient,
+        config: SmokeSuiteConfig,
+        leak: LeakTestConfig,
+        leak_number: int,
+        imitator_start_time: datetime,
+    ) -> None:
+        """[BalanceAlgorithmResultsContent] Проверка сообщения "подозрение на утечку" в таблице КГ"""
+        tag = "BalanceAlgorithmResultsContent"
+        title = f"[{tag}] Проверка сообщения 'подозрение на утечку'. ЭФ: КГ.Табличное представление"
+        description = (
+            f"Проверка сообщения 'подозрение на утечку' в таблице КГ, \n"
+            f"на технологическом участке {config.technological_unit.description}\n"
+            f"Время проведения проверки: {leak.balance_algorithm_leak_waiting_test.offset} мин.\n"
+            "Подписка на сообщения типа: BalanceAlgorithmResultsContent\n"
+        )
+        _apply_allure_markers(leak.balance_algorithm_leak_waiting_test, tag, title, description)
+        # Добавляем номер утечки в title для multi-leak
+        if config.has_multiple_leaks:
+            allure.dynamic.title(f"{title} (утечка #{leak_number})")
+        await scenarios.balance_algorithm_leak_waiting(ws_client, config, leak, imitator_start_time)

@@ -59,6 +59,11 @@ IS_MASKED_FALSE = False
 # ===== Параметры подтверждения =====
 IS_ACKNOWLEDGED_FALSE = False
 
+# ===== Параметры BalanceAlgorithmResults =====
+BALANCE_ALGORITHM_POLL_INTERVAL = 15  # Интервал опроса подписки в секундах
+BALANCE_ALGORITHM_TOTAL_WAIT = 600  # Общее время опроса в секундах 10 минут
+DEBALANCE_TOLERANCE = 0.3  # Допустимое отклонение дебаланса от порога 30%
+
 # ===== Прочие константы =====
 BASIC_MESSAGE_TIMEOUT = 5.0  # Таймаут ожидания сообщений в секундах
 PRECISION = 3  # Точность округления для координат

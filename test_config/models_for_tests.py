@@ -110,7 +110,6 @@ class LeakTestConfig:
 
     # ===== Идентификаторы =====
     control_site_id: Optional[int] = None
-    diagnostic_area_id: Optional[int] = None
     diagnostic_area_name: Optional[str] = None
     linear_part_id: Optional[int] = None
     technological_object: Optional[str] = None
@@ -119,6 +118,8 @@ class LeakTestConfig:
     coordinate_meters: float = None
     volume_m3: float = None
     max_pumping_m3: int = 2500  # Производительность(максимальная перекачка)
+    # Порог объема настройки дебаланса для текущего ДУ в текущем режиме
+    flow_rate_settings_threshold: Optional[float] = None
 
     # ===== Временные интервалы (секунды) =====
     leak_start_interval_seconds: int = BaseTN3Constants.LEAK_START_INTERVAL
@@ -135,6 +136,7 @@ class LeakTestConfig:
     lds_status_during_leak_config: Optional[DiagnosticAreaStatusConfig] = None
 
     # ===== Тест-кейсы для этой утечки =====
+    balance_algorithm_leak_waiting_test: Optional[CaseMarkers] = None
     leaks_content_test: Optional[CaseMarkers] = None
     all_leaks_info_test: Optional[CaseMarkers] = None
     tu_leaks_info_test: Optional[CaseMarkers] = None
@@ -142,6 +144,13 @@ class LeakTestConfig:
     acknowledge_leak_test: Optional[CaseMarkers] = None
     output_signals_test: Optional[CaseMarkers] = None
     lds_status_during_leak_test: Optional[CaseMarkers] = None
+
+    @property
+    def leak_diagnostic_area_id(self) -> Optional[int]:
+        """ID диагностического участка с утечкой из lds_status_during_leak_config"""
+        if self.lds_status_during_leak_config is not None:
+            return self.lds_status_during_leak_config.leak_diagnostic_area_id
+        return None
 
     @property
     def allowed_volume_m3(self) -> float:

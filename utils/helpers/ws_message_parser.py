@@ -16,6 +16,7 @@ from models.get_messages_model import GetMessagesReply
 from models.get_output_signals_model import GetOutputSignalsReply
 from models.mask_signal_model import MaskSignalReply
 from models.subscribe_all_leaks_info_model import SubscribeAllLeaksInfoReply
+from models.subscribe_balance_algorithm_results_model import SubscribeBalanceAlgorithmResultsReply
 from models.subscribe_common_scheme_model import SubscribeCommonSchemeReply
 from models.subscribe_input_signals_model import InputSignal, SubscribeInputSignalsContent, SubscribeInputSignalsReply
 from models.subscribe_leaks_model import SubscribeLeaksReply
@@ -175,6 +176,12 @@ class WsMessageParser:
         Парсит getOutputSignals сообщение
         """
         return self._find_and_parse_message(data_class=GetOutputSignalsReply, data=data)
+
+    def parse_balance_algorithm_msg(self, data: list) -> SubscribeBalanceAlgorithmResultsReply:
+        """
+        Парсит BalanceAlgorithmResults сообщение
+        """
+        return self._find_and_parse_message(data_class=SubscribeBalanceAlgorithmResultsReply, data=data)
 
     def parse_tu_leaks_info_msg(self, data: list) -> SubscribeTuLeaksInfoReply:
         """

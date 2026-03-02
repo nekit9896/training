@@ -28,6 +28,7 @@ ALLOWED_TIME_DIFF_SECONDS = 1440  # 24 минуты
 LEAK_START_INTERVAL_SECONDS = 2100  # 35 минут
 LEAK_TECHNOLOGICAL_OBJECT = "НПС-5 Тихорецкая - НПС-3 Нововеличковская"
 LEAK_DIAGNOSTIC_AREA_NAME = "Т-Н-3.НПС-5 «Тихорецкая».УЗР вых - Т-Н-3.НПС-3 «Нововеличковская».УЗР вых"
+FLOW_RATE_SETTINGS_THRESHOLD = 17
 
 # ID диагностических участков
 LEAK_DIAGNOSTIC_AREA_ID = 2
@@ -77,6 +78,7 @@ SELECT_6_CONFIG = SmokeSuiteConfig(
         volume_m3=LEAK_VOLUME_M3,
         linear_part_id=LINEAR_PART_ID,
         technological_object=LEAK_TECHNOLOGICAL_OBJECT,
+        flow_rate_settings_threshold=FLOW_RATE_SETTINGS_THRESHOLD,
         # ----- Временные интервалы -----
         leak_start_interval_seconds=LEAK_START_INTERVAL_SECONDS,
         allowed_time_diff_seconds=ALLOWED_TIME_DIFF_SECONDS,
@@ -89,6 +91,8 @@ SELECT_6_CONFIG = SmokeSuiteConfig(
         all_leaks_info_test=CaseMarkers(test_case_id="4", offset=59),
         # ----- Тест LeaksContent -----
         leaks_content_test=CaseMarkers(test_case_id="97", offset=59),
+        # ----- Тест BalanceAlgorithmResultsContent -----
+        balance_algorithm_leak_waiting_test=CaseMarkers(test_case_id="", offset=35),
         # ----- Тест MessageInfo -----
         leak_info_in_journal=CaseMarkers(test_case_id="119", offset=59),
         # ----- Тест TuLeaksInfo -----
