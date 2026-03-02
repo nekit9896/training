@@ -196,6 +196,34 @@ def find_object_by_field(item_list: List[ObjectType], field_name: str, value: An
         fail(f"Не найдено значение: {value} для поля: {field_name}, в списке: {item_list}.")
 
 
+def find_leak_by_coordinate(
+    leaks_list: List[ObjectType],
+    expected_coordinate: float,
+    tolerance: float = TestConst.ALLOWED_DISTANCE_DIFF_METERS,
+) -> ObjectType:
+    """
+    Ищет утечку в списке по координатам с допустимой погрешностью.
+
+    Рейзим:
+        pytest.fail: Если список пуст или утечка не найдена.
+    """
+    if not leaks_list:
+        fail("Список утечек пуст")
+
+    for leak in leaks_list:
+        leak_coordinate = getattr(leak, "leakCoordinate", None)
+        if leak_coordinate is None:
+            continue
+        if abs(leak_coordinate - expected_coordinate) <= tolerance:
+            return leak
+
+    coordinates = [getattr(leak, "leakCoordinate", None) for leak in leaks_list]
+    fail(
+        f"Не найдена утечка с координатой {expected_coordinate} ± {tolerance} м. "
+        f"Координаты полученных утечек: {coordinates}"
+    )
+
+
 def find_diagnostic_area_by_id(flow_areas: List[FlowArea], id_value: int) -> DiagnosticArea:
     """
     Ищет ДУ по id в списке участков карты течений
