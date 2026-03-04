@@ -36,6 +36,7 @@ class WebSocketClient:
         self._recv_task: asyncio.Task | None = None
         self._stop_event = asyncio.Event()
         self._invocation_id: Optional[str] = None
+        self.suppress_recv_logging: bool = False
 
     @property
     def invocation_id(self):
@@ -114,16 +115,18 @@ class WebSocketClient:
         while not self._stop_event.is_set():
             try:
                 chunk = await self._ws.recv()
-                logger.info(f"Сырые биты до обработки: {chunk[:100]}")
+                if not self.suppress_recv_logging:
+                    logger.info(f"Сырые биты до обработки: {chunk[:100]}")
             except websockets.ConnectionClosed as e:
                 logger.warning(f"WebSocket соединение разорвано: {e}")
                 return
 
             result_message = parse_message(chunk)
-            logger.info(
-                f"Обработанное сообщение от api-gateway: {str(result_message)[:1000]} - размер можно увеличить в "
-                f"WebSocketClient в _recv_loop(self)"
-            )
+            if not self.suppress_recv_logging:
+                logger.info(
+                    f"Обработанное сообщение от api-gateway: {str(result_message)[:1000]} - размер можно увеличить в "
+                    f"WebSocketClient в _recv_loop(self)"
+                )
             await self.recv_queue.put(result_message)
 
     async def invoke(self, target: str, args: list) -> None:
