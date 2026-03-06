@@ -14,7 +14,6 @@ import pytest
 
 from constants.enums import Direction, LdsStatus, MessageType, ReplyStatus, StationaryStatus, InitializationLdsStatusReasons
 from constants.test_constants import BaseTN3Constants as TestConst
-from utils.msgpack_utils.message_filters import is_desired_type
 from models.get_messages_model import Filtering, Pagination
 from test_config.models_for_tests import LDSStatusConfig, LeakTestConfig, SmokeSuiteConfig
 from utils.helpers import ws_test_utils as t_utils
@@ -1012,6 +1011,83 @@ async def lds_status_initialization_check_with_reasons(ws_client, cfg: LDSStatus
                 f"Проверка причины режима работы СОУ на ДУ с id:{diagnostic_area.id}", "ldsStatusReasons"
             ).contains(lds_status_reasons, InitializationLdsStatusReasons.LDS_COLD_START)
 
+async def balance_algorithm_leak_detected(
+    ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time: datetime,
+):
+    """
+    Проверка наличия утечки (isLeakDetected) через BalanceAlgorithmResults.
+
+    Логика:
+    1. Подписка на BalanceAlgorithmResultsContent (однократно).
+    2. Получение первого подходящего сообщения.
+    3. Проверяем, что на ДУ с утечкой isLeakDetected=True.
+    4. Проверяем, что на всех остальных ДУ isLeakDetected=False.
+    5. Проверяем, что |debalance| на ДУ с утечкой > FLOW_RATE_SETTINGS_THRESHOLD.
+    """
+    leak_da_id = leak.leak_diagnostic_area_id
+    if leak_da_id is None:
+        pytest.fail(
+            "В конфигурации утечки не задан leak_diagnostic_area_id "
+            "(проверьте lds_status_during_leak_config)"
+        )
+
+    with allure.step("Подписка и получение BalanceAlgorithmResultsContent"):
+        payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "BalanceAlgorithmResultsContent",
+            "SubscribeBalanceAlgorithmResultsRequest",
+            {'tuId': cfg.tu_id, 'additionalProperties': None},
+        )
+
+    parsed_payload = parser.parse_balance_algorithm_msg(payload)
+    reply_content = parsed_payload.replyContent
+    if not reply_content or not reply_content.flowAreas:
+        pytest.fail("В ответе BalanceAlgorithmResultsContent отсутствуют flowAreas")
+
+    all_diagnostic_areas = []
+    for flow_area in reply_content.flowAreas:
+        if flow_area.diagnosticAreas:
+            all_diagnostic_areas.extend(flow_area.diagnosticAreas)
+
+    if not all_diagnostic_areas:
+        pytest.fail("Во всех flowAreas отсутствуют diagnosticAreas")
+
+    leak_da = next(
+        (da for da in all_diagnostic_areas if da.id == leak_da_id), None,
+    )
+    if leak_da is None:
+        pytest.fail(f"ДУ с id={leak_da_id} не найден в ответе BalanceAlgorithmResultsContent")
+
+    with allure.step("Верификация BalanceAlgorithmResults: isLeakDetected"):
+        with SoftAssertions() as soft_failures:
+            StepCheck(
+                f"На ДУ id={leak_da_id} обнаружена утечка: isLeakDetected=True",
+                "isLeakDetected",
+                soft_failures,
+            ).actual(leak_da.isLeakDetected).expected(True).equal_to()
+
+            foreign_with_detected = [
+                da for da in all_diagnostic_areas
+                if da.id != leak_da_id and da.isLeakDetected
+            ]
+            StepCheck(
+                f"На остальных ДУ isLeakDetected=False "
+                f"(нарушителей: {len(foreign_with_detected)}, "
+                f"id: {[da.id for da in foreign_with_detected]})",
+                "isLeakDetected_other",
+                soft_failures,
+            ).actual(len(foreign_with_detected)).expected(0).equal_to()
+
+            if leak.flow_rate_settings_threshold is not None:
+                threshold = leak.flow_rate_settings_threshold
+                StepCheck(
+                    f"Дебаланс на ДУ id={leak_da_id} по модулю "
+                    f"строго больше порога {threshold}",
+                    "debalance",
+                    soft_failures,
+                ).actual(abs(leak_da.debalance)).is_greater_than(threshold)
+
+
 async def balance_algorithm_leak_waiting(
     ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time: datetime,
 ):
@@ -1037,8 +1113,6 @@ async def balance_algorithm_leak_waiting(
             "В конфигурации утечки не задан leak_diagnostic_area_id "
         )
 
-    collected_diagnostic_areas = []
-
     with allure.step(
         f"Подписка и сбор BalanceAlgorithmResults "
         f"раз в {poll_interval} с, в течение {total_wait} с после начала утечки"
@@ -1049,45 +1123,11 @@ async def balance_algorithm_leak_waiting(
             {'tuId': cfg.tu_id, 'additionalProperties': None},
         )
 
-        ws_client.suppress_recv_logging = True
-        try:
-            while datetime.now(tz=imitator_start_time.tzinfo) < end_time:
-                await asyncio.sleep(poll_interval)
-
-                latest_msg = None
-                while not ws_client.recv_queue.empty():
-                    try:
-                        msg = ws_client.recv_queue.get_nowait()
-                    except asyncio.QueueEmpty:
-                        break
-                    if isinstance(msg, list) and is_desired_type(msg, "BalanceAlgorithmResultsContent"):
-                        latest_msg = msg
-
-                if latest_msg is None:
-                    continue
-
-                parsed_payload = parser.parse_balance_algorithm_msg(latest_msg)
-                reply_content = parsed_payload.replyContent
-                if reply_content and reply_content.flowAreas:
-                    for flow_area in reply_content.flowAreas:
-                        if flow_area.diagnosticAreas:
-                            collected_diagnostic_areas.extend(flow_area.diagnosticAreas)
-        finally:
-            ws_client.suppress_recv_logging = False
-
-    if not collected_diagnostic_areas:
-        pytest.fail(
-            f"За {total_wait} секунд не пришло ни одной diagnosticArea "
-            f"в BalanceAlgorithmResultsContent"
+        collected_diagnostic_areas = await t_utils.poll_balance_algorithm_diagnostic_areas(
+            ws_client, imitator_start_time, end_time, poll_interval,
         )
-
-    leak_da_samples = [
-        da for da in collected_diagnostic_areas if da.id == leak_da_id
-    ]
-    if not leak_da_samples:
-        pytest.fail(
-            f"За {total_wait} секунд не пришло ни одного сообщения "
-            f"для ДУ с id={leak_da_id}."
+        leak_da_samples = t_utils.get_leak_da_samples(
+            collected_diagnostic_areas, leak_da_id, total_wait,
         )
 
     with SoftAssertions() as soft_failures:

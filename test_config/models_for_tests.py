@@ -136,6 +136,7 @@ class LeakTestConfig:
     lds_status_during_leak_config: Optional[DiagnosticAreaStatusConfig] = None
 
     # ===== Тест-кейсы для этой утечки =====
+    balance_algorithm_leak_detected_test: Optional[CaseMarkers] = None
     balance_algorithm_leak_waiting_test: Optional[CaseMarkers] = None
     leaks_content_test: Optional[CaseMarkers] = None
     all_leaks_info_test: Optional[CaseMarkers] = None

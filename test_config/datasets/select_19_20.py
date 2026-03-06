@@ -97,6 +97,8 @@ SELECT_19_20_CONFIG = SmokeSuiteConfig(
             expected_stationary_status=StationaryStatus.UNSTATIONARY.value,
             expected_algorithm_type=ReservedType.UNSTATIONARY_FLOW.value,
             expected_leak_status=ConfirmationStatus.CONFIRMED.value,
+            # ----- Тест BalanceAlgorithmResultsContent (первая утечка) -----
+            balance_algorithm_leak_detected_test=CaseMarkers(test_case_id="", offset=47),
             # ----- Тест LeaksContent (первая утечка) -----
             leaks_content_test=CaseMarkers(test_case_id="72", offset=47),
             # ----- Тест AllLeaksInfo (первая утечка) -----
