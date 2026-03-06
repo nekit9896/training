@@ -85,6 +85,8 @@ SELECT_22_CONFIG = SmokeSuiteConfig(
         expected_leak_status=ConfirmationStatus.CONFIRMED.value,
         # ----- Тесты LeaksContent -----
         leaks_content_test=CaseMarkers(test_case_id="124", offset=47),
+        # ----- Тест BalanceAlgorithmResultsContent -----
+        balance_algorithm_leak_detected_test=CaseMarkers(test_case_id="", offset=47),
         # ----- Тест AllLeaksInfo -----
         all_leaks_info_test=CaseMarkers(test_case_id="121", offset=47),
         # ----- Тест TuLeaksInfo  -----

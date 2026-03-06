@@ -77,6 +77,8 @@ SELECT_7_CONFIG = SmokeSuiteConfig(
         expected_leak_status=ConfirmationStatus.CONFIRMED.value,
         expected_lds_status=LdsStatus.SERVICEABLE.value,
         expected_stationary_status=StationaryStatus.STATIONARY.value,
+        # ----- Тест BalanceAlgorithmResultsContent -----
+        balance_algorithm_leak_detected_test=CaseMarkers(test_case_id="", offset=59),
         # ----- Тест AllLeaksInfo -----
         all_leaks_info_test=CaseMarkers(test_case_id="13", offset=59),
         # ----- Тест LeaksContent -----

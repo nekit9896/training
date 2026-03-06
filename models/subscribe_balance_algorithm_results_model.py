@@ -1,55 +1,83 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from constants.enums import ReplyStatus
 
 
 @dataclass
-class FlowAreas:
-    """Результаты работы алгоритма для каждой области течения. Находятся в выходном слое LDS: flowAreas"""
+class BalanceAlgorithmDiagnosticArea:
+    """
+    Результаты работы алгоритма баланса для одного диагностического участка
+    """
 
-    flowAreas: List[Dict[str, Any]]
+    id: int
+    name: str
+    debalance: float
+    isLeakPossible: bool
+    isLeakDetected: bool
+    timeToLeakDetection: int
+    status: int
+    statusReason: int
+    timeToInitialize: int
 
 
 @dataclass
-class ReplyErrors:
-    replyErrors: List[Dict[str, Any]]
+class BalanceAlgorithmFlowArea:
+    """
+    Результаты работы алгоритма баланса для одной flowArea
+    """
+
+    id: str
+    isFlowAvailable: bool
+    diagnosticAreas: List[BalanceAlgorithmDiagnosticArea]
+
+
+@dataclass
+class BalanceAlgorithmResultsContent:
+    """
+    Содержимое BalanceAlgorithmResultsContent
+    """
+
+    tuId: int
+    flowAreas: List[BalanceAlgorithmFlowArea]
 
 
 @dataclass
 class SubscribeBalanceAlgorithmResultsReply:
-    """Информация для каждого диагностического участка"""
+    """
+    DTO ответа на SubscribeBalanceAlgorithmResultsRequest
+    """
 
     replyStatus: ReplyStatus
-    replyContent: Optional[FlowAreas] = None
-    replyErrors: Optional[ReplyErrors] = None
+    replyContent: Optional[BalanceAlgorithmResultsContent] = None
+    replyErrors: Optional[object] = None
 
 
 @dataclass
 class SubscribeBalanceAlgorithmResultsRequest:
-    """ТУ, для которого нужны результаты работы алгоритма"""
-
-    tuId: TuId
-
-
-@dataclass
-class TuId:
-    """Идентификатор ТУ"""
+    """
+    DTO запроса SubscribeBalanceAlgorithmResultsRequest
+    """
 
     tuId: int
+    additionalProperties: Optional[object] = None
 
 
 @dataclass
 class SubscribeBalanceAlgorithmResultsReplyMessage:
-    """Ответ на запрос subscribeBalanceAlgorithmResultsRequest"""
+    """
+    Обёртка ws-сообщения с ответом BalanceAlgorithmResultsContent
+    """
 
     payload: SubscribeBalanceAlgorithmResultsReply
 
 
 @dataclass
 class SubscribeBalanceAlgorithmResultsRequestMessage:
-    """Подписка на получение результатов работы алгоритма баланса на ТУ"""
+    """
+    Обёртка ws-сообщения с запросом SubscribeBalanceAlgorithmResultsRequest
+    """
 
     payload: SubscribeBalanceAlgorithmResultsRequest

@@ -15,6 +15,7 @@ from pytest import fail
 from clients.websocket_client import WebSocketClient
 from constants.enums import LdsStatus, DegradationLdsStatusReasons, FaultyLdsStatusReasons, InitializationLdsStatusReasons
 from constants.test_constants import BaseTN3Constants as TestConst
+from utils.msgpack_utils.message_filters import is_desired_type
 from models.get_messages_model import GetMessagesRequest
 from models.subscribe_all_leaks_info_model import SubscribeAllLeaksInfoReply
 from models.subscribe_common_scheme_model import DiagnosticArea, FlowArea
@@ -338,6 +339,71 @@ def parse_lds_status_reasons(
     """
     enum_cls = get_reason_enum_by_lds_status(lds_status)
     return parse_bit_flags(lds_status_reasons, enum_cls)
+
+async def poll_balance_algorithm_diagnostic_areas(
+    ws_client: WebSocketClient,
+    imitator_start_time: datetime,
+    end_time: datetime,
+    poll_interval: float,
+) -> list:
+    """
+    Поллит очередь ws_client на наличие BalanceAlgorithmResultsContent,
+    собирает и возвращает все diagnosticAreas из flowAreas.
+    """
+    collected = []
+    ws_client.suppress_recv_logging = True
+    try:
+        while datetime.now(tz=imitator_start_time.tzinfo) < end_time:
+            await asyncio.sleep(poll_interval)
+
+            latest_msg = None
+            while not ws_client.recv_queue.empty():
+                try:
+                    msg = ws_client.recv_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+                if isinstance(msg, list) and is_desired_type(msg, "BalanceAlgorithmResultsContent"):
+                    latest_msg = msg
+
+            if latest_msg is None:
+                continue
+
+            parsed_payload = ws_message_parser.parse_balance_algorithm_msg(latest_msg)
+            reply_content = parsed_payload.replyContent
+            if reply_content and reply_content.flowAreas:
+                for flow_area in reply_content.flowAreas:
+                    if flow_area.diagnosticAreas:
+                        collected.extend(flow_area.diagnosticAreas)
+    finally:
+        ws_client.suppress_recv_logging = False
+    return collected
+
+
+def get_leak_da_samples(
+    collected_diagnostic_areas: list,
+    leak_da_id: int,
+    total_wait: int,
+) -> list:
+    """
+    Проверяет наличие diagnosticAreas и возвращает подмножество
+    для ДУ с заданным leak_da_id. Падает, если данные не найдены.
+    """
+    if not collected_diagnostic_areas:
+        fail(
+            f"За {total_wait} секунд не пришло ни одной diagnosticArea "
+            f"в BalanceAlgorithmResultsContent"
+        )
+
+    leak_da_samples = [
+        da for da in collected_diagnostic_areas if da.id == leak_da_id
+    ]
+    if not leak_da_samples:
+        fail(
+            f"За {total_wait} секунд не пришло ни одного сообщения "
+            f"для ДУ с id={leak_da_id}."
+        )
+    return leak_da_samples
+
 
 async def connect(ws_client: WebSocketClient, ws_invoke_type: str, ws_invoke_params: Any = None) -> None:
     """

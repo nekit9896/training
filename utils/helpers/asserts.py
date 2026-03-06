@@ -137,6 +137,15 @@ class StepMessageBuilder:
             message_parts.append(f"Дополнительная информация: {self._format_val(extra_info)}")
         return self._build_message(message_parts)
 
+    def is_greater_than(self, exp_value: Any, act_value: Any, extra_info: Optional[Any] = None) -> str:
+        message_parts = [
+            f"Ожидаемый результат: Значение в поле {self.field_name} > {self._format_val(exp_value)}",
+            f"Фактический результат: {self.field_name} = {self._format_val(act_value)}",
+        ]
+        if extra_info:
+            message_parts.append(f"Дополнительная информация: {self._format_val(extra_info)}")
+        return self._build_message(message_parts)
+
     def is_between(self, act_value: Any, lower_bound: Any, upper_bound: Any) -> str:
         message_parts = [
             f"Ожидаемый результат: "
@@ -312,6 +321,19 @@ class StepCheck:
         try:
             with allure.step(msg):
                 assert_that(self._actual).described_as(msg).is_less_than(threshold)
+        except AssertionError as exc:
+            self._handle_assertion(exc)
+
+    def is_greater_than(self, threshold: Any, extra_info: Any = None) -> None:
+        """Проверка, что значение строго больше порога"""
+        if self._actual is None:
+            raise ValueError("Фактический результат должен быть заполнен при вызове is_greater_than()")
+
+        msg = self._msg_builder.is_greater_than(threshold, self._actual, extra_info)
+
+        try:
+            with allure.step(msg):
+                assert_that(self._actual).described_as(msg).is_greater_than(threshold)
         except AssertionError as exc:
             self._handle_assertion(exc)
 
