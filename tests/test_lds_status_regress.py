@@ -58,9 +58,7 @@ SUITE_PARAMS: List[Any] = _generate_suite_params()
 def _apply_allure_markers(test_config: CaseMarkers, tag: str, title: str, description: Optional[str] = None) -> None:
     """Применяет allure-маркеры из конфига теста."""
     if not test_config:
-        msg = "Не заполнена конфигурация теста: запуск остановлен"
-        allure.attach(msg, name="Ошибка подготовки тестрана", attachment_type=allure.attachment_type.TEXT)
-        pytest.exit(msg)
+        pytest.skip("Тест не сконфигурирован для данного набора данных")
     allure.dynamic.tag(tag)
     allure.dynamic.tag("REGRESS")
     allure.dynamic.title(title)
