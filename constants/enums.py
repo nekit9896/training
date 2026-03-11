@@ -151,36 +151,34 @@ class MessagePriority(IntFlag):
     MEDIUM = 1 << 2  # Значительное
     HIGH = 1 << 3  # Важное
     VERY_HIGH = 1 << 4  # Особой важности
-    
+
 
 class DegradationLdsStatusReasons(IntFlag):
-    """Причины режима деградации СОУ (до 14 причин)."""
-    NEIGHBOUR_LEAK = 1 << 0                    # Утечка на соседнем ДУ
-    PRESSURE_SENSOR_FAULT = 1 << 1             # Неисправность датчика давления
-    FLOW_SENSOR_FAULT = 1 << 2                 # Неисправность расходомера
-    PRESSURE_OUT_OF_RANGE = 1 << 3             # Давление вне допустимого диапазона
-    FLOW_OUT_OF_RANGE = 1 << 4                 # Расход вне допустимого диапазона
-    PRESSURE_GRADIENT_EXCEEDED = 1 << 5        # Превышен градиент давления
-    FLOW_GRADIENT_EXCEEDED = 1 << 6            # Превышен градиент расхода
-    BALANCE_THRESHOLD_EXCEEDED = 1 << 7        # Превышен порог дебаланса
-    MASKED_SENSOR = 1 << 8                     # Маскированный датчик
-    COMMUNICATION_FAULT = 1 << 9               # Нарушение связи с датчиком
-    DATA_QUALITY_LOW = 1 << 10                 # Низкое качество данных
-    ALGORITHM_LIMITATION = 1 << 11             # Ограничение алгоритма
-    MANUAL_DEGRADATION = 1 << 12               # Ручной перевод в деградацию
-    OTHER = 1 << 13                            # Прочие причины
+    LEAK_ON_ADJACENT_DIAGNOSTIC_AREAS = 1 << 0  # Возникновение утечки на соседнем диагностическом участке
+    ADDITIVE_INJECTORS_OPERATION = 1 << 1  # Наличие ПТП
+    PIG_SENSOR_PASSAGE = 1 << 2  # Наличие СОД
+    TRIGGERING_EMERGENCY_RESET = 1 << 3  # Срабатывание аварийного сброса
+    STARTING_PUMPING_OUT_PUMPS = 1 << 4  # Работа насосов откачки
+    EXCEEDING_DISTANCE_BETWEEN_SERVICEABLE_PRESSURE_SENSORS = 1 << 5  # Расстояние между СИ давления более 50 км
+    FAULTY_PRESSURE_SENSORS_AT_PUMP_STATION_NODES = 1 << 6  # Отказ СИ давления на входе/выходе НПС
+    REJECTION_TEMPERATURE_SENSOR = 1 << 7  # Отказ СИ температуры
+    REJECTION_VISCOSITY_SENSOR = 1 << 8  # Отказ СИ вязкости
+    REJECTION_DENSITY_SENSOR = 1 << 9  # Отказ СИ плотности
+    GRAVITY_SECTION_IN_PUMPING_MODE = 1 << 10  # Наличие самотечного участка/участка с неполным сечением
+    ABSENCE_MIN_PRESSURE_SENSORS_REQUIRED_NUMBER = 1 << 11  # Менее 4 исправных СИ давления на разных КП ЛЧ и НПС
+    EXCEEDING_DISTANCE_BETWEEN_FLOW_METERS = 1 << 12  # Расстояние между СИ расхода на пути перекачки более 200 км
+    GRAVITY_SECTION_IN_STOPPED_PUMPING_MODE = 1 << 13  # Наличие самотечного участка в режиме остановленной перекачки
 
 
 class FaultyLdsStatusReasons(IntFlag):
-    NO_CONNECTION = 1 << 0  # Отсутствует связь серверного оборудования СОУ с источником «сырых» данных
-    MIN_NEED_SENSORS_WHEN_STOPPED = 1 << 1  # Менее настраиваемого количества исправных СИ давления на разных КП ЛЧ
-    BALANCE_ALGORITHM_FAULT = 1 << 2  # Алгоритм дебаланса неисправен
+    NO_DATA_SOURCE_CONNECTION = 1 << 0  # Отсутствует связь серверного оборудования СОУ с источником «сырых» данны
+    ABSENCE_MIN_PRESSURE_SENSORS_REQUIRED_NUMBER = 1 << 1  # Менее 4 КП с достоверными СИ давления
+    ABSENCE_MIN_FLOW_METERS_REQUIRED_NUMBER = 1 << 2  # Недостоверность граничного СИ расхода
 
 
 class InitializationLdsStatusReasons(IntFlag):
-    DATA_STORAGE_PERIOD = 1 << 0  # В период накопления данных после выявленной утечки до момента окончания утечки
-    LDS_FAULTY_OUT = 1 << 1  # При выходе СОУ из режима «неисправна» устанавливается на время не более 30 мин
-    LDS_COLD_START = 1 << 2  # При «холодном» одновременном запуске основного и резервного серверов работы СОУ
-    BLOCK_VALVE_SWITCH = 1 << 3  # В режиме остановленной перекачки при наличии переключения запорной арматуры
-    REINITIALIZATION = 1 << 4  # После получения команды на переинициализацию от пользователя
-    
+    ACCUMULATION_DATA = 1 << 0  # Накопление данных
+    EXITING_FAULTY_MODE = 1 << 1  # Выход СОУ из режима «Неисправна»
+    COLD_START_OF_SERVERS = 1 << 2  # Одновременный «холодный» запуск нескольких серверов СОУ
+    SWITCHING_SHUT_OFF_IN_STOPPED_PUMPING_MODE = 1 << 3  # Переключение запорной арматуры
+    USER_ACTION = 1 << 4  # По команде пользователя

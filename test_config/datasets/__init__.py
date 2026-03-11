@@ -6,13 +6,11 @@
 2. Экспортировать переменную с суффиксом _CONFIG (например, SELECT_XX_CONFIG)
 3. Для наборов с одной утечкой - config.leak должен быть заполнен
 4. Для наборов с несколькими утечками - config.leaks должен содержать список
-
-Всё! Импорты обновятся автоматически.
+Теперь импорты обновятся автоматически.
 
 Архитектура:
 - ALL_SMOKE_CONFIGS: конфиги для smoke-тестов (SmokeSuiteConfig)
 - ALL_LDS_STATUS_CONFIGS: конфиги для regress-тестов режимов СОУ (LDSStatusConfig)
-- ALL_CONFIGS: все конфиги (для обратной совместимости, алиас ALL_SMOKE_CONFIGS)
 """
 
 import importlib
@@ -28,9 +26,8 @@ _DATASETS_PATH = Path(__file__).parent
 # Кэш для прямого доступа по имени переменной (SELECT_4_CONFIG и т.д.)
 _CONFIG_CACHE: Dict[str, BaseSuiteConfig] = {}
 
-
-# TypeVar позволяет функции запомнить переданный тип и вернуть список того же типа. 
-# Сделано чтобы из-за аннотаий не писать свой _discover_configs для каждого нового добавляемого конфига в инфру
+# TypeVar позволяет функции запомнить переданный тип и вернуть список того же типа.
+# Сделано чтобы из-за аннотаций не писать свой _discover_configs для каждого нового добавляемого конфига в инфру
 type_var = TypeVar('type_var', bound=BaseSuiteConfig)
 
 
@@ -58,18 +55,23 @@ def _discover_configs_by_type(config_type: Type[type_var]) -> List[type_var]:
                     _CONFIG_CACHE[attr_name] = config
                     configs.append(config)
 
-    configs.sort(key=lambda c: c.suite_name)
+    # Сортируем по имени для стабильного порядка
+    configs.sort(key=lambda name: name.suite_name)
     return configs
 
 
+def _split_smoke_configs(configs: List[SmokeSuiteConfig]) -> tuple[List[SmokeSuiteConfig], List[SmokeSuiteConfig]]:
+    """Разделяет smoke-конфиги на single-leak и multi-leak."""
+    single = [config for config in configs if not config.has_multiple_leaks]
+    multi = [config for config in configs if config.has_multiple_leaks]
+    return single, multi
+
+
 # ===== Smoke-тесты (утечки) =====
-ALL_SMOKE_CONFIGS: List[SmokeSuiteConfig] = _discover_configs_by_type(SmokeSuiteConfig)
+ALL_SMOKE_CONFIGS = _discover_configs_by_type(SmokeSuiteConfig)
 
 # ===== Regress-тесты режимов СОУ =====
 ALL_LDS_STATUS_CONFIGS = _discover_configs_by_type(LDSStatusConfig)
-
-# ===== Обратная совместимость =====
-ALL_CONFIGS = ALL_SMOKE_CONFIGS
 
 
 def get_config_by_name(name: str) -> BaseSuiteConfig:
@@ -93,7 +95,8 @@ def __getattr__(name: str):
 def __dir__():
     """Для автодополнения в IDE"""
     return list(_CONFIG_CACHE.keys()) + [
-        "ALL_CONFIGS",
+        "SINGLE_LEAK_CONFIGS",
+        "MULTI_LEAK_CONFIGS",
         "ALL_SMOKE_CONFIGS",
         "ALL_LDS_STATUS_CONFIGS",
         "get_config_by_name",
@@ -101,7 +104,8 @@ def __dir__():
 
 
 __all__ = [
-    "ALL_CONFIGS",
+    "SINGLE_LEAK_CONFIGS",
+    "MULTI_LEAK_CONFIGS",
     "ALL_SMOKE_CONFIGS",
     "ALL_LDS_STATUS_CONFIGS",
     "get_config_by_name",

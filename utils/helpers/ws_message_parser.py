@@ -3,17 +3,20 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Type, TypeVar
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from allure import attach, attachment_type
 from dacite import Config, DaciteError, from_dict
 from msgpack import Timestamp
 from pytest import fail
 
+from constants.architecture_constants import WebSocketClientConstants
 from models.acknowledge_leak_model import AcknowledgeLeakReply
 from models.basic_info_model import BasicInfoReply
 from models.get_input_signals_model import GetInputSignalsReply
 from models.get_messages_model import GetMessagesReply
 from models.get_output_signals_model import GetOutputSignalsReply
+from models.launch_pig_model import LaunchPigReply
 from models.mask_signal_model import MaskSignalReply
 from models.subscribe_all_leaks_info_model import SubscribeAllLeaksInfoReply
 from models.subscribe_balance_algorithm_results_model import SubscribeBalanceAlgorithmResultsReply
@@ -37,6 +40,7 @@ class WsMessageParser:
 
     def __init__(self, dacite_config: Config = None):
         self._dacite_config = dacite_config or self._get_default_config()
+        self.suppress_recv_logging: bool = False
 
     @staticmethod
     def timestamp_to_datetime(value: Any) -> Optional[datetime]:
@@ -101,17 +105,8 @@ class WsMessageParser:
         Парсит сообщение InputSignalsInfo
         """
         payload = self._find_reply_status_in_ws_msg(data)
-        # На всякий случай: _find_reply_status_in_ws_msg должен упасть с fail(), но не даём словить AttributeError.
-        if not payload:
-            fail("Не удалось распарсить InputSignalsInfo: не найден replyStatus в сообщении")
-
         reply_content = payload.get('replyContent')
-        if not isinstance(reply_content, dict):
-            fail("Не удалось распарсить InputSignalsInfo: replyContent отсутствует или имеет неверный формат")
-
         input_signals_list = reply_content.get('inputSignals')
-        if input_signals_list is None:
-            fail("Не удалось распарсить InputSignalsInfo: отсутствует поле replyContent.inputSignals")
         parsed_payload = SubscribeInputSignalsReply(
             replyStatus=payload.get('replyStatus'),
             replyErrors=payload.get('replyErrors'),
@@ -159,6 +154,12 @@ class WsMessageParser:
         """
         return self._find_and_parse_message(data_class=SubscribeMainPageSignalsInfoReply, data=data)
 
+    def parse_launch_pig_msg(self, data: list) -> LaunchPigReply:
+        """
+        Парсит сообщение LaunchPig
+        """
+        return self._find_and_parse_message(data_class=LaunchPigReply, data=data)
+
     def parse_mask_signal_msg(self, data: list) -> MaskSignalReply:
         """
         Парсит сообщение MaskSignal
@@ -196,7 +197,10 @@ class WsMessageParser:
         return self._find_and_parse_message(data_class=UnmaskSignalReply, data=data)
 
     def _find_and_parse_message(
-        self, data_class: Type[ContentType], data: List[Any], config: Optional[Config] = None
+        self,
+        data_class: Type[ContentType],
+        data: List[Any],
+        config: Optional[Config] = None,
     ) -> ContentType:
         """
         Ищет объект с replyStatus в ws сообщении и парсит его
@@ -206,7 +210,12 @@ class WsMessageParser:
 
         return parsed_payload
 
-    def _parse_message(self, data_class: Type[MessageType], data: dict, config: Optional[Config] = None) -> MessageType:
+    def _parse_message(
+        self,
+        data_class: Type[MessageType],
+        data: dict,
+        config: Optional[Config] = None,
+    ) -> MessageType:
         """
         Универсальная функция парсинга сообщений
         """
@@ -220,7 +229,12 @@ class WsMessageParser:
             message = from_dict(
                 data_class=data_class, data=data, config=config or self._dacite_config  # type: ignore[arg-type]
             )
-            attach(str(message), name=data_class_name, attachment_type=attachment_type.TEXT)
+            if not self.suppress_recv_logging:
+                attach(
+                    str(message) + f" {datetime.now(ZoneInfo(WebSocketClientConstants.ZONE_INFO))}",
+                    name=data_class_name,
+                    attachment_type=attachment_type.TEXT,
+                )
 
             return message
         except DaciteError as error:
@@ -245,8 +259,6 @@ class WsMessageParser:
                             return elem
         except (AttributeError, KeyError, TypeError, RuntimeError, ValueError):
             fail("Не удалось найти replyStatus в сообщении")
-        # Если дошли сюда — replyStatus не найден
-        fail("Не удалось найти replyStatus в сообщении")
 
     def _get_default_config(self) -> Config:
         """

@@ -1,10 +1,13 @@
 import asyncio
 import logging
 import time
+from datetime import datetime
 from typing import Any, Callable, List, Optional
+from zoneinfo import ZoneInfo
 
 import msgpack
 import websockets
+from allure import attach, attachment_type
 
 from constants.architecture_constants import WebSocketClientConstants as WS_Const
 from utils.msgpack_utils.message_filters import is_desired_invocation_id, is_desired_type
@@ -46,7 +49,14 @@ class WebSocketClient:
         """
         Очищает очередь путем пересоздания экземпляра класса очереди
         """
-        self.recv_queue = asyncio.Queue()
+        # TODO разобраться почему не выполняется очистка очереди сообщений LDS-8599
+        while not self.recv_queue.empty():
+            try:
+                self.recv_queue.get_nowait()
+                self.recv_queue.task_done()
+            except asyncio.QueueEmpty as message_empty:
+                logger.info(f"Очередь сообщений очищена: {message_empty}")
+                break
 
     async def __aenter__(self):
         await self._connect_loop()
@@ -64,7 +74,7 @@ class WebSocketClient:
 
     async def _handshake(self) -> None:
         payload = WS_Const.HANDSHAKE_MESSAGE + WS_Const.RS.decode()
-        logger.info(
+        logger.debug(
             f"Отправлен handshake: {payload}",
         )
         await self._ws.send(payload)
@@ -73,7 +83,7 @@ class WebSocketClient:
         finish = time.monotonic() + WS_Const.HANDSHAKE_WAITING
         while time.monotonic() < finish:
             chunk = await self._ws.recv()
-            logger.info(f"Ответ на handshake: {chunk}")
+            logger.debug(f"Ответ на handshake: {chunk}")
             buf += chunk.encode() if isinstance(chunk, str) else chunk
             if WS_Const.RS in buf:
                 return
@@ -116,16 +126,19 @@ class WebSocketClient:
             try:
                 chunk = await self._ws.recv()
                 if not self.suppress_recv_logging:
-                    logger.info(f"Сырые биты до обработки: {chunk[:100]}")
+                    logger.debug(f"Сырые биты до обработки: {chunk[:100]}")
             except websockets.ConnectionClosed as e:
                 logger.warning(f"WebSocket соединение разорвано: {e}")
                 return
 
             result_message = parse_message(chunk)
+            str_message = str(result_message)
             if not self.suppress_recv_logging:
-                logger.info(
-                    f"Обработанное сообщение от api-gateway: {str(result_message)[:1000]} - размер можно увеличить в "
-                    f"WebSocketClient в _recv_loop(self)"
+                logger.info(f"Обработанное сообщение от api-gateway: {str_message[:500]} полное сообщение в attach")
+                attach(
+                    str_message,
+                    name=f"Распакованное сообщение от api-gateway {datetime.now(ZoneInfo(WS_Const.ZONE_INFO))}",
+                    attachment_type=attachment_type.TEXT,
                 )
             await self.recv_queue.put(result_message)
 
@@ -154,13 +167,13 @@ class WebSocketClient:
             target,
             [args],
         ]
-        logger.info(f"Готовится сообщение: {invocation}")
+        logger.info(f"Сообщение подготовлено к отправке: {invocation}")
         payload = msgpack.packb(invocation, use_bin_type=True)
         packet = encode_with_varint_prefix(payload)
-        logger.info(f"Отправляем сообщение: {packet}")
+        logger.debug(f"Отправляем сообщение: {packet}")
         await self._ws.send(packet)
 
-    async def receive_by_type(self, message_type: str, timeout: float = 5.0) -> List[Any]:
+    async def receive_by_type(self, message_type: str, timeout: WS_Const.FILTERING_TIMEOUT) -> List[Any]:
         """
         Фильтрует сообщения по message_type
         """
@@ -169,7 +182,9 @@ class WebSocketClient:
         except websockets.WebSocketException:
             raise websockets.WebSocketException(f"Ошибка при фильтрации сообщений по {message_type}")
 
-    async def receive_by_invocation_id(self, invocation_id: str, timeout: float = 5.0) -> List[Any]:
+    async def receive_by_invocation_id(
+        self, invocation_id: str, timeout: float = WS_Const.FILTERING_TIMEOUT
+    ) -> List[Any]:
         """
         Фильтрует сообщения по invocation_id
         """
@@ -203,4 +218,3 @@ class WebSocketClient:
             # 5) Фильтрация по filter_func
             if isinstance(msg, list) and filter_func(msg):
                 return msg
-            
