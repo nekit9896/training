@@ -5,23 +5,22 @@
 Pytest маркеры и allure декораторы применяются в тестовых файлах.
 """
 
-import asyncio
 import time
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import allure
 import pytest
 
-from constants.enums import Direction, LdsStatus, MessageType, ReplyStatus, StationaryStatus, InitializationLdsStatusReasons
+from constants.enums import Direction, LdsStatus, MessageType, ReplyStatus, StationaryStatus
 from constants.test_constants import BaseTN3Constants as TestConst
 from models.get_messages_model import Filtering, Pagination
-from test_config.models_for_tests import LDSStatusConfig, LeakTestConfig, SmokeSuiteConfig
+from test_config.models_for_tests import CaseData, LDSStatusConfig, LeakTestConfig, SmokeSuiteConfig
 from utils.helpers import ws_test_utils as t_utils
 from utils.helpers.asserts import SoftAssertions, StepCheck
 from utils.helpers.ws_message_parser import ws_message_parser as parser
 
 
-async def basic_info(ws_client, cfg: SmokeSuiteConfig):
+async def basic_info(ws_client, cfg: SmokeSuiteConfig | LDSStatusConfig):
     """
     Проверка базовой информации СОУ: список ТУ.
     """
@@ -404,17 +403,8 @@ async def leaks_content(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, 
         parsed_payload = parser.parse_leaks_content_msg(payload)
         leaks_list_info = parsed_payload.replyContent.leaksListInfo
 
-        # Ищем утечку по имени ДУ или берём первую
-        if leak.diagnostic_area_name:
-            first_leak_info = t_utils.find_object_by_field(
-                leaks_list_info, "diagnosticAreaName", leak.diagnostic_area_name
-            )
-        else:
-            first_leak_info = leaks_list_info[0]
-            StepCheck(
-                "Проверка: пришла хотя бы одна утечка",
-                "leak",
-            ).actual(first_leak_info).is_not_none()
+        first_leak_info = t_utils.find_leak_by_coordinate(leaks_list_info, leak.coordinate_meters)
+
         # Конвертируем время обнаружения в московское время
         leak_detected_at = t_utils.ensure_moscow_timezone(first_leak_info.detectedAt)
         leak_wait_start_time, leak_wait_end_time = t_utils.get_leak_time_window(
@@ -431,14 +421,9 @@ async def leaks_content(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, 
             parsed_payload.replyContent.tuId
         ).expected(cfg.tu_id).equal_to()
 
-        if leak.diagnostic_area_name:
-            StepCheck("Проверка названия диагностического участка утечки", "diagnosticAreaName", soft_failures).actual(
-                first_leak_info.diagnosticAreaName
-            ).expected(leak.diagnostic_area_name).equal_to()
-        else:
-            StepCheck("Проверка наличия названия участка утечки", "diagnosticAreaName", soft_failures).actual(
-                first_leak_info.diagnosticAreaName
-            ).is_not_none()
+        StepCheck("Проверка наличия названия участка утечки", "diagnosticAreaName", soft_failures).actual(
+            first_leak_info.diagnosticAreaName
+        ).is_not_none()
 
         StepCheck("Проверка статуса утечки", "confirmationStatus", soft_failures).actual(
             first_leak_info.confirmationStatus
@@ -548,14 +533,7 @@ async def all_leaks_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig,
     with allure.step("Обработка сообщения об утечке типа AllLeaksInfoContent"):
         leaks_info = parsed_payload.replyContent.leaksInfo
         # Если у утечки указано имя ДУ - ищем по нему, иначе берём первую
-        if leak.diagnostic_area_name:
-            first_leak_info = t_utils.find_object_by_field(leaks_info, "diagnosticAreaName", leak.diagnostic_area_name)
-        else:
-            first_leak_info = leaks_info[0]
-            StepCheck(
-                "Проверка: пришла хотя бы одна утечка",
-                "leakInfo",
-            ).actual(first_leak_info).is_not_none()
+        first_leak_info = t_utils.find_leak_by_coordinate(leaks_info, leak.coordinate_meters)
 
         # Конвертируем время обнаружения в московское время
         leak_detected_at = t_utils.ensure_moscow_timezone(first_leak_info.leakDetectedAt)
@@ -573,14 +551,9 @@ async def all_leaks_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig,
             parsed_payload.replyContent.tuId
         ).expected(cfg.tu_id).equal_to()
 
-        if leak.diagnostic_area_name:
-            StepCheck("Проверка названия диагностического участка утечки", "diagnosticAreaName", soft_failures).actual(
-                first_leak_info.diagnosticAreaName
-            ).expected(leak.diagnostic_area_name).equal_to()
-        else:
-            StepCheck("Проверка наличия названия участка утечки", "diagnosticAreaName", soft_failures).actual(
-                first_leak_info.diagnosticAreaName
-            ).is_not_none()
+        StepCheck("Проверка наличия названия участка утечки", "diagnosticAreaName", soft_failures).actual(
+            first_leak_info.diagnosticAreaName
+        ).is_not_none()
 
         StepCheck("Проверка статуса СОУ", "ldsStatus", soft_failures).actual(first_leak_info.ldsStatus).expected(
             leak.expected_lds_status
@@ -638,6 +611,7 @@ async def tu_leaks_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, 
 
     with allure.step("Обработка сообщения об утечке типа TuLeaksInfoContent"):
         tu_leaks_info_list = parsed_payload.replyContent.leaksInfo
+
         first_leak_info = t_utils.find_leak_by_coordinate(tu_leaks_info_list, leak.coordinate_meters)
 
         # Конвертируем время обнаружения в московское время
@@ -716,14 +690,14 @@ async def lds_status_during_leak(ws_client, cfg: SmokeSuiteConfig, leak: LeakTes
     if status_config is None:
         pytest.fail("Не задан leak.lds_status_during_leak_config для теста lds_status_during_leak")
 
-    leak_diagnostic_area = t_utils.find_diagnostic_area_by_id(flow_areas, status_config.diagnostic_area_id)
+    leak_diagnostic_area = t_utils.find_diagnostic_area_by_id(flow_areas, status_config.leak_diagnostic_area_id)
 
     with SoftAssertions() as soft_failures:
         StepCheck(
-            f"Проверка режима работы СОУ на ДУ с утечкой, id ДУ: {status_config.diagnostic_area_id}",
+            f"Проверка режима работы СОУ на ДУ с утечкой, id ДУ: {status_config.leak_diagnostic_area_id}",
             "ldsStatus",
             soft_failures,
-        ).actual(leak_diagnostic_area.ldsStatus).expected(status_config.expected_lds_status).equal_to()
+        ).actual(leak_diagnostic_area.ldsStatus).expected(status_config.leak_du_expected_lds_status).equal_to()
 
         # Проверки соседних ДУ: поддерживаются 0..N соседей отдельно для in/out.
         # Формат конфига: status_config.in_neighbors / status_config.out_neighbors (dict[id] = expected_status)
@@ -756,31 +730,23 @@ async def acknowledge_leak_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTest
     Для single-leak наборов: проверяется что список утечек пуст.
     """
     with allure.step("Получение id утечки"):
-        with allure.step("Подключение по ws, получение и обработка сообщения об утечке типа: TuLeaksInfoContent"):
+        with allure.step("Подключение по ws и получение сообщения об утечке типа: LeaksContent"):
             payload = await t_utils.connect_and_subscribe_msg(
                 ws_client,
-                "TuLeaksInfoContent",
-                "subscribeTuLeaksInfoRequest",
+                "LeaksContent",
+                "SubscribeLeaksRequest",
                 {'tuId': cfg.tu_id},
             )
-            parsed_payload = parser.parse_tu_leaks_info_msg(payload)
+            parsed_payload = parser.parse_leaks_content_msg(payload)
 
-        with allure.step("Получение id утечки из принятого сообщения типа: TuLeaksInfoContent"):
-            StepCheck("Проверка наличия сообщения об утечке", "leaksInfo").actual(
-                parsed_payload.replyContent.leaksInfo
+        with allure.step("Получение id утечки из принятого сообщения типа: LeaksContent"):
+            StepCheck("Проверка наличия сообщения об утечке", "leaksListInfo").actual(
+                parsed_payload.replyContent.leaksListInfo
             ).is_not_empty()
 
-            leaks_info = parsed_payload.replyContent.leaksInfo
+            leaks_info = parsed_payload.replyContent.leaksListInfo
 
-            # Для multi-leak ищем по control_site_id или diagnostic_area_name
-            if leak and leak.control_site_id:
-                leak_to_ack = t_utils.find_object_by_field(leaks_info, "controlledSiteId", leak.control_site_id)
-            else:
-                leak_to_ack = leaks_info[0]
-                StepCheck(
-                    "Проверка: пришла хотя бы одна утечка",
-                    "leakInfo",
-                ).actual(leak_to_ack).is_not_none()
+            leak_to_ack = t_utils.find_leak_by_coordinate(leaks_info, leak.coordinate_meters)
 
             acknowledged_leak_id = leak_to_ack.id
 
@@ -948,44 +914,12 @@ async def output_signals(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig,
         ).is_between(leak_wait_start_time, leak_wait_end_time)
 
 
-async def leaks_content_end(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
-    """
-    Проверка завершенной утечки через сообщение LeaksContent.
-    Проверяется только confirmationStatus на значения confirmed и closed.
-    """
-    with allure.step("Подключение по ws и получение сообщения об утечке типа: LeaksContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
-            ws_client,
-            "LeaksContent",
-            "SubscribeLeaksRequest",
-            {'tuId': cfg.tu_id},
-        )
-        parsed_payload = parser.parse_leaks_content_msg(payload)
-        leaks_list_info = parsed_payload.replyContent.leaksListInfo
-
-        # Ищем утечку по имени ДУ или берём первую
-        if leak.diagnostic_area_name:
-            first_leak_info = t_utils.find_object_by_field(
-                leaks_list_info, "diagnosticAreaName", leak.diagnostic_area_name
-            )
-        else:
-            first_leak_info = leaks_list_info[0]
-            StepCheck(
-                "Проверка: пришла хотя бы одна утечка",
-                "leak",
-            ).actual(first_leak_info).is_not_none()
-
-    with SoftAssertions() as soft_failures:
-        # Проверка confirmationStatus
-        StepCheck(
-            "Проверка статуса утечки: должен быть подтверждена и завершена", "confirmationStatus", soft_failures
-        ).actual(first_leak_info.confirmationStatus).expected(leak.expected_leak_completed_status).equal_to()
-
-
-async def lds_status_initialization_check_with_reasons(ws_client, cfg: LDSStatusConfig):
+async def lds_status_check_on_base_diagnostic_areas(ws_client, cfg: LDSStatusConfig, test_data: CaseData):
     """
     Проверка Инициализации и причины инициализации СОУ на базовых ДУ
     """
+    # Распаковка данных для теста
+    expected_lds_status, expected_lds_status_reasons = test_data.expected_result
     with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
         payload = await t_utils.connect_and_subscribe_msg(
             ws_client,
@@ -996,40 +930,216 @@ async def lds_status_initialization_check_with_reasons(ws_client, cfg: LDSStatus
         parsed_payload = parser.parse_common_scheme_info_msg(payload)
         # Получает список участков карты течения
         flow_areas = parsed_payload.replyContent.flowAreas
-        # Получает самый протяженный участок карты течения
+        # Получает список базовых ДУ
         base_diagnostic_areas = t_utils.find_base_diagnostic_areas(flow_areas)
-        with allure.step(f"Причины режима СОУ{base_diagnostic_areas}"):
-            pass
-        for diagnostic_area in base_diagnostic_areas:
-            StepCheck(f"Проверка режима работы СОУ на ДУ с id:{diagnostic_area.id}", "ldsStatus").actual(
-                diagnostic_area.ldsStatus
-            ).expected(LdsStatus.INITIALIZATION.value).equal_to()
-            lds_status_reasons = t_utils.parse_lds_status_reasons(
-                diagnostic_area.ldsStatus, diagnostic_area.ldsStatusReasons
-            )
-            StepCheck(
-                f"Проверка причины режима работы СОУ на ДУ с id:{diagnostic_area.id}", "ldsStatusReasons"
-            ).contains(lds_status_reasons, InitializationLdsStatusReasons.LDS_COLD_START)
+    for diagnostic_area in base_diagnostic_areas:
+        StepCheck(f"Проверка режима работы СОУ на ДУ с id:{diagnostic_area.id}", "ldsStatus").actual(
+            diagnostic_area.ldsStatus
+        ).expected(expected_lds_status).equal_to()
+        lds_status_reasons = t_utils.parse_lds_status_reasons(
+            diagnostic_area.ldsStatus, diagnostic_area.ldsStatusReasons
+        )
+        StepCheck(f"Проверка причины режима работы СОУ на ДУ с id:{diagnostic_area.id}", "ldsStatusReasons").contains(
+            lds_status_reasons, expected_lds_status_reasons
+        )
 
-async def balance_algorithm_leak_detected(
-    ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time: datetime,
+
+async def lds_status_check_on_representative(ws_client, cfg: SmokeSuiteConfig | LDSStatusConfig, test_data: CaseData):
+    """
+    Проверка режима работы СОУ на показательных ДУ
+    """
+    # Распаковка данных для теста
+    expected_result = test_data.expected_result
+    with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
+        payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "CommonSchemeContent",
+            "SubscribeCommonSchemeRequest",
+            {'tuId': cfg.tu_id, 'additionalProperties': None},
+        )
+
+        parsed_payload = parser.parse_common_scheme_info_msg(payload)
+        flow_areas = parsed_payload.replyContent.flowAreas
+        representative_diagnostic_areas = t_utils.find_representative_diagnostic_areas(flow_areas)
+        lds_status_set = {diagnostic_area.ldsStatus for diagnostic_area in representative_diagnostic_areas}
+        lds_status = t_utils.determine_lds_status_by_priority(lds_status_set)
+
+    StepCheck(
+        "Проверка режима работы СОУ на базовых ДУ",
+        "ldsStatus",
+    ).actual(
+        lds_status
+    ).expected(expected_result).equal_to()
+
+
+async def lds_status_check_with_reasons(ws_client, cfg: SmokeSuiteConfig | LDSStatusConfig, test_data: CaseData):
+    """
+    Проверка режима работы и причины режима СОУ на заданном ДУ
+    """
+    # Распаковка данных для теста
+    diagnostic_area_id = test_data.params.get("diagnostic_area_id")
+    expected_lds_status, expected_lds_status_reasons = test_data.expected_result
+    with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
+        payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "CommonSchemeContent",
+            "SubscribeCommonSchemeRequest",
+            {'tuId': cfg.tu_id, 'additionalProperties': None},
+        )
+        parsed_payload = parser.parse_common_scheme_info_msg(payload)
+        # Получает список участков карты течения
+        flow_areas = parsed_payload.replyContent.flowAreas
+        # Получает список базовых ДУ
+        diagnostic_area = t_utils.find_diagnostic_area_by_id(flow_areas, diagnostic_area_id)
+    StepCheck(f"Проверка режима работы СОУ на ДУ с id:{diagnostic_area.id}", "ldsStatus").actual(
+        diagnostic_area.ldsStatus
+    ).expected(expected_lds_status).equal_to()
+    lds_status_reasons = t_utils.parse_lds_status_reasons(diagnostic_area.ldsStatus, diagnostic_area.ldsStatusReasons)
+    StepCheck(f"Проверка причины режима работы СОУ на ДУ с id:{diagnostic_area.id}", "ldsStatusReasons").contains(
+        lds_status_reasons, expected_lds_status_reasons
+    )
+
+
+async def lds_status_check_degradation_pig_sensor_passage(
+    ws_client, cfg: SmokeSuiteConfig | LDSStatusConfig, test_data: CaseData
 ):
+    """
+    Проверка режима работы и причины режима СОУ на заданном ДУ
+    """
+    # Распаковка данных для теста
+    diagnostic_area_id = test_data.params.get("diagnostic_area_id")
+    pig_trap_id = test_data.params.get("pig_trap_id")
+    expected_lds_status, expected_lds_status_reasons = test_data.expected_result
+
+    with allure.step("Подключение по ws, отправка сообщения и обработка ответа о запуске СОД: LaunchPigRequest"):
+        payload = await t_utils.connect_and_get_msg(
+            ws_client,
+            "LaunchPigRequest",
+            {'pigTrapId': pig_trap_id, 'tuId': cfg.tu_id, 'timeToLaunch': 0, 'additionalProperties': None},
+        )
+        parsed_payload = parser.parse_launch_pig_msg(payload)
+        launch_pig_reply_status = parsed_payload.replyStatus
+        time.sleep(cfg.basic_message_timeout)
+
+    with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
+        payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "CommonSchemeContent",
+            "SubscribeCommonSchemeRequest",
+            {'tuId': cfg.tu_id, 'additionalProperties': None},
+        )
+        parsed_payload = parser.parse_common_scheme_info_msg(payload)
+        # Получает список участков карты течения
+        flow_areas = parsed_payload.replyContent.flowAreas
+        # Получает список базовых ДУ
+        diagnostic_area = t_utils.find_diagnostic_area_by_id(flow_areas, diagnostic_area_id)
+    StepCheck(f"Проверка режима работы СОУ на ДУ с id:{diagnostic_area.id}", "ldsStatus").actual(
+        diagnostic_area.ldsStatus
+    ).expected(expected_lds_status).equal_to()
+    lds_status_reasons = t_utils.parse_lds_status_reasons(diagnostic_area.ldsStatus, diagnostic_area.ldsStatusReasons)
+    StepCheck(f"Проверка причины режима работы СОУ на ДУ с id:{diagnostic_area.id}", "ldsStatusReasons").contains(
+        lds_status_reasons, expected_lds_status_reasons
+    )
+    StepCheck("Проверка кода ответа на запрос о запуске СОД", "replyStatus").actual(launch_pig_reply_status).expected(
+        ReplyStatus.OK.value
+    ).equal_to()
+
+
+async def balance_algorithm_leak_waiting(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
+    """
+    Проверка подозрения утечки через BalanceAlgorithmResults
+
+    Логика:
+    - Подписка на BalanceAlgorithmResults однократно
+    - Раз в BALANCE_ALGORITHM_POLL_INTERVAL секунд забираем из очереди свежее сообщение
+    - Собираем все diagnosticAreas (только из flowAreas с непустым списком)
+    - Проверяем, что на ДУ с утечкой хотя бы раз пришёл isLeakPossible=True
+    - Проверяем, что на всех остальных ДУ isLeakPossible всегда False
+    - Проверяем дебаланс на ДУ с будущей утечкой через is_between (плюс-минус DEBALANCE_TOLERANCE от порога)
+    """
+    poll_interval = TestConst.BALANCE_ALGORITHM_POLL_INTERVAL
+    total_wait = TestConst.BALANCE_ALGORITHM_TOTAL_WAIT
+    end_time = imitator_start_time + timedelta(
+        seconds=leak.balance_algorithm_leak_waiting_test.offset * 60 + total_wait
+    )
+
+    leak_diagnostic_area_id = leak.leak_diagnostic_area_id
+    if leak_diagnostic_area_id is None:
+        pytest.fail("В датасете конфигурации утечки для данного набора данных не указан leak_diagnostic_area_id")
+
+    with allure.step(
+        f"Подписка и сбор BalanceAlgorithmResults раз в {poll_interval} с, в течение {total_wait} с после начала утечки"
+    ):
+        await t_utils.connect(
+            ws_client,
+            "SubscribeBalanceAlgorithmResultsRequest",
+            {'tuId': cfg.tu_id, 'additionalProperties': None},
+        )
+
+        collected_diagnostic_areas = await t_utils.poll_balance_algorithm_diagnostic_areas(
+            ws_client,
+            parser,
+            imitator_start_time,
+            end_time,
+            poll_interval,
+        )
+        leak_diagnostic_area_samples = t_utils.get_leak_diagnostic_area_samples(
+            collected_diagnostic_areas,
+            leak_diagnostic_area_id,
+            total_wait,
+        )
+
+    with SoftAssertions() as soft_failures:
+        is_leak_possible_seen = any(diagnostic_area.isLeakPossible for diagnostic_area in leak_diagnostic_area_samples)
+        StepCheck(
+            f"Проверка: на ДУ id={leak_diagnostic_area_id} с будущей утечкой хотя бы раз за "
+            f"{TestConst.BALANCE_ALGORITHM_TOTAL_WAIT / 60} минут приходил"
+            " статус 'подозрение на утечку': isLeakPossible=True",
+            "isLeakPossible",
+            soft_failures,
+        ).actual(is_leak_possible_seen).expected(True).equal_to()
+
+        foreign_with_possible = [
+            diagnostic_area
+            for diagnostic_area in collected_diagnostic_areas
+            if diagnostic_area.id != leak_diagnostic_area_id and diagnostic_area.isLeakPossible
+        ]
+        if not cfg.has_multiple_leaks:
+            StepCheck(
+                "Проверка: на остальных ДУ, где утечка не ожидается isLeakPossible всегда False",
+                "isLeakPossible_without_leak",
+                soft_failures,
+            ).actual(len(foreign_with_possible)).expected(0).equal_to()
+
+        if leak.flow_rate_settings_threshold is not None:
+            threshold = leak.flow_rate_settings_threshold
+            tolerance = TestConst.DEBALANCE_TOLERANCE
+            lower_bound = threshold * (1 - tolerance)
+
+            for diagnostic_area in leak_diagnostic_area_samples:
+                if diagnostic_area.isLeakPossible:
+                    StepCheck(
+                        f"Проверка значения дебаланса на ДУ id={leak_diagnostic_area_id} с будущей утечкой "
+                        f"в пределах {int(tolerance * 100)}% снизу от порогового значения по объему: {threshold}).",
+                        "debalance",
+                        soft_failures,
+                    ).actual(abs(diagnostic_area.debalance)).is_greater_than(lower_bound)
+
+
+async def balance_algorithm_leak_detected(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig):
     """
     Проверка наличия утечки (isLeakDetected) через BalanceAlgorithmResults.
 
     Логика:
-    1. Подписка на BalanceAlgorithmResultsContent (однократно).
-    2. Получение первого подходящего сообщения.
-    3. Проверяем, что на ДУ с утечкой isLeakDetected=True.
-    4. Проверяем, что на всех остальных ДУ isLeakDetected=False.
-    5. Проверяем, что |debalance| на ДУ с утечкой > FLOW_RATE_SETTINGS_THRESHOLD.
+    - Подписка на BalanceAlgorithmResultsContent
+    - Получение первого подходящего сообщения типа BalanceAlgorithmResultsContent
+    - Проверяем, что на ДУ с утечкой isLeakDetected=True
+    - Проверяем, что на всех остальных ДУ isLeakDetected=False
+    - Проверяем, что дебаланс на ДУ с утечкой > FLOW_RATE_SETTINGS_THRESHOLD
     """
-    leak_da_id = leak.leak_diagnostic_area_id
-    if leak_da_id is None:
-        pytest.fail(
-            "В конфигурации утечки не задан leak_diagnostic_area_id "
-            "(проверьте lds_status_during_leak_config)"
-        )
+    leak_diagnostic_area_id = leak.leak_diagnostic_area_id
+    if leak_diagnostic_area_id is None:
+        pytest.fail("В конфигурации утечки не задан leak_diagnostic_area_id")
 
     with allure.step("Подписка и получение BalanceAlgorithmResultsContent"):
         payload = await t_utils.connect_and_subscribe_msg(
@@ -1039,125 +1149,65 @@ async def balance_algorithm_leak_detected(
             {'tuId': cfg.tu_id, 'additionalProperties': None},
         )
 
-    parsed_payload = parser.parse_balance_algorithm_msg(payload)
-    reply_content = parsed_payload.replyContent
-    if not reply_content or not reply_content.flowAreas:
-        pytest.fail("В ответе BalanceAlgorithmResultsContent отсутствуют flowAreas")
+        parsed_payload = parser.parse_balance_algorithm_msg(payload)
+        reply_content = parsed_payload.replyContent
+        if not reply_content or not reply_content.flowAreas:
+            pytest.fail(
+                "В ответе с бэка в DTO BalanceAlgorithmResults отсутствуют flowAreas, "
+                "невозможно проверить наличие утечки"
+            )
 
-    all_diagnostic_areas = []
-    for flow_area in reply_content.flowAreas:
-        if flow_area.diagnosticAreas:
-            all_diagnostic_areas.extend(flow_area.diagnosticAreas)
+        all_diagnostic_areas = []
+        for flow_area in reply_content.flowAreas:
+            if flow_area.diagnosticAreas:
+                all_diagnostic_areas.extend(flow_area.diagnosticAreas)
 
-    if not all_diagnostic_areas:
-        pytest.fail("Во всех flowAreas отсутствуют diagnosticAreas")
+        if not all_diagnostic_areas:
+            pytest.fail(
+                "В ответе с бэка в DTO BalanceAlgorithmResults во всех flowAreas отсутствуют diagnosticAreas, "
+                "невозможно проверить наличие утечки"
+            )
 
-    leak_da = next(
-        (da for da in all_diagnostic_areas if da.id == leak_da_id), None,
-    )
-    if leak_da is None:
-        pytest.fail(f"ДУ с id={leak_da_id} не найден в ответе BalanceAlgorithmResultsContent")
+        leak_diagnostic_area = next(
+            (
+                diagnostic_area
+                for diagnostic_area in all_diagnostic_areas
+                if diagnostic_area.id == leak_diagnostic_area_id
+            ),
+            None,
+        )
+        if leak_diagnostic_area is None:
+            pytest.fail(
+                f"ДУ с id={leak_diagnostic_area_id} не найден в ответе BalanceAlgorithmResultsContent,"
+                "невозможно проверить наличие утечки"
+            )
 
-    with allure.step("Верификация BalanceAlgorithmResults: isLeakDetected"):
-        with SoftAssertions() as soft_failures:
+    with SoftAssertions() as soft_failures:
+        StepCheck(
+            f"Проверка: на ДУ id={leak_diagnostic_area_id} обнаружена утечка",
+            "isLeakDetected",
+            soft_failures,
+        ).actual(leak_diagnostic_area.isLeakDetected).expected(True).equal_to()
+
+        foreign_with_detected = [
+            diagnostic_area
+            for diagnostic_area in all_diagnostic_areas
+            if diagnostic_area.id != leak_diagnostic_area_id and diagnostic_area.isLeakDetected
+        ]
+        if not cfg.has_multiple_leaks:
             StepCheck(
-                f"На ДУ id={leak_da_id} обнаружена утечка: isLeakDetected=True",
-                "isLeakDetected",
-                soft_failures,
-            ).actual(leak_da.isLeakDetected).expected(True).equal_to()
-
-            foreign_with_detected = [
-                da for da in all_diagnostic_areas
-                if da.id != leak_da_id and da.isLeakDetected
-            ]
-            StepCheck(
-                f"На остальных ДУ isLeakDetected=False "
-                f"(нарушителей: {len(foreign_with_detected)}, "
-                f"id: {[da.id for da in foreign_with_detected]})",
-                "isLeakDetected_other",
+                "Проверка: на остальных ДУ не обнаружена утечка, "
+                f" количество ДУ с неправильным статусом: {len(foreign_with_detected)}, "
+                f"их id: {[diagnostic_area.id for diagnostic_area in foreign_with_detected]})",
+                "isLeakDetected_without_leak",
                 soft_failures,
             ).actual(len(foreign_with_detected)).expected(0).equal_to()
 
-            if leak.flow_rate_settings_threshold is not None:
-                threshold = leak.flow_rate_settings_threshold
-                StepCheck(
-                    f"Дебаланс на ДУ id={leak_da_id} по модулю "
-                    f"строго больше порога {threshold}",
-                    "debalance",
-                    soft_failures,
-                ).actual(abs(leak_da.debalance)).is_greater_than(threshold)
-
-
-async def balance_algorithm_leak_waiting(
-    ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time: datetime,
-):
-    """
-    Проверка подозрения утечки через BalanceAlgorithmResults.
-
-    Логика:
-    1. Подписка на BalanceAlgorithmResultsContent (однократно).
-    2. Раз в BALANCE_ALGORITHM_POLL_INTERVAL секунд забираем из очереди самое свежее сообщение.
-    3. Собираем diagnosticAreas (только из flowAreas с непустым списком).
-    4. Проверяем, что на ДУ с утечкой хотя бы раз пришёл isLeakPossible=True.
-    5. Проверяем, что на всех остальных ДУ isLeakPossible всегда False.
-    6. Проверяем дебаланс на ДУ с утечкой через is_between (±DEBALANCE_TOLERANCE от порога).
-    """
-    poll_interval = TestConst.BALANCE_ALGORITHM_POLL_INTERVAL
-    total_wait = TestConst.BALANCE_ALGORITHM_TOTAL_WAIT
-    total_wait_minutes = total_wait // 60
-    end_time = imitator_start_time + timedelta(seconds=leak.leak_start_interval_seconds + total_wait)
-
-    leak_da_id = leak.leak_diagnostic_area_id
-    if leak_da_id is None:
-        pytest.fail(
-            "В конфигурации утечки не задан leak_diagnostic_area_id "
-        )
-
-    with allure.step(
-        f"Подписка и сбор BalanceAlgorithmResults "
-        f"раз в {poll_interval} с, в течение {total_wait} с после начала утечки"
-    ):
-        await t_utils.connect(
-            ws_client,
-            "SubscribeBalanceAlgorithmResultsRequest",
-            {'tuId': cfg.tu_id, 'additionalProperties': None},
-        )
-
-        collected_diagnostic_areas = await t_utils.poll_balance_algorithm_diagnostic_areas(
-            ws_client, imitator_start_time, end_time, poll_interval,
-        )
-        leak_da_samples = t_utils.get_leak_da_samples(
-            collected_diagnostic_areas, leak_da_id, total_wait,
-        )
-
-    with SoftAssertions() as soft_failures:
-        is_leak_possible_seen = any(diagnostic_area.isLeakPossible for diagnostic_area in leak_da_samples)
-        StepCheck(
-            f"Проверка: на ДУ id={leak_da_id} с будущей утечкой хотя бы раз за 10 минут приходил статус 'подозрение на утечку': isLeakPossible=True",
-            "isLeakPossible",
-            soft_failures,
-        ).actual(is_leak_possible_seen).expected(True).equal_to()
-
-        foreign_with_possible = [
-            diagnostic_area for diagnostic_area in collected_diagnostic_areas if diagnostic_area.id != leak_da_id and diagnostic_area.isLeakPossible
-        ]
-        StepCheck(
-            "Проверка: на остальных ДУ isLeakPossible всегда False",
-            "isLeakPossible_other",
-            soft_failures,
-        ).actual(len(foreign_with_possible)).expected(0).equal_to()
-
         if leak.flow_rate_settings_threshold is not None:
             threshold = leak.flow_rate_settings_threshold
-            tolerance = TestConst.DEBALANCE_TOLERANCE
-            lower_bound = threshold * (1 - tolerance)
-            upper_bound = threshold * (1 + tolerance)
-
-            for diagnostic_area in leak_da_samples:
-                if diagnostic_area.isLeakPossible:
-                    StepCheck(
-                        f"Проверка дебаланса на ДУ id={leak_da_id} "
-                        f"(±{int(tolerance * 100)}% от порога {threshold})",
-                        "debalance",
-                        soft_failures,
-                    ).actual(abs(diagnostic_area.debalance)).is_between(lower_bound, upper_bound)
+            StepCheck(
+                f"Дебаланс на ДУ id={leak_diagnostic_area_id} по модулю больше порога для данного режима МТ:"
+                f" {threshold}",
+                "debalance",
+                soft_failures,
+            ).actual(abs(leak_diagnostic_area.debalance)).is_greater_than(threshold)

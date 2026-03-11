@@ -27,7 +27,6 @@ LEAK_VOLUME_M3 = 113.6
 ALLOWED_TIME_DIFF_SECONDS = 1440  # 24 минуты
 LEAK_START_INTERVAL_SECONDS = 2100  # 35 минут
 LEAK_TECHNOLOGICAL_OBJECT = "НПС-5 Тихорецкая - НПС-3 Нововеличковская"
-LEAK_DIAGNOSTIC_AREA_NAME = "Т-Н-3.НПС-5 «Тихорецкая».УЗР вых - Т-Н-3.НПС-3 «Нововеличковская».УЗР вых"
 FLOW_RATE_SETTINGS_THRESHOLD = 17
 
 # ID диагностических участков
@@ -63,8 +62,8 @@ SELECT_6_CONFIG = SmokeSuiteConfig(
     leak=LeakTestConfig(
         # ----- Конфигурация статусов СОУ во время утечки -----
         lds_status_during_leak_config=DiagnosticAreaStatusConfig(
-            diagnostic_area_id=LEAK_DIAGNOSTIC_AREA_ID,
-            expected_lds_status=LdsStatus.INITIALIZATION.value,
+            leak_diagnostic_area_id=LEAK_DIAGNOSTIC_AREA_ID,
+            leak_du_expected_lds_status=LdsStatus.INITIALIZATION.value,
             in_neighbors={
                 IN_NEIGHBOR_DIAGNOSTIC_AREA_ID: LdsStatus.DEGRADATION.value,
             },
@@ -73,7 +72,6 @@ SELECT_6_CONFIG = SmokeSuiteConfig(
             },
         ),
         # ----- Параметры утечки -----
-        diagnostic_area_name=LEAK_DIAGNOSTIC_AREA_NAME,
         coordinate_meters=LEAK_COORDINATE_METERS,
         volume_m3=LEAK_VOLUME_M3,
         linear_part_id=LINEAR_PART_ID,
@@ -87,13 +85,13 @@ SELECT_6_CONFIG = SmokeSuiteConfig(
         expected_leak_status=ConfirmationStatus.CONFIRMED.value,
         expected_lds_status=LdsStatus.SERVICEABLE.value,
         expected_stationary_status=StationaryStatus.STATIONARY.value,
+        # ----- Тест BalanceAlgorithmResultsContent -----
+        balance_algorithm_leak_waiting_test=CaseMarkers(test_case_id="", offset=42),  # Длительность теста 5 минут
+        balance_algorithm_leak_detected_test=CaseMarkers(test_case_id="", offset=59),
         # ----- Тест AllLeaksInfo -----
         all_leaks_info_test=CaseMarkers(test_case_id="4", offset=59),
         # ----- Тест LeaksContent -----
         leaks_content_test=CaseMarkers(test_case_id="97", offset=59),
-        # ----- Тест BalanceAlgorithmResultsContent -----
-        balance_algorithm_leak_detected_test=CaseMarkers(test_case_id="", offset=59),
-        balance_algorithm_leak_waiting_test=CaseMarkers(test_case_id="", offset=35),
         # ----- Тест MessageInfo -----
         leak_info_in_journal=CaseMarkers(test_case_id="119", offset=59),
         # ----- Тест TuLeaksInfo -----

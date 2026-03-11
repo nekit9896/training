@@ -62,12 +62,6 @@ class ClickhouseConstants(ImitatorConstants):
     EVO_ID_PAIRS_CHUNK_SIZE: int = 450
 
 
-class MockConstants:
-    MOCK_DURATION: int = 60
-    MOCK_TEST_DATA_ID: int = 1
-    MOCK_TEST_DATA_NAME: str = "mock.tar.gz"
-
-
 class DockerConstants:
     HOSTNAME_CMD: str = "hostname"
     STOP_CMD: str = "docker stop"
@@ -139,6 +133,14 @@ class WebSocketClientConstants:
     SERVICE_NAME = "web-app"
     COMPONENT = "lds"
     ROOT_DOMAIN = "tn.tngrp.ru"
+    FILTERING_TIMEOUT: int | float = 10.0
+    ZONE_INFO: str = 'Europe/Moscow'
+
+
+class MockConstants:
+    MOCK_DURATION: int = 60
+    MOCK_TEST_DATA_ID: int = 1
+    MOCK_TEST_DATA_NAME: str = "mock.tar.gz"
 
 
 class EnvKeyConstants:
@@ -154,3 +156,4 @@ class EnvKeyConstants:
     STAND_NAME: str = "STAND_NAME"
     DATA_PATH: str = "DATA_PATH"
     OPC_URL: str = "OPC_URL"
+    TU_ID: str = "TU_ID"

@@ -110,6 +110,7 @@ class LeakTestConfig:
 
     # ===== Идентификаторы =====
     control_site_id: Optional[int] = None
+    diagnostic_area_id: Optional[int] = None
     diagnostic_area_name: Optional[str] = None
     linear_part_id: Optional[int] = None
     technological_object: Optional[str] = None
@@ -118,8 +119,7 @@ class LeakTestConfig:
     coordinate_meters: float = None
     volume_m3: float = None
     max_pumping_m3: int = 2500  # Производительность(максимальная перекачка)
-    # Порог объема настройки дебаланса для текущего ДУ в текущем режиме
-    flow_rate_settings_threshold: Optional[float] = None
+    flow_rate_settings_threshold: Optional[float] = None  # Порог объема дебаланса для текущего ДУ в текущем режиме
 
     # ===== Временные интервалы (секунды) =====
     leak_start_interval_seconds: int = BaseTN3Constants.LEAK_START_INTERVAL
@@ -136,8 +136,8 @@ class LeakTestConfig:
     lds_status_during_leak_config: Optional[DiagnosticAreaStatusConfig] = None
 
     # ===== Тест-кейсы для этой утечки =====
-    balance_algorithm_leak_detected_test: Optional[CaseMarkers] = None
     balance_algorithm_leak_waiting_test: Optional[CaseMarkers] = None
+    balance_algorithm_leak_detected_test: Optional[CaseMarkers] = None
     leaks_content_test: Optional[CaseMarkers] = None
     all_leaks_info_test: Optional[CaseMarkers] = None
     tu_leaks_info_test: Optional[CaseMarkers] = None
@@ -241,8 +241,19 @@ class LDSStatusConfig(BaseSuiteConfig):
     """
 
     # ===== Данные для тестов =====
-    lds_status_initialization_test_data: Optional[CaseData] = None
-
+    lds_status_init_cold_start_test_data: Optional[CaseData] = None
+    lds_status_serviceable_all_test_data: Optional[CaseData] = None
+    lds_status_deg_not_enough_pressure_sensors_test_data: Optional[CaseData] = None
+    lds_status_deg_exceeding_distance_between_pressure_sensors_test_data: Optional[CaseData] = None
+    lds_status_deg_gravity_section_pumping_test_data: Optional[CaseData] = None
+    lds_status_deg_pig_sensor_passage_test_data: Optional[CaseData] = None
+    lds_status_deg_exceeding_distance_between_flow_meters_test_data: Optional[CaseData] = None
     # ===== Тесты =====
-    basic_info_test: Optional[CaseMarkers] = None
-    lds_status_initialization_test: Optional[CaseMarkers] = None
+    lds_status_basic_info_test: Optional[CaseMarkers] = None
+    lds_status_init_cold_start_test: Optional[CaseMarkers] = None
+    lds_status_serviceable_after_faulty_test: Optional[CaseMarkers] = None
+    lds_status_deg_exceeding_distance_between_pressure_sensors_test: Optional[CaseMarkers] = None
+    lds_status_deg_not_enough_pressure_sensors_test: Optional[CaseMarkers] = None
+    lds_status_deg_gravity_section_pumping_test: Optional[CaseMarkers] = None
+    lds_status_deg_pig_sensor_passage_test: Optional[CaseMarkers] = None
+    lds_status_deg_exceeding_distance_between_flow_meters_test: Optional[CaseMarkers] = None

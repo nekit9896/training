@@ -5,21 +5,26 @@ import random
 import re
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta, timezone
+from enum import IntEnum, IntFlag
 from typing import Any, List, Set, Tuple, Type, TypeVar
 from zoneinfo import ZoneInfo
-from enum import IntEnum, IntFlag
 
 import allure
 from pytest import fail
 
 from clients.websocket_client import WebSocketClient
-from constants.enums import LdsStatus, DegradationLdsStatusReasons, FaultyLdsStatusReasons, InitializationLdsStatusReasons
+from constants.enums import (
+    DegradationLdsStatusReasons,
+    FaultyLdsStatusReasons,
+    InitializationLdsStatusReasons,
+    LdsStatus,
+)
 from constants.test_constants import BaseTN3Constants as TestConst
-from utils.msgpack_utils.message_filters import is_desired_type
 from models.get_messages_model import GetMessagesRequest
 from models.subscribe_all_leaks_info_model import SubscribeAllLeaksInfoReply
 from models.subscribe_common_scheme_model import DiagnosticArea, FlowArea
 from utils.helpers.ws_message_parser import ws_message_parser
+from utils.msgpack_utils.message_filters import is_desired_type
 
 ObjectType = TypeVar("ObjectType")  # создает типовую переменную для поиска объектов в списке
 RandomObjectType = TypeVar("RandomObjectType")
@@ -197,34 +202,6 @@ def find_object_by_field(item_list: List[ObjectType], field_name: str, value: An
         fail(f"Не найдено значение: {value} для поля: {field_name}, в списке: {item_list}.")
 
 
-def find_leak_by_coordinate(
-    leaks_list: List[ObjectType],
-    expected_coordinate: float,
-    tolerance: float = TestConst.ALLOWED_DISTANCE_DIFF_METERS,
-) -> ObjectType:
-    """
-    Ищет утечку в списке по координатам с допустимой погрешностью.
-
-    Рейзим:
-        pytest.fail: Если список пуст или утечка не найдена.
-    """
-    if not leaks_list:
-        fail("Список утечек пуст")
-
-    for leak in leaks_list:
-        leak_coordinate = getattr(leak, "leakCoordinate", None)
-        if leak_coordinate is None:
-            continue
-        if abs(leak_coordinate - expected_coordinate) <= tolerance:
-            return leak
-
-    coordinates = [getattr(leak, "leakCoordinate", None) for leak in leaks_list]
-    fail(
-        f"Не найдена утечка с координатой {expected_coordinate} ± {tolerance} м. "
-        f"Координаты полученных утечек: {coordinates}"
-    )
-
-
 def find_diagnostic_area_by_id(flow_areas: List[FlowArea], id_value: int) -> DiagnosticArea:
     """
     Ищет ДУ по id в списке участков карты течений
@@ -240,13 +217,55 @@ def find_diagnostic_area_by_id(flow_areas: List[FlowArea], id_value: int) -> Dia
     except (AttributeError, KeyError, RuntimeError, TypeError, ValueError):
         fail(f"Не найден ДУ по id: {id_value}.")
 
-def find_base_diagnostic_areas(flow_areas: List[FlowArea]) -> List[DiagnosticArea]:
-    base_diagnostic_areas = [
-        find_diagnostic_area_by_id(flow_areas, d_a_id)
-        for d_a_id in TestConst.DIAGNOSTIC_AREAS_BASE_IDS
-        if find_diagnostic_area_by_id(flow_areas, d_a_id) is not None
+
+def find_diagnostic_areas_by_ids(flow_areas: List[FlowArea], id_list: List[int]) -> List[DiagnosticArea]:
+    """
+    Получает список ДУ из списка flow_areas по списку id
+    """
+    diagnostic_areas = [
+        find_diagnostic_area_by_id(flow_areas, diagnostic_area_id)
+        for diagnostic_area_id in id_list
+        if find_diagnostic_area_by_id(flow_areas, diagnostic_area_id) is not None
     ]
-    return base_diagnostic_areas
+    return diagnostic_areas
+
+
+def find_base_diagnostic_areas(flow_areas: List[FlowArea]) -> List[DiagnosticArea]:
+    """
+    Получает список базовых ДУ из списка flow_areas
+    """
+    return find_diagnostic_areas_by_ids(flow_areas, TestConst.DIAGNOSTIC_AREA_BASE_IDS)
+
+
+def find_representative_diagnostic_areas(flow_areas: List[FlowArea]) -> List[DiagnosticArea]:
+    """
+    Получает список показательных ДУ из списка flow_areas, для проверки режимов СОУ
+    """
+    return find_diagnostic_areas_by_ids(flow_areas, TestConst.REPRESENTATIVE_DIAGNOSTIC_AREA_IDS)
+
+
+def find_leak_by_coordinate(
+    leaks_list: List[ObjectType], expected_coordinate: float, tolerance: float = TestConst.ALLOWED_DISTANCE_DIFF_METERS
+) -> ObjectType:
+    """
+    Ищет утечку в списке по координатам с допустимой погрешностью
+    Рейзит pytest.fail если список пуст или утечка не найдена
+    """
+    if not leaks_list:
+        fail("Список утечек пуст")
+
+    for leak in leaks_list:
+        leak_coordinate = getattr(leak, "leakCoordinate")
+        if leak_coordinate is None or "":
+            continue
+        if abs(leak_coordinate - expected_coordinate) <= tolerance:
+            return leak
+
+    fail(
+        f"Не найдена утечка с координатой {expected_coordinate} +- {tolerance} м"
+        f"Список полученных утечек: {leaks_list}"
+    )
+
 
 def to_moscow_timezone(date_str: str) -> datetime:
     """
@@ -292,26 +311,32 @@ def parse_journal_msg_value(value: str) -> Tuple[float, float]:
     except (TypeError, ValueError):
         fail("Ошибка распаковки данных из поля value в сообщении журнала")
 
-def parse_bit_flags(value: int, enum_cls: Type[IntFlag]) -> List[IntFlag]:
+
+def parse_bit_flags(value: int, enum_cls: Type[IntEnum | IntFlag]) -> List[IntFlag]:  # переименовал "кусающиеся" фаги
     """
     Распаковка битовых флагов
     """
+    # 0 - это валидное состояние когда причин нет, в прошлой реализации тест бы падал если причин нет
+    # хотя это может быть ожидаемо, например при тестировании исправности или где-нибудь еще
     if value == 0:
         return []
 
     found_flags = [flag for flag in enum_cls if value & flag.value]
+    known_bits = sum(flag.value for flag in found_flags)
 
-    if sum(f.value for f in found_flags) != value:
-        unknown_bits = value ^ sum(f.value for f in found_flags)
+    if known_bits != value:
+        unknown_bits = value ^ known_bits
         fail(f"Неизвестные биты при распаковке {enum_cls.__name__}: {unknown_bits}")
 
-    return sorted(found_flags, key=lambda f: f.value)
+    # та же сортировка только не цифры а их текстовое значение
+    return sorted(found_flags, key=lambda flag: flag.value)
 
 
 def get_reason_enum_by_lds_status(lds_status: int | LdsStatus) -> Type[IntFlag]:
     """
-    Получение класса причин по статусу СОУ.
+    Получение класса причин по режимам СОУ
     """
+
     if isinstance(lds_status, int):
         try:
             lds_status = LdsStatus(lds_status)
@@ -323,86 +348,19 @@ def get_reason_enum_by_lds_status(lds_status: int | LdsStatus) -> Type[IntFlag]:
         LdsStatus.INITIALIZATION: InitializationLdsStatusReasons,
         LdsStatus.DEGRADATION: DegradationLdsStatusReasons,
     }
+    enum_class = reason_by_lds_status.get(lds_status)
+    if enum_class is None:
+        fail(f"Для LdsStatus{lds_status.name} не определены причины")
+    return enum_class
 
-    enum_cls = reason_by_lds_status.get(lds_status)
-    if enum_cls is None:
-        fail(f"Для LdsStatus.{lds_status.name} не определены причины")
-    return enum_cls
 
-
-def parse_lds_status_reasons(
-    lds_status: int | LdsStatus,
-    lds_status_reasons: int,
-) -> List[IntFlag]:
+def parse_lds_status_reasons(lds_status: int, lds_status_reasons: int):
     """
     Получение списка ldsStatusReasons, соответствующего ldsStatus
     """
     enum_cls = get_reason_enum_by_lds_status(lds_status)
-    return parse_bit_flags(lds_status_reasons, enum_cls)
-
-async def poll_balance_algorithm_diagnostic_areas(
-    ws_client: WebSocketClient,
-    imitator_start_time: datetime,
-    end_time: datetime,
-    poll_interval: float,
-) -> list:
-    """
-    Поллит очередь ws_client на наличие BalanceAlgorithmResultsContent,
-    собирает и возвращает все diagnosticAreas из flowAreas.
-    """
-    collected = []
-    ws_client.suppress_recv_logging = True
-    try:
-        while datetime.now(tz=imitator_start_time.tzinfo) < end_time:
-            await asyncio.sleep(poll_interval)
-
-            latest_msg = None
-            while not ws_client.recv_queue.empty():
-                try:
-                    msg = ws_client.recv_queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    break
-                if isinstance(msg, list) and is_desired_type(msg, "BalanceAlgorithmResultsContent"):
-                    latest_msg = msg
-
-            if latest_msg is None:
-                continue
-
-            parsed_payload = ws_message_parser.parse_balance_algorithm_msg(latest_msg)
-            reply_content = parsed_payload.replyContent
-            if reply_content and reply_content.flowAreas:
-                for flow_area in reply_content.flowAreas:
-                    if flow_area.diagnosticAreas:
-                        collected.extend(flow_area.diagnosticAreas)
-    finally:
-        ws_client.suppress_recv_logging = False
-    return collected
-
-
-def get_leak_da_samples(
-    collected_diagnostic_areas: list,
-    leak_da_id: int,
-    total_wait: int,
-) -> list:
-    """
-    Проверяет наличие diagnosticAreas и возвращает подмножество
-    для ДУ с заданным leak_da_id. Падает, если данные не найдены.
-    """
-    if not collected_diagnostic_areas:
-        fail(
-            f"За {total_wait} секунд не пришло ни одной diagnosticArea "
-            f"в BalanceAlgorithmResultsContent"
-        )
-
-    leak_da_samples = [
-        da for da in collected_diagnostic_areas if da.id == leak_da_id
-    ]
-    if not leak_da_samples:
-        fail(
-            f"За {total_wait} секунд не пришло ни одного сообщения "
-            f"для ДУ с id={leak_da_id}."
-        )
-    return leak_da_samples
+    flags = parse_bit_flags(lds_status_reasons, enum_cls)
+    return flags
 
 
 async def connect(ws_client: WebSocketClient, ws_invoke_type: str, ws_invoke_params: Any = None) -> None:
@@ -480,3 +438,69 @@ async def connect_and_subscribe_msg(
         return payload
     except (asyncio.TimeoutError, OSError, ConnectionError, ConnectionResetError) as error:
         fail(f"Не удалось получить сообщение типа: {ws_invoke_type}. Ошибка: {error}")
+
+
+async def poll_balance_algorithm_diagnostic_areas(
+    ws_client: WebSocketClient,
+    ws_parser: ws_message_parser,
+    imitator_start_time: datetime,
+    end_time: datetime,
+    poll_interval: float,
+) -> list:
+    """
+    Опрашивает очередь ws_client на наличие BalanceAlgorithmResultsContent,
+    собирает и возвращает все diagnosticAreas из flowAreas.
+    """
+    collected_diagnostic_areas = []
+    ws_client.suppress_recv_logging = True
+    ws_parser.suppress_recv_logging = True
+    try:
+        while datetime.now(tz=imitator_start_time.tzinfo) < end_time:
+            await asyncio.sleep(poll_interval)
+
+            latest_msg = None
+            while not ws_client.recv_queue.empty():
+                try:
+                    msg = ws_client.recv_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+                if isinstance(msg, list) and is_desired_type(msg, "BalanceAlgorithmResultsContent"):
+                    latest_msg = msg
+
+            if latest_msg is None:
+                continue
+
+            parsed_payload = ws_message_parser.parse_balance_algorithm_msg(latest_msg)
+            reply_content = parsed_payload.replyContent
+            if reply_content and reply_content.flowAreas:
+                for flow_area in reply_content.flowAreas:
+                    if flow_area.diagnosticAreas:
+                        collected_diagnostic_areas.extend(flow_area.diagnosticAreas)
+    finally:
+        ws_client.suppress_recv_logging = False
+        ws_parser.suppress_recv_logging = False
+
+    return collected_diagnostic_areas
+
+
+def get_leak_diagnostic_area_samples(
+    collected_diagnostic_areas: list,
+    leak_diagnostic_area_id: int,
+    total_wait: int,
+) -> list:
+    """
+    Проверяет наличие diagnosticAreas и возвращает подмножество
+    для ДУ с заданным leak_diagnostic_area_id. Падает, если данные не найдены.
+    """
+    if not collected_diagnostic_areas:
+        fail(f"За {total_wait} секунд не пришло ни одной diagnosticArea в BalanceAlgorithmResultsContent")
+
+    leak_diagnostic_area_samples = [
+        diagnostic_area
+        for diagnostic_area in collected_diagnostic_areas
+        if diagnostic_area.id == leak_diagnostic_area_id
+    ]
+    if not leak_diagnostic_area_samples:
+        fail(f"За {total_wait} секунд не пришло ни одного сообщения для ДУ с id={leak_diagnostic_area_id}.")
+    return leak_diagnostic_area_samples
+    
