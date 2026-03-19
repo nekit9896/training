@@ -220,7 +220,7 @@ def pytest_collection_modifyitems(session, config, items):
             # Добавляем маркер test_case_id
             if hasattr(test_config, 'test_case_id') and test_config.test_case_id is not None:
                 item.add_marker(pytest.mark.test_case_id(test_config.test_case_id))
-        elif test_name in SMOKE_SUITE_LEVEL_MAPPING or test_name in LEAK_LEVEL_TEST_MAPPING:
+        elif test_name in SUITE_LEVEL_TEST_MAPPING or test_name in LEAK_LEVEL_TEST_MAPPING:
             # Конфиг теста = None - исключаем тест из прогона
             deselected_items.append(item)
             continue
