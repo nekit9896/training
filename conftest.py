@@ -15,7 +15,7 @@ from constants.architecture_constants import EnvKeyConstants as EnvConst
 from constants.architecture_constants import ImitatorConstants as ImConst
 from constants.architecture_constants import WebSocketClientConstants as WSCliConst
 from infra.stand_setup_manager import StandSetupManager
-from test_config.datasets import ALL_CONFIGS
+from test_config.datasets import ALL_SMOKE_CONFIGS
 
 
 def pytest_addoption(parser):
@@ -32,7 +32,7 @@ def pytest_addoption(parser):
 
 def _find_config_by_suite_name(suite_name: str):
     """Находит конфиг по имени набора данных."""
-    for config in ALL_CONFIGS:
+    for config in ALL_SMOKE_CONFIGS:
         if config.suite_name == suite_name:
             return config
     return None
@@ -117,12 +117,15 @@ SMOKE_SUITE_LEVEL_MAPPING = {
 
 # Regress-тесты режимов СОУ (маркеры из LDSStatusConfig)
 LDS_STATUS_SUITE_LEVEL_MAPPING = {
-    'test_basic_info_mode_sou': 'basic_info_test',
-    'test_lds_status_initialization_mode_sou': 'lds_status_initialization_test',
+    'test_lds_status_basic_info': 'lds_status_basic_info_test',
+    'test_lds_status_init_cold_start': 'lds_status_init_cold_start_test',
+    'test_lds_status_serviceable_after_faulty': 'lds_status_serviceable_after_faulty_test',
+    'test_lds_status_degradation_exceeding_distance_between_pressure_sensors': 'lds_status_deg_exceeding_distance_between_pressure_sensors_test',  # noqa: E501
+    'test_lds_status_degradation_not_enough_pressure_sensors': 'lds_status_deg_not_enough_pressure_sensors_test',
+    'test_lds_status_degradation_gravity_section_pumping': 'lds_status_deg_gravity_section_pumping_test',
+    'test_lds_status_degradation_pig_sensor_passage': 'lds_status_deg_pig_sensor_passage_test',
+    'test_lds_status_degradation_exceeding_distance_between_flow_meters': 'lds_status_deg_exceeding_distance_between_flow_meters_test',  # noqa: E501
 }
-
-# Объединённый маппинг для логики conftest
-SUITE_LEVEL_TEST_MAPPING = {**SMOKE_SUITE_LEVEL_MAPPING, **LDS_STATUS_SUITE_LEVEL_MAPPING}
 
 # Тесты уровня утечки (маркеры из LeakTestConfig - параметр leak)
 LEAK_LEVEL_TEST_MAPPING = {
@@ -133,10 +136,12 @@ LEAK_LEVEL_TEST_MAPPING = {
     'test_acknowledge_leak_info': 'acknowledge_leak_test',
     'test_output_signals': 'output_signals_test',
     'test_lds_status_during_leak': 'lds_status_during_leak_test',
-    'test_leak_completed_status': 'leak_completed_status_test',
-    'test_balance_algorithm_leak_detected': 'balance_algorithm_leak_detected_test',
     'test_balance_algorithm_leak_waiting': 'balance_algorithm_leak_waiting_test',
+    'test_balance_algorithm_leak_detected': 'balance_algorithm_leak_detected_test',
 }
+
+# Мержим все вместе чтобы не переписывать логику коллектора айтемов (тестов)
+SUITE_LEVEL_TEST_MAPPING = {**SMOKE_SUITE_LEVEL_MAPPING, **LDS_STATUS_SUITE_LEVEL_MAPPING}
 
 
 def _get_test_markers_config(item, test_name):
@@ -160,10 +165,15 @@ def _get_test_markers_config(item, test_name):
         return getattr(leak, attr_name, None)
 
     # Для suite-level тестов берём из config
-    if 'config' in params and test_name in SUITE_LEVEL_TEST_MAPPING:
-        suite_config = params['config']
-        attr_name = SUITE_LEVEL_TEST_MAPPING[test_name]
-        return getattr(suite_config, attr_name, None)
+    if 'config' in params:
+        if test_name in SMOKE_SUITE_LEVEL_MAPPING:
+            suite_config = params['config']
+            attr_name = SMOKE_SUITE_LEVEL_MAPPING[test_name]
+            return getattr(suite_config, attr_name, None)
+        if test_name in LDS_STATUS_SUITE_LEVEL_MAPPING:
+            suite_config = params['config']
+            attr_name = LDS_STATUS_SUITE_LEVEL_MAPPING[test_name]
+            return getattr(suite_config, attr_name, None)
 
     return None
 
@@ -552,4 +562,3 @@ def ws_params(request):
     Передает параметры для websocket в тест
     """
     return request.param
-    

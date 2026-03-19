@@ -58,9 +58,7 @@ SUITE_PARAMS: List[Any] = _generate_suite_params()
 def _apply_allure_markers(test_config: CaseMarkers, tag: str, title: str, description: Optional[str] = None) -> None:
     """Применяет allure-маркеры из конфига теста."""
     if not test_config:
-        msg = "Не заполнена конфигурация теста: запуск остановлен"
-        allure.attach(msg, name="Ошибка подготовки тестрана", attachment_type=allure.attachment_type.TEXT)
-        pytest.exit(msg)
+        pytest.skip("Тест не сконфигурирован для данного набора данных")
     allure.dynamic.tag(tag)
     allure.dynamic.tag("REGRESS")
     allure.dynamic.title(title)
@@ -98,14 +96,14 @@ class TestSuiteScenarios:
         """
         tag = "CommonScheme"
         title = f"[{tag}] Проверка режима работы СОУ: 'Инициализация', по причине: 'Холодный пуск'. ЭФ: Схема"
-        description = (
+        _apply_allure_markers(config.lds_status_init_cold_start_test, tag, title)
+        allure.dynamic.description(
             f"Проверка режима работы СОУ на базовых ДУ, на наборе данных {config.suite_name}, \n"
             f"на технологическом участке {config.technological_unit.description}\n"
             f"Время проведения проверки : {config.lds_status_init_cold_start_test.offset} мин.\n"
             "Подписка на сообщения типа: CommonScheme\n"
             "Ожидаемый режим работы СОУ: Инициализация\n Ожидаемая причина режима работы СОУ: Холодный пуск"
         )
-        _apply_allure_markers(config.lds_status_init_cold_start_test, tag, title, description)
         test_data = config.lds_status_init_cold_start_test_data
         await scenarios.lds_status_check_on_base_diagnostic_areas(ws_client, config, test_data)
 
@@ -118,7 +116,8 @@ class TestSuiteScenarios:
         """
         tag = "CommonScheme"
         title = f"[{tag}] Проверка режима работы СОУ: 'Исправна' на базовых ДУ. ЭФ: Схема"
-        description = (
+        _apply_allure_markers(config.lds_status_serviceable_after_faulty_test, tag, title)
+        allure.dynamic.description(
             "Проверка выхода СОУ из повторной Инициализации, после Неисправности, на базовых ДУ,"
             f" на наборе данных {config.suite_name}, \n"
             f"на технологическом участке {config.technological_unit.description}\n"
@@ -126,7 +125,6 @@ class TestSuiteScenarios:
             "Подписка на сообщения типа: CommonScheme\n"
             "Ожидаемый режим работы СОУ: Исправна"
         )
-        _apply_allure_markers(config.lds_status_serviceable_after_faulty_test, tag, title, description)
         test_data = config.lds_status_serviceable_all_test_data
         await scenarios.lds_status_check_on_representative(ws_client, config, test_data)
 
@@ -144,7 +142,10 @@ class TestSuiteScenarios:
             f"[{tag}] Проверка режима работы СОУ: 'Ухудшение характеристик', "
             "по причине: 'Расстояние между СИ давления более 50 км'. ЭФ: Схема"
         )
-        description = (
+        _apply_allure_markers(
+            config.lds_status_deg_exceeding_distance_between_pressure_sensors_test, tag, title
+        )
+        allure.dynamic.description(
             f"Проверка режима работы СОУ на базовых ДУ, на наборе данных {config.suite_name}, \n"
             f"на технологическом участке {config.technological_unit.description}\n"
             "Время проведения проверки : "
@@ -152,9 +153,6 @@ class TestSuiteScenarios:
             "Подписка на сообщения типа: CommonScheme\n"
             "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
             "Ожидаемая причина режима работы СОУ: Расстояние между СИ давления более 50 км"
-        )
-        _apply_allure_markers(
-            config.lds_status_deg_exceeding_distance_between_pressure_sensors_test, tag, title, description
         )
         test_data = config.lds_status_deg_exceeding_distance_between_pressure_sensors_test_data
         await scenarios.lds_status_check_with_reasons(ws_client, config, test_data)
@@ -172,7 +170,8 @@ class TestSuiteScenarios:
             f"[{tag}] Проверка режима работы СОУ: 'Ухудшение характеристик', "
             "по причине: 'менее 4 исправных СИ давления'. ЭФ: Схема"
         )
-        description = (
+        _apply_allure_markers(config.lds_status_deg_not_enough_pressure_sensors_test, tag, title)
+        allure.dynamic.description(
             f"Проверка режима работы СОУ на базовых ДУ, на наборе данных {config.suite_name}, \n"
             f"на технологическом участке {config.technological_unit.description}\n"
             "Время проведения проверки : "
@@ -183,7 +182,6 @@ class TestSuiteScenarios:
             "на разных КП ЛЧ МТ/НПС на диагностическом участке (кроме случая нахождения трубопровода "
             "в режиме остановленной перекачки)"
         )
-        _apply_allure_markers(config.lds_status_deg_not_enough_pressure_sensors_test, tag, title, description)
         test_data = config.lds_status_deg_not_enough_pressure_sensors_test_data
         await scenarios.lds_status_check_with_reasons(ws_client, config, test_data)
 
@@ -196,7 +194,8 @@ class TestSuiteScenarios:
         """
         tag = "CommonScheme"
         title = f"[{tag}] Проверка режима работы СОУ: 'Ухудшение характеристик', по причине: 'прохождение СОД'"
-        description = (
+        _apply_allure_markers(config.lds_status_deg_pig_sensor_passage_test, tag, title)
+        allure.dynamic.description(
             f"Проверка режима работы СОУ на базовых ДУ, на наборе данных {config.suite_name}, \n"
             f"на технологическом участке {config.technological_unit.description}\n"
             f"Время проведения проверки : {config.lds_status_deg_pig_sensor_passage_test.offset} мин.\n"
@@ -204,7 +203,6 @@ class TestSuiteScenarios:
             "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
             "Ожидаемая причина режима работы СОУ: прохождение СОД "
         )
-        _apply_allure_markers(config.lds_status_deg_pig_sensor_passage_test, tag, title, description)
         test_data = config.lds_status_deg_pig_sensor_passage_test_data
         await scenarios.lds_status_check_degradation_pig_sensor_passage(ws_client, config, test_data)
 
@@ -221,7 +219,8 @@ class TestSuiteScenarios:
             f"[{tag}] Проверка режима работы СОУ: 'Ухудшение характеристик', "
             "по причине: 'Наличие самотечного участка/участка с неполным сечением'"
         )
-        description = (
+        _apply_allure_markers(config.lds_status_deg_gravity_section_pumping_test, tag, title)
+        allure.dynamic.description(
             f"Проверка режима работы СОУ на базовых ДУ, на наборе данных {config.suite_name}, \n"
             f"на технологическом участке {config.technological_unit.description}\n"
             f"Время проведения проверки : {config.lds_status_deg_gravity_section_pumping_test.offset} мин.\n"
@@ -229,7 +228,6 @@ class TestSuiteScenarios:
             "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
             "Ожидаемая причина режима работы СОУ: Наличие самотечного участка/участка с неполным сечением "
         )
-        _apply_allure_markers(config.lds_status_deg_gravity_section_pumping_test, tag, title, description)
         test_data = config.lds_status_deg_gravity_section_pumping_test_data
         await scenarios.lds_status_check_with_reasons(ws_client, config, test_data)
 
@@ -246,7 +244,10 @@ class TestSuiteScenarios:
             f"[{tag}] Проверка режима работы СОУ: 'Ухудшение характеристик', "
             "по причине: 'Расстояние между СИ расхода на пути перекачки более 200 км'. ЭФ: Схема"
         )
-        description = (
+        _apply_allure_markers(
+            config.lds_status_deg_exceeding_distance_between_flow_meters_test, tag, title
+        )
+        allure.dynamic.description(
             f"Проверка режима работы СОУ на базовых ДУ, на наборе данных {config.suite_name}, \n"
             f"на технологическом участке {config.technological_unit.description}\n"
             "Время проведения проверки : "
@@ -254,9 +255,6 @@ class TestSuiteScenarios:
             "Подписка на сообщения типа: CommonScheme\n"
             "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
             "Ожидаемая причина режима работы СОУ: Расстояние между СИ расхода на пути перекачки более 200 км"
-        )
-        _apply_allure_markers(
-            config.lds_status_deg_exceeding_distance_between_flow_meters_test, tag, title, description
         )
         test_data = config.lds_status_deg_exceeding_distance_between_flow_meters_test_data
         await scenarios.lds_status_check_with_reasons(ws_client, config, test_data)
