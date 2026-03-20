@@ -19,6 +19,9 @@ ARCHIVE_NAME = f"{SUITE_NAME}.tar.gz"
 # Технологический участок
 TECHNOLOGICAL_UNIT = TU.TIKHORETSK_NOVOROSSIYSK_3
 
+# Название МН
+MAIN_PIPELINE = "МН Тихорецк-Новороссийск-3"
+
 # ===== Параметры утечки =====
 LEAK_DIAGNOSTIC_AREA_NAME = "Т-Н-3.НПС-5 «Тихорецкая».УЗР вых - Т-Н-3.НПС-3 «Нововеличковская».УЗР вых"
 LEAK_DIAGNOSTIC_AREA_ID = 2
@@ -43,6 +46,7 @@ SELECT_22_CONFIG = SmokeSuiteConfig(
     suite_data_id=SUITE_DATA_ID,
     archive_name=ARCHIVE_NAME,
     technological_unit=TECHNOLOGICAL_UNIT,
+    main_pipeline=MAIN_PIPELINE,
     # ----- Ожидаемый статус стационара -----
     expected_stationary_status=StationaryStatus.STATIONARY.value,
     # ===== БАЗОВЫЕ ТЕСТЫ =====

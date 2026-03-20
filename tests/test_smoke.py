@@ -186,8 +186,10 @@ class TestSuiteScenarios:
         await scenarios.main_page_info_signals(ws_client, config)
 
     @pytest.mark.asyncio
-    async def test_mask_signal_msg(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
-        """[MaskSignal] Проверка маскирования датчиков"""
+    async def test_mask_signal_msg(
+        self, ws_client: WebSocketClient, config: SmokeSuiteConfig, imitator_start_time: datetime
+    ) -> None:
+        """[MaskSignal] Проверка маскирования датчиков и записей журнала"""
         tag = "MaskSignal"
         title = f"[{tag}] проверка маскирования датчиков. ЭФ: Схема"
         description = (
@@ -201,10 +203,11 @@ class TestSuiteScenarios:
             "Значение в поле isMasked сигнала во входных сигналах после маскирования.\n"
             "Статус-код ответа на синхронный запрос снятия маскирования.\n"
             "Значение в поле isMasked сигнала во входных сигналах после снятия маскирования.\n"
+            "Проверка записей в журнале о маскировании и размаскировании: структура, фильтрация, уникальность тегов.\n"
             "Примечание: что бы не повлиять на проверки утечек, тест на маскирование выполняется во время инициализации"
         )
         _apply_allure_markers(config.mask_signal_test, tag, title, description)
-        await scenarios.mask_signal_msg(ws_client, config)
+        await scenarios.mask_signal_msg(ws_client, config, imitator_start_time)
 
     @pytest.mark.asyncio
     async def test_lds_status_initialization_out(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:

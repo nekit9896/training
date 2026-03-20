@@ -190,6 +190,9 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     expected_stationary_status: int = StationaryStatus.STATIONARY.value
     expected_main_page_signals: dict = field(default_factory=lambda: asdict(SignalsInfo()))
 
+    # ===== Название Магистрального Нефтепровода =====
+    main_pipeline: str = ""
+
     # ===== Базовые тесты =====
     basic_info_test: Optional[CaseMarkers] = None
     journal_info_test: Optional[CaseMarkers] = None

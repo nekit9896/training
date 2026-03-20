@@ -57,6 +57,16 @@ class BaseTN3Constants:
     IS_MASKED_TRUE = True
     IS_MASKED_FALSE = False
 
+    # ===== Константы журнала маскирования =====
+    JOURNAL_EVENT_MASK = "Установка признака маскирования"
+    JOURNAL_EVENT_UNMASK = "Снятие признака маскирования"
+    JOURNAL_SIGNAL_PRESSURE = "Значение давления"
+    JOURNAL_SIGNAL_FLOW = "Расход"
+    JOURNAL_MESSAGE_TYPE_USER_ACTIONS = "Действия пользователя"
+    JOURNAL_STATUS_SUCCESS = "Успешно"
+    JOURNAL_EXPECTED_MSG_COUNT_PER_SIGNAL = 2
+    JOURNAL_MASK_PAGINATION_LIMIT = 10
+
     # ===== Параметры подтверждения =====
     IS_ACKNOWLEDGED_FALSE = False
 
