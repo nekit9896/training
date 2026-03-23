@@ -142,6 +142,7 @@ class LeakTestConfig:
     all_leaks_info_test: Optional[CaseMarkers] = None
     tu_leaks_info_test: Optional[CaseMarkers] = None
     leak_info_in_journal: Optional[CaseMarkers] = None
+    possible_leak_in_journal_test: Optional[CaseMarkers] = None
     acknowledge_leak_test: Optional[CaseMarkers] = None
     output_signals_test: Optional[CaseMarkers] = None
     lds_status_during_leak_test: Optional[CaseMarkers] = None

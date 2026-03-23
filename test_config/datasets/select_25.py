@@ -81,6 +81,8 @@ SELECT_25_CONFIG = SmokeSuiteConfig(
         balance_algorithm_leak_detected_test=CaseMarkers(test_case_id="", offset=58.0),
         # ----- Тест AllLeaksInfo -----
         all_leaks_info_test=CaseMarkers(test_case_id="20", offset=58.0),
+        # ----- Тест MessagesInfo -----
+        possible_leak_in_journal_test=CaseMarkers(test_case_id="", offset=58.0),
         # ----- Тест TuLeaksInfo -----
         tu_leaks_info_test=CaseMarkers(test_case_id="84", offset=58.0),
         # ----- Тест CommonSchemeContent -----

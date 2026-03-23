@@ -647,6 +647,45 @@ async def leak_info_in_journal(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestC
         )
 
 
+async def possible_leak_in_journal(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig):
+    """
+    Проверка наличия сообщения 'Возможна утечка' в журнале.
+    """
+    with allure.step("Подключение по ws, получение и обработка сообщений журнала типа: MessagesInfoContent"):
+        request_body = t_utils.create_journal_req_body(
+            pagination=Pagination(limit=TestConst.JOURNAL_LEAKS_PAGINATION_LIMIT, direction=Direction.FIRST.value),
+            filtering=Filtering(messageTypes=int(MessageType.LEAKS)),
+        )
+        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        parsed_payload = parser.parse_journal_msg(payload)
+        messages_info = parsed_payload.replyContent.messagesInfo
+
+        StepCheck("Проверка наличия сообщений в журнале", "messagesInfo").actual(
+            messages_info
+        ).is_not_empty()
+
+        possible_leak_msg = t_utils.find_object_by_field(
+            messages_info, 'event', TestConst.JOURNAL_EVENT_POSSIBLE_LEAK
+        )
+
+    with SoftAssertions() as soft_failures:
+        StepCheck(
+            "Проверка mainPipeline", "mainPipeline", soft_failures
+        ).actual(possible_leak_msg.mainPipeline).expected(cfg.main_pipeline).equal_to()
+
+        StepCheck(
+            "Проверка messageType", "messageType", soft_failures
+        ).actual(possible_leak_msg.messageType).expected(TestConst.JOURNAL_MESSAGE_TYPE_LEAKS).equal_to()
+
+        StepCheck(
+            "Проверка technologicalSection не пустой", "technologicalSection", soft_failures
+        ).actual(possible_leak_msg.technologicalSection).is_not_none()
+
+        StepCheck(
+            "Проверка technologicalObject не пустой", "technologicalObject", soft_failures
+        ).actual(possible_leak_msg.technologicalObject).is_not_none()
+
+
 async def all_leaks_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
     """
     Проверка сообщения AllLeaksInfo об утечке.

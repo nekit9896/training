@@ -336,6 +336,28 @@ class TestLeakScenarios:
         await scenarios.leak_info_in_journal(ws_client, config, leak, imitator_start_time)
 
     @pytest.mark.asyncio
+    async def test_possible_leak_in_journal(
+        self,
+        ws_client: WebSocketClient,
+        config: SmokeSuiteConfig,
+        leak: LeakTestConfig,
+        leak_number: int,
+    ) -> None:
+        """[MessagesInfo] Проверка наличия сообщения 'Возможна утечка' в журнале"""
+        tag = "MessagesInfo"
+        title = f"[{tag}] Проверка сообщения 'Возможна утечка' в журнале. ЭФ: Журнал.Реальное время"
+        description = (
+            f"Проверка наличия сообщения 'Возможна утечка' в журнале на наборе данных {config.suite_name}, \n"
+            f"на технологическом участке {config.technological_unit.description}\n"
+            f"Время проведения проверки: {leak.possible_leak_in_journal_test.offset} мин.\n"
+            "Синхронный запрос типа: MessagesInfo"
+        )
+        _apply_allure_markers(leak.possible_leak_in_journal_test, tag, title, description)
+        if config.has_multiple_leaks:
+            allure.dynamic.title(f"{title} (утечка #{leak_number})")
+        await scenarios.possible_leak_in_journal(ws_client, config, leak)
+
+    @pytest.mark.asyncio
     async def test_tu_leaks_info(
         self,
         ws_client: WebSocketClient,

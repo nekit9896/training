@@ -107,6 +107,7 @@ SELECT_19_20_CONFIG = SmokeSuiteConfig(
             leaks_content_test=CaseMarkers(test_case_id="72", offset=47),
             # ----- Тест AllLeaksInfo (первая утечка) -----
             all_leaks_info_test=CaseMarkers(test_case_id="66", offset=47),
+            possible_leak_in_journal_test=CaseMarkers(test_case_id="", offset=47),
             # ----- Тест TuLeaksInfo (первая утечка) -----
             tu_leaks_info_test=CaseMarkers(test_case_id="70", offset=47),
             # ----- Тест CommonSchemeContent -----
@@ -139,6 +140,8 @@ SELECT_19_20_CONFIG = SmokeSuiteConfig(
             leaks_content_test=CaseMarkers(test_case_id="73", offset=61),
             # ----- Тест AllLeaksInfo (вторая утечка) -----
             all_leaks_info_test=CaseMarkers(test_case_id="69", offset=61),
+            # ----- Тест MessagesInfo-----
+            possible_leak_in_journal_test=CaseMarkers(test_case_id="", offset=61),
             # ----- Тест TuLeaksInfo (вторая утечка) -----
             tu_leaks_info_test=CaseMarkers(test_case_id="71", offset=61.0),
             # ----- Тест CommonSchemeContent -----

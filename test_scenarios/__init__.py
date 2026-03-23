@@ -18,6 +18,7 @@ __all__ = [
     scenarios.lds_status_initialization_out,
     scenarios.all_leaks_info,
     scenarios.leak_info_in_journal,
+    scenarios.possible_leak_in_journal,
     scenarios.tu_leaks_info,
     scenarios.lds_status_during_leak,
     scenarios.acknowledge_leak_info,

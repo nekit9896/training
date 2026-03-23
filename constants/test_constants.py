@@ -67,6 +67,11 @@ class BaseTN3Constants:
     JOURNAL_EXPECTED_MSG_COUNT_PER_SIGNAL = 2
     JOURNAL_MASK_PAGINATION_LIMIT = 10
 
+    # ===== Константы журнала утечек =====
+    JOURNAL_EVENT_POSSIBLE_LEAK = "Возможна утечка"
+    JOURNAL_MESSAGE_TYPE_LEAKS = "Утечки"
+    JOURNAL_LEAKS_PAGINATION_LIMIT = 10
+
     # ===== Параметры подтверждения =====
     IS_ACKNOWLEDGED_FALSE = False
 

@@ -83,6 +83,7 @@ SELECT_3_CONFIG = SmokeSuiteConfig(
         leaks_content_test=CaseMarkers(test_case_id="97", offset=65),
         # ----- Тест MessageInfo -----
         leak_info_in_journal=CaseMarkers(test_case_id="97", offset=65),
+        possible_leak_in_journal_test=CaseMarkers(test_case_id="", offset=65),
         # ----- Тест TuLeaksInfo -----
         tu_leaks_info_test=CaseMarkers(test_case_id="5", offset=65),
         # ----- Тест: lds_status_during_leak CommonSchemeContent (НПС: без соседей) -----
