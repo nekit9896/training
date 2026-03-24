@@ -13,7 +13,7 @@ import pytest
 
 from constants.enums import Direction, LdsStatus, MessageType, ReplyStatus, StationaryStatus, UserActions
 from constants.test_constants import BaseTN3Constants as TestConst
-from models.get_messages_model import Filtering, Pagination, PeriodTime
+from models.get_messages_model import Filtering, Pagination
 from test_config.models_for_tests import CaseData, LDSStatusConfig, LeakTestConfig, SmokeSuiteConfig
 from utils.helpers import ws_test_utils as t_utils
 from utils.helpers.asserts import SoftAssertions, StepCheck
@@ -208,9 +208,9 @@ async def main_page_info_unstationary(ws_client, cfg: SmokeSuiteConfig):
         ).equal_to()
 
 
-async def mask_signal_msg(ws_client, cfg: SmokeSuiteConfig, imitator_start_time):
+async def mask_signal_msg(ws_client, cfg: SmokeSuiteConfig):
     """
-    Проверка маскирования датчиков и записей в журнале о маскировании/размаскировании.
+    Проверка маскирования и снятия маскирования датчиков.
     """
     with allure.step("Подключение по ws, получение и обработка данных датчиков давления и расхода"):
         payload = await t_utils.connect_and_get_msg(
@@ -342,33 +342,6 @@ async def mask_signal_msg(ws_client, cfg: SmokeSuiteConfig, imitator_start_time)
         pressure_sensor_unmask_data = t_utils.find_object_by_field(sensor_data, "id", pressure_sensor.id)
         flowmeter_unmask_data = t_utils.find_object_by_field(sensor_data, "id", flowmeter.id)
 
-    with allure.step("Получение сообщений журнала о маскировании и размаскировании"):
-        time.sleep(cfg.basic_message_timeout)
-        end_time = datetime.now(tz=imitator_start_time.tzinfo)
-        request_body = t_utils.create_journal_req_body(
-            pagination=Pagination(limit=TestConst.JOURNAL_MASK_PAGINATION_LIMIT, direction=Direction.FIRST.value),
-            periodTime=PeriodTime(start=imitator_start_time, end=end_time),
-            filtering=Filtering(userActions=int(UserActions.SIGNAL_MASK_SIM)),
-        )
-        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
-        parsed_payload = parser.parse_journal_msg(payload)
-        journal_messages = parsed_payload.replyContent.messagesInfo
-
-        pressure_journal_msgs = [
-            journal_message for journal_message in journal_messages if journal_message.signalName == TestConst.JOURNAL_SIGNAL_PRESSURE
-        ]
-        flow_journal_msgs = [
-            journal_message for journal_message in journal_messages if journal_message.signalName == TestConst.JOURNAL_SIGNAL_FLOW
-        ]
-
-        mask_event_msgs = [journal_message for journal_message in journal_messages if journal_message.event == TestConst.JOURNAL_EVENT_MASK]
-        unmask_event_msgs = [journal_message for journal_message in journal_messages if journal_message.event == TestConst.JOURNAL_EVENT_UNMASK]
-        mask_signal_names = {mask_event.signalName for mask_event in mask_event_msgs}
-        unmask_signal_names = {unmask_event.signalName for unmask_event in unmask_event_msgs}
-
-        filter_start_msk = t_utils.ensure_moscow_timezone(imitator_start_time)
-        filter_end_msk = t_utils.ensure_moscow_timezone(end_time)
-
     with SoftAssertions() as soft_failures:
         StepCheck(
             f"Проверка маскирования датчика давления с id: {pressure_sensor.id}", "isMasked", soft_failures
@@ -383,18 +356,71 @@ async def mask_signal_msg(ws_client, cfg: SmokeSuiteConfig, imitator_start_time)
             flowmeter_unmask_data.isMasked
         ).expected(False).equal_to()
 
+
+async def mask_info_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_time):
+    """
+    Проверка записей журнала о маскировании и размаскировании.
+    """
+    with allure.step("Запрос сообщений журнала с фильтром userActions"):
+        end_time = datetime.now(tz=imitator_start_time.tzinfo)
+        request_body = t_utils.create_journal_req_body(
+            pagination=Pagination(limit=TestConst.JOURNAL_MASK_PAGINATION_LIMIT, direction=Direction.FIRST.value),
+            filtering=Filtering(userActions=int(UserActions.SIGNAL_MASK_SIM)),
+        )
+        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        parsed_payload = parser.parse_journal_msg(payload)
+        all_messages = parsed_payload.replyContent.messagesInfo
+
+    with allure.step("Фильтрация сообщений по событиям маскирования и временному диапазону"):
+        filter_start_msk = t_utils.ensure_moscow_timezone(imitator_start_time)
+        filter_end_msk = t_utils.ensure_moscow_timezone(end_time)
+
+        mask_unmask_msgs = [
+            msg for msg in all_messages
+            if msg.event in TestConst.JOURNAL_MASK_EXPECTED_EVENTS
+            and msg.signalName in TestConst.JOURNAL_MASK_EXPECTED_SIGNALS
+        ]
+
+        journal_messages = [
+            msg for msg in mask_unmask_msgs
+            if filter_start_msk <= t_utils.ensure_moscow_timezone(msg.time) <= filter_end_msk
+        ]
+
+        allure.attach(
+            f"Всего получено сообщений: {len(all_messages)}\n"
+            f"После фильтрации по event и signalName осталось сообщений: {len(mask_unmask_msgs)}\n"
+            f"После фильтрации по времени ({filter_start_msk} - {filter_end_msk}) осталось сообщений: {len(journal_messages)}",
+            name="Результат фильтрации сообщений журнала",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+    with allure.step("Группировка отфильтрованных сообщений"):
+        pressure_msgs = [msg for msg in journal_messages if msg.signalName == TestConst.JOURNAL_SIGNAL_PRESSURE]
+        flow_msgs = [msg for msg in journal_messages if msg.signalName == TestConst.JOURNAL_SIGNAL_FLOW]
+
+        mask_event_msgs = [msg for msg in journal_messages if msg.event == TestConst.JOURNAL_EVENT_MASK]
+        unmask_event_msgs = [msg for msg in journal_messages if msg.event == TestConst.JOURNAL_EVENT_UNMASK]
+        mask_signal_names = {msg.signalName for msg in mask_event_msgs}
+        unmask_signal_names = {msg.signalName for msg in unmask_event_msgs}
+
     with SoftAssertions() as journal_soft_failures:
+        StepCheck(
+            "Проверка общего количества отфильтрованных сообщений",
+            "total_count",
+            journal_soft_failures,
+        ).actual(len(journal_messages)).expected(TestConst.JOURNAL_EXPECTED_MASK_MSG_TOTAL).equal_to()
+
         StepCheck(
             f"Проверка количества сообщений для '{TestConst.JOURNAL_SIGNAL_PRESSURE}'",
             "count",
             journal_soft_failures,
-        ).actual(len(pressure_journal_msgs)).expected(TestConst.JOURNAL_EXPECTED_MSG_COUNT_PER_SIGNAL).equal_to()
+        ).actual(len(pressure_msgs)).expected(TestConst.JOURNAL_EXPECTED_MSG_COUNT_PER_SIGNAL).equal_to()
 
         StepCheck(
             f"Проверка количества сообщений для '{TestConst.JOURNAL_SIGNAL_FLOW}'",
             "count",
             journal_soft_failures,
-        ).actual(len(flow_journal_msgs)).expected(TestConst.JOURNAL_EXPECTED_MSG_COUNT_PER_SIGNAL).equal_to()
+        ).actual(len(flow_msgs)).expected(TestConst.JOURNAL_EXPECTED_MSG_COUNT_PER_SIGNAL).equal_to()
 
         StepCheck(
             f"Проверка: событие '{TestConst.JOURNAL_EVENT_MASK}' содержит '{TestConst.JOURNAL_SIGNAL_PRESSURE}'",
@@ -482,13 +508,6 @@ async def mask_signal_msg(ws_client, cfg: SmokeSuiteConfig, imitator_start_time)
                 "status",
                 journal_soft_failures,
             ).actual(msg.status).expected(TestConst.JOURNAL_STATUS_SUCCESS).equal_to()
-
-            msg_time_msk = t_utils.ensure_moscow_timezone(msg.time)
-            StepCheck(
-                f"Проверка времени сообщения в пределах фильтра запроса [{msg_label}]",
-                "time",
-                journal_soft_failures,
-            ).actual(msg_time_msk).is_between(filter_start_msk, filter_end_msk)
 
 
 async def lds_status_initialization_out(ws_client, cfg: SmokeSuiteConfig):

@@ -15,6 +15,7 @@ class ColumnsSelection(Enum):
     TECHNOLOGICAL_SECTION = 'TechnologicalSection'
     TECHNOLOGICAL_OBJECT = 'TechnologicalObject'
     CONTROL_POINT = 'ControlPoint'
+    OBJECT = 'Object'
     SIGNAL_NAME = 'SignalName'
     EVENT = 'Event'
     VALUE = 'Value'
@@ -69,7 +70,7 @@ class Filtering:
     """Фильтрация по выбранному полю"""
 
     priorities: Optional[int] = 0
-    messageTypes: Optional[int] = None
+    messageTypes: Optional[int] = 0
     userActions: Optional[int] = 0
     objects: Optional[FilteringObjects] = field(default_factory=FilteringObjects)
     additionalProperties: Optional[str] = None
@@ -85,17 +86,31 @@ class GetMessagesReply:
 
 
 @dataclass
+class Search:
+    """- Поиск сообщений
+    - Осуществляется по полям из БД lds-Journal: details[columnId = x]
+    .argument, где x - от 1 до 8
+    """
+
+    # Строка, которая ищется в сообщении.
+    query: Optional[str] = ''
+    additionalProperties: Optional[str] = None
+
+
+@dataclass
 class GetMessagesRequest:
     """Запрос для получения журнала"""
 
     pagination: Pagination = field(default_factory=Pagination)
     periodTime: Optional[PeriodTime] = None
     sorting: Optional[Sorting] = field(default_factory=Sorting)
-    search: Optional[Search] = None
+    search: Optional[Search] = field(default_factory=Search)
     # Фильтрация по нескольким полям
     filtering: Optional[Filtering] = None
     # Выбор отображаемых колонок
     columnsSelection: List[str] = field(default_factory=lambda: [column.value for column in ColumnsSelection])
+    availableMessageIds: List[int] = field(default_factory=list)
+    isHistorical: bool = False
     additionalProperties: Optional[str] = None
 
 
@@ -149,17 +164,7 @@ class PeriodTime:
     end: datetime
     # Время начала отображения сообщений в формате ISO: yyyy-mm-dd"T"HH:mm:ss
     start: datetime
-
-
-@dataclass
-class Search:
-    """- Поиск сообщений
-    - Осуществляется по полям из БД lds-Journal: details[columnId = x]
-    .argument, где x - от 1 до 8
-    """
-
-    # Строка, которая ищется в сообщении.
-    query: Optional[str] = None
+    additionalProperties: Optional[str] = None
 
 
 @dataclass

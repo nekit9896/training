@@ -111,6 +111,7 @@ SMOKE_SUITE_LEVEL_MAPPING = {
     'test_main_page_info': 'main_page_info_test',
     'test_main_page_info_signals': 'main_page_info_signals_test',
     'test_mask_signal_msg': 'mask_signal_test',
+    'test_mask_info_in_journal': 'mask_info_in_journal_test',
     'test_lds_status_initialization_out': 'lds_status_initialization_out_test',
     'test_main_page_info_unstationary': 'main_page_info_unstationary_test',
 }

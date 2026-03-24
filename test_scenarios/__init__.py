@@ -15,6 +15,7 @@ __all__ = [
     scenarios.main_page_info,
     scenarios.main_page_info_signals,
     scenarios.mask_signal_msg,
+    scenarios.mask_info_in_journal,
     scenarios.lds_status_initialization_out,
     scenarios.all_leaks_info,
     scenarios.leak_info_in_journal,

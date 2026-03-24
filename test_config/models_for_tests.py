@@ -201,6 +201,7 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     main_page_info_test: Optional[CaseMarkers] = None
     main_page_info_signals_test: Optional[CaseMarkers] = None
     mask_signal_test: Optional[CaseMarkers] = None
+    mask_info_in_journal_test: Optional[CaseMarkers] = None
     lds_status_initialization_out_test: Optional[CaseMarkers] = None
 
     # ===== Конфигурации утечек =====

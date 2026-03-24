@@ -1,142 +1,63 @@
-{
-    "text": [
-      1,
-      {
-        
+[
+  1,
+  {
+    
+  },
+  '257',
+  'GetMessagesRequest',
+  [
+    {
+      'pagination': {
+        'limit': 50,
+        'id': None,
+        'direction': 3,
+        'eventTime': None,
+        'additionalProperties': None
       },
-      '38',
-      'GetMessagesRequest',
-      [
-        {
-          'pagination': {
-            'limit': 50,
-            'id': None,
-            'direction': 3,
-            'eventTime': None,
-            'additionalProperties': None
-          },
-          'periodTime': {
-            'start': [
-              Timestamp(seconds=1773894055,
-              nanoseconds=0),
-              0
-            ],
-            'end': [
-              Timestamp(seconds=1773897655,
-              nanoseconds=0),
-              0
-            ],
-            'additionalProperties': None
-          },
-          'sorting': {
-            'sortingParam': 1,
-            'sortingType': 2,
-            'additionalProperties': None
-          },
-          'search': {
-            'query': '',
-            'additionalProperties': None
-          },
-          'filtering': {
-            'priorities': 0,
-            'messageTypes': 0,
-            'userActions': 16,
-            'objects': {
-              'tuId': None,
-              'objectIds': [
-                
-              ],
-              'objectTypes': 0,
-              'additionalProperties': None
-            },
-            'additionalProperties': None
-          },
-          'columnsSelection': [
-            'Time',
-            'User',
-            'MainPipeline',
-            'TechnologicalSection',
-            'TechnologicalObject',
-            'ControlPoint',
-            'Object',
-            'SignalName',
-            'Event',
-            'Value',
-            'MessageType',
-            'Tag',
-            'Status'
-          ],
-          'availableMessageIds': [
+      'periodTime': None,
+      'sorting': {
+        'sortingParam': 1,
+        'sortingType': 2,
+        'additionalProperties': None
+      },
+      'search': {
+        'query': '',
+        'additionalProperties': None
+      },
+      'filtering': {
+        'priorities': 0,
+        'messageTypes': 0,
+        'userActions': 256,
+        'objects': {
+          'tuId': None,
+          'objectIds': [
             
           ],
-          'isHistorical': False,
+          'objectTypes': 0,
           'additionalProperties': None
-        }
-      ]
-    ]
-  }
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-фрагмент из контракта по котрому надо дозаполнить enum:
-          userActions:
-            title: userActions
-            type: array
-            description: >
-              Фильтрация по действиям пользователя. 
-              Пустой массив, если нет фильтрации по действиям пользователя
-            items:
-              title: userAction
-              type: integer
-              format: int32
-              description: Тип действия пользователя
-              enum:
-                - 1
-                - 2
-                - 3
-                - 4
-                - 5
-                - 6
-                - 7
-                - 8
-                - 9
-                - 10
-                - 11
-                - 12
-              x-enumNames:
-                "1": UserLogin (Вход пользователя)
-                "2": UserExit (Выход пользователя)
-                "3": FailedUserLogin (Неуспешная попытка входа пользователя)
-                "4": AlgorithmsReinitialization (Переинициализация алгоритмов)
-                "5": SignalMaskSim (Маскирование и имитация входных сигналов)
-                "6": LDSMasking (Маскирование СОУ)
-                "7": Export (Экспорт и выгрузки)
-                "8": SettingsChange (Изменение настроек)
-                "9": LeakAck (Квитирование сообщения об утечке)
-                "10": LeakRemove (Исключение неактивных утечек)
-                "11": LDSAdmin (Администрирование СОУ)
-                "12": PigControl (Управление СОД)
+        },
+        'additionalProperties': None
+      },
+      'columnsSelection': [
+        'Time',
+        'User',
+        'MainPipeline',
+        'TechnologicalSection',
+        'TechnologicalObject',
+        'ControlPoint',
+        'Object',
+        'SignalName',
+        'Event',
+        'Value',
+        'MessageType',
+        'Tag',
+        'Status'
+      ],
+      'availableMessageIds': [
+        
+      ],
+      'isHistorical': False,
+      'additionalProperties': None
+    }
+  ]
+]

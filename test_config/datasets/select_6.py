@@ -61,6 +61,7 @@ SELECT_6_CONFIG = SmokeSuiteConfig(
     main_page_info_test=CaseMarkers(test_case_id="3", offset=7),
     main_page_info_signals_test=CaseMarkers(test_case_id="120", offset=7),
     mask_signal_test=CaseMarkers(test_case_id="32", offset=8),
+    mask_info_in_journal_test=CaseMarkers(test_case_id="", offset=9),
     lds_status_initialization_out_test=CaseMarkers(test_case_id="30", offset=30),
     # ===== КОНФИГУРАЦИЯ УТЕЧКИ =====
     leak=LeakTestConfig(

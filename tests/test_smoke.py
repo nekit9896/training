@@ -186,14 +186,12 @@ class TestSuiteScenarios:
         await scenarios.main_page_info_signals(ws_client, config)
 
     @pytest.mark.asyncio
-    async def test_mask_signal_msg(
-        self, ws_client: WebSocketClient, config: SmokeSuiteConfig, imitator_start_time: datetime
-    ) -> None:
-        """[MaskSignal] Проверка маскирования датчиков и записей журнала"""
+    async def test_mask_signal_msg(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
+        """[MaskSignal] Проверка маскирования датчиков"""
         tag = "MaskSignal"
         title = f"[{tag}] проверка маскирования датчиков. ЭФ: Схема"
         description = (
-            f"Проверка работы маскирования и снятия маскирования  на наборе данных {config.suite_name}, \n"
+            f"Проверка работы маскирования и снятия маскирования на наборе данных {config.suite_name}, \n"
             f"на технологическом участке {config.technological_unit.description}\n"
             f"Время проведения проверки: {config.mask_signal_test.offset} мин.\n"
             "Синхронные запросы типа: GetInputSignalsRequest, MaskSignalRequest, UnmaskSignalRequest\n"
@@ -203,11 +201,28 @@ class TestSuiteScenarios:
             "Значение в поле isMasked сигнала во входных сигналах после маскирования.\n"
             "Статус-код ответа на синхронный запрос снятия маскирования.\n"
             "Значение в поле isMasked сигнала во входных сигналах после снятия маскирования.\n"
-            "Проверка записей в журнале о маскировании и размаскировании: структура, фильтрация, уникальность тегов.\n"
             "Примечание: что бы не повлиять на проверки утечек, тест на маскирование выполняется во время инициализации"
         )
         _apply_allure_markers(config.mask_signal_test, tag, title, description)
-        await scenarios.mask_signal_msg(ws_client, config, imitator_start_time)
+        await scenarios.mask_signal_msg(ws_client, config)
+
+    @pytest.mark.asyncio
+    async def test_mask_info_in_journal(
+        self, ws_client: WebSocketClient, config: SmokeSuiteConfig, imitator_start_time: datetime
+    ) -> None:
+        """[MessagesInfo] Проверка записей журнала о маскировании и размаскировании"""
+        tag = "MessagesInfo"
+        title = f"[{tag}] Проверка записей журнала о маскировании и размаскировании. ЭФ: Журнал.Реальное время"
+        description = (
+            f"Проверка записей журнала о маскировании и размаскировании на наборе данных {config.suite_name}, \n"
+            f"на технологическом участке {config.technological_unit.description}\n"
+            f"Время проведения проверки: {config.mask_info_in_journal_test.offset} мин.\n"
+            "Синхронный запрос типа: MessagesInfo\n"
+            "Проверки: структура, фильтрация по времени, совпадение тегов между маскированием и снятием.\n"
+            "Примечание: тест выполняется после теста маскирования, чтобы записи успели попасть в журнал"
+        )
+        _apply_allure_markers(config.mask_info_in_journal_test, tag, title, description)
+        await scenarios.mask_info_in_journal(ws_client, config, imitator_start_time)
 
     @pytest.mark.asyncio
     async def test_lds_status_initialization_out(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:

@@ -10,6 +10,7 @@ from typing import Any, List, Set, Tuple, Type, TypeVar
 from zoneinfo import ZoneInfo
 
 import allure
+from msgpack import Timestamp as MsgpackTimestamp
 from pytest import fail
 
 from clients.websocket_client import WebSocketClient
@@ -293,9 +294,20 @@ def create_dict_from_dataclass(cls: Type, **kwargs) -> dict:
     return asdict(instance)
 
 
+def datetime_to_msgpack_timestamp(dt: datetime) -> list:
+    """Конвертирует datetime в формат [Timestamp(seconds, nanoseconds), tz_offset] для отправки на бэкенд."""
+    return [MsgpackTimestamp(seconds=int(dt.timestamp()), nanoseconds=0), 0]
+
+
 def create_journal_req_body(**kwargs) -> dict:
     """Создает дефолтные параметры запроса к журналу"""
-    return create_dict_from_dataclass(GetMessagesRequest, **kwargs)
+    result = create_dict_from_dataclass(GetMessagesRequest, **kwargs)
+    period = result.get('periodTime')
+    if period:
+        for key in ('start', 'end'):
+            if isinstance(period.get(key), datetime):
+                period[key] = datetime_to_msgpack_timestamp(period[key])
+    return result
 
 
 def parse_journal_msg_value(value: str) -> Tuple[float, float]:
