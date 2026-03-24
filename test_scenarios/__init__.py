@@ -23,5 +23,6 @@ __all__ = [
     scenarios.tu_leaks_info,
     scenarios.lds_status_during_leak,
     scenarios.acknowledge_leak_info,
+    scenarios.acknowledge_leak_in_journal,
     scenarios.output_signals,
 ]

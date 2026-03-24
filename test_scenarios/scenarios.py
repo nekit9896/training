@@ -979,6 +979,54 @@ async def acknowledge_leak_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTest
     )
 
 
+async def acknowledge_leak_in_journal(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
+    """
+    Проверка записи в журнале о квитировании утечки.
+    """
+    with allure.step("Запрос сообщений журнала с фильтром userActions=LEAK_ACK"):
+        request_body = t_utils.create_journal_req_body(
+            pagination=Pagination(limit=TestConst.JOURNAL_ACK_PAGINATION_LIMIT, direction=Direction.FIRST.value),
+            filtering=Filtering(userActions=int(UserActions.LEAK_ACK)),
+        )
+        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        parsed_payload = parser.parse_journal_msg(payload)
+        messages_info = parsed_payload.replyContent.messagesInfo
+
+        StepCheck("Проверка наличия сообщений в журнале", "messagesInfo").actual(
+            messages_info
+        ).is_not_empty()
+
+        ack_message = t_utils.find_object_by_field(
+            messages_info, 'event', TestConst.JOURNAL_EVENT_LEAK_ACKNOWLEDGED
+        )
+
+    with allure.step("Проверка актуальности сообщения"):
+        msg_time_msk = t_utils.ensure_moscow_timezone(ack_message.time)
+        start_time_msk = t_utils.ensure_moscow_timezone(imitator_start_time)
+
+        StepCheck(
+            "Проверка: время сообщения позднее времени старта имитатора",
+            "time",
+        ).actual(msg_time_msk > start_time_msk).expected(True).equal_to()
+
+    with SoftAssertions() as soft_failures:
+        StepCheck(
+            "Проверка event", "event", soft_failures
+        ).actual(ack_message.event).expected(TestConst.JOURNAL_EVENT_LEAK_ACKNOWLEDGED).equal_to()
+
+        StepCheck(
+            "Проверка mainPipeline", "mainPipeline", soft_failures
+        ).actual(ack_message.mainPipeline).expected(cfg.main_pipeline).equal_to()
+
+        StepCheck(
+            "Проверка technologicalSection", "technologicalSection", soft_failures
+        ).actual(ack_message.technologicalSection).expected(cfg.tu_name).equal_to()
+
+        StepCheck(
+            "Проверка technologicalObject не пустой", "technologicalObject", soft_failures
+        ).actual(ack_message.technologicalObject).is_not_none()
+
+
 async def output_signals(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
     """
     Проверка наличия данных об утечке в выходных сигналах.

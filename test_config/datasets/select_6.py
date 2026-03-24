@@ -100,6 +100,7 @@ SELECT_6_CONFIG = SmokeSuiteConfig(
         # ----- Тест MessageInfo -----
         leak_info_in_journal=CaseMarkers(test_case_id="119", offset=59),
         possible_leak_in_journal_test=CaseMarkers(test_case_id="", offset=50),
+        acknowledge_leak_in_journal_test=CaseMarkers(test_case_id="", offset=60.5),
         # ----- Тест TuLeaksInfo -----
         tu_leaks_info_test=CaseMarkers(test_case_id="5", offset=59),
         # ----- Тест CommonSchemeContent -----

@@ -445,6 +445,29 @@ class TestLeakScenarios:
         await scenarios.acknowledge_leak_info(ws_client, config, leak)
 
     @pytest.mark.asyncio
+    async def test_acknowledge_leak_in_journal(
+        self,
+        ws_client: WebSocketClient,
+        config: SmokeSuiteConfig,
+        leak: LeakTestConfig,
+        leak_number: int,
+        imitator_start_time: datetime,
+    ) -> None:
+        """[MessagesInfo] Проверка записи в журнале о квитировании утечки"""
+        tag = "MessagesInfo"
+        title = f"[{tag}] Проверка записи в журнале о квитировании утечки. ЭФ: Журнал.Реальное время"
+        description = (
+            f"Проверка записи о квитировании утечки в журнале на наборе данных {config.suite_name}, \n"
+            f"на технологическом участке {config.technological_unit.description}\n"
+            f"Время проведения проверки: {leak.acknowledge_leak_in_journal_test.offset} мин.\n"
+            "Синхронный запрос типа: MessagesInfo с фильтром userActions=LEAK_ACK\n"
+        )
+        _apply_allure_markers(leak.acknowledge_leak_in_journal_test, tag, title, description)
+        if config.has_multiple_leaks:
+            allure.dynamic.title(f"{title} (утечка #{leak_number})")
+        await scenarios.acknowledge_leak_in_journal(ws_client, config, leak, imitator_start_time)
+
+    @pytest.mark.asyncio
     async def test_output_signals(
         self,
         ws_client: WebSocketClient,

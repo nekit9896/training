@@ -69,11 +69,12 @@ class BaseTN3Constants:
     JOURNAL_MASK_PAGINATION_LIMIT = 10
     JOURNAL_MASK_EXPECTED_EVENTS = {"Установка признака маскирования", "Снятие признака маскирования"}
     JOURNAL_MASK_EXPECTED_SIGNALS = {"Значение давления", "Расход"}
-
-    # ===== Константы журнала утечек =====
     JOURNAL_EVENT_POSSIBLE_LEAK = "Возможна утечка"
     JOURNAL_MESSAGE_TYPE_LEAKS = "Утечки"
     JOURNAL_LEAKS_PAGINATION_LIMIT = 10
+    JOURNAL_ACK_PAGINATION_LIMIT = 1
+    JOURNAL_EVENT_LEAK_ACKNOWLEDGED = "Сообщение об утечке квитировано"
+
 
     # ===== Параметры подтверждения =====
     IS_ACKNOWLEDGED_FALSE = False

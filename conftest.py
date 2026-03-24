@@ -136,6 +136,7 @@ LEAK_LEVEL_TEST_MAPPING = {
     'test_leak_info_in_journal': 'leak_info_in_journal',
     'test_possible_leak_in_journal': 'possible_leak_in_journal_test',
     'test_acknowledge_leak_info': 'acknowledge_leak_test',
+    'test_acknowledge_leak_in_journal': 'acknowledge_leak_in_journal_test',
     'test_output_signals': 'output_signals_test',
     'test_lds_status_during_leak': 'lds_status_during_leak_test',
     'test_balance_algorithm_leak_waiting': 'balance_algorithm_leak_waiting_test',
