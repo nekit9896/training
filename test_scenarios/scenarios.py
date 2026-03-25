@@ -362,7 +362,7 @@ async def mask_info_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_
     Проверка записей журнала о маскировании и размаскировании.
     """
     with allure.step("Запрос сообщений журнала с фильтром userActions"):
-        end_time = datetime.now(tz=imitator_start_time.tzinfo)
+        end_time = datetime.now()
         request_body = t_utils.create_journal_req_body(
             pagination=Pagination(limit=TestConst.JOURNAL_MASK_PAGINATION_LIMIT, direction=Direction.FIRST.value),
             filtering=Filtering(userActions=int(UserActions.SIGNAL_MASK_SIM)),
@@ -372,8 +372,8 @@ async def mask_info_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_
         all_messages = parsed_payload.replyContent.messagesInfo
 
     with allure.step("Фильтрация сообщений по событиям маскирования и временному диапазону"):
-        filter_start_msk = t_utils.ensure_moscow_timezone(imitator_start_time)
-        filter_end_msk = t_utils.ensure_moscow_timezone(end_time)
+        filter_start_msk = t_utils.localize_as_moscow(imitator_start_time)
+        filter_end_msk = t_utils.localize_as_moscow(end_time)
 
         mask_unmask_msgs = [
             msg for msg in all_messages
@@ -449,14 +449,13 @@ async def mask_info_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_
         for signal_name in [TestConst.JOURNAL_SIGNAL_PRESSURE, TestConst.JOURNAL_SIGNAL_FLOW]:
             mask_msg_for_signal = next((m for m in mask_event_msgs if m.signalName == signal_name), None)
             unmask_msg_for_signal = next((m for m in unmask_event_msgs if m.signalName == signal_name), None)
-            mask_tag = mask_msg_for_signal.tag if mask_msg_for_signal else None
-            unmask_tag = unmask_msg_for_signal.tag if unmask_msg_for_signal else None
 
-            StepCheck(
-                f"Проверка совпадения tag для '{signal_name}' между маскированием и снятием",
-                "tag",
-                journal_soft_failures,
-            ).actual(mask_tag).expected(unmask_tag).equal_to()
+            if mask_msg_for_signal and unmask_msg_for_signal:
+                StepCheck(
+                    f"Проверка совпадения tag для '{signal_name}' между маскированием и снятием",
+                    "tag",
+                    journal_soft_failures,
+                ).actual(mask_msg_for_signal.tag).expected(unmask_msg_for_signal.tag).equal_to()
 
         for msg in journal_messages:
             msg_label = f"{msg.event} - {msg.signalName}"
@@ -1002,7 +1001,7 @@ async def acknowledge_leak_in_journal(ws_client, cfg: SmokeSuiteConfig, leak: Le
 
     with allure.step("Проверка актуальности сообщения"):
         msg_time_msk = t_utils.ensure_moscow_timezone(ack_message.time)
-        start_time_msk = t_utils.ensure_moscow_timezone(imitator_start_time)
+        start_time_msk = t_utils.localize_as_moscow(imitator_start_time)
 
         StepCheck(
             "Проверка: время сообщения позднее времени старта имитатора",

@@ -116,6 +116,20 @@ def ensure_moscow_timezone(input_datetime: datetime) -> None | datetime:
     return input_datetime.astimezone(ZoneInfo("Europe/Moscow"))
 
 
+def localize_as_moscow(input_datetime: datetime) -> None | datetime:
+    """
+    Присваивает datetime московский часовой пояс без сдвига времени.
+    Если datetime уже имеет timezone - конвертирует в московское время.
+    """
+    if input_datetime is None:
+        return input_datetime
+
+    moscow_tz = ZoneInfo("Europe/Moscow")
+    if input_datetime.tzinfo is None:
+        return input_datetime.replace(tzinfo=moscow_tz)
+    return input_datetime.astimezone(moscow_tz)
+
+
 def get_random_item(item_list: List[RandomObjectType]) -> RandomObjectType:
     """
     Получает случайный объект из списка
