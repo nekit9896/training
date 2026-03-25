@@ -1,0 +1,62 @@
+[
+  3,
+  {
+    
+  },
+  '257',
+  3,
+  {
+    'replyStatus': 200,
+    'replyErrors': None,
+    'replyContent': {
+      'messagesInfo': [
+        {
+          'messageId': 1438979,
+          'time': [
+            Timestamp(seconds=1774274223,
+            nanoseconds=0),
+            0
+          ],
+          'user': 'Пользователь А.',
+          'mainPipeline': 'МН Тихорецк-Новороссийск-3',
+          'technologicalSection': 'Тихорецк-Новороссийск-3',
+          'technologicalObject': 'Т-Н-3.НПС-3 «Нововеличковская».УЗР вых - Т-Н-3.НПС-2 «Крымская».УЗР вх',
+          'controlPoint': None,
+          'object': None,
+          'signalName': None,
+          'event': 'Сообщение об утечке квитировано',
+          'value': None,
+          'priority': 2,
+          'messageType': 'Действия пользователя',
+          'tag': 'AK.CHTN.SOU.MN_TN_3.LU_VELKRIM.AckLeak',
+          'login': 'lds-autotest-user',
+          'userIpAddress': '192.168.1.1',
+          'status': 'Успешно'
+        },
+        {
+          'messageId': 1438976,
+          'time': [
+            Timestamp(seconds=1774274193,
+            nanoseconds=0),
+            0
+          ],
+          'user': 'Пользователь А.',
+          'mainPipeline': 'МН Тихорецк-Новороссийск-3',
+          'technologicalSection': 'Тихорецк-Новороссийск-3',
+          'technologicalObject': 'Т-Н-3.НПС-5 «Тихорецкая».УЗР вых - Т-Н-3.НПС-3 «Нововеличковская».УЗР вых',
+          'controlPoint': None,
+          'object': None,
+          'signalName': None,
+          'event': 'Сообщение об утечке квитировано',
+          'value': None,
+          'priority': 2,
+          'messageType': 'Действия пользователя',
+          'tag': 'AK.CHTN.SOU.MN_TN_3.LU_TIHVEL.AckLeak',
+          'login': 'lds-autotest-user',
+          'userIpAddress': '192.168.1.1',
+          'status': 'Успешно'
+        }
+      ]
+    }
+  }
+]

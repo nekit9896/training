@@ -134,6 +134,21 @@ class ReservedType(Enum):
     CREATED_IN_DECISION_MAKING = 6  # Создано в АПР
 
 
+class UserActions(IntFlag):
+    USER_LOGIN = 1  # Вход пользователя
+    USER_EXIT = 1 << 1  # Выход пользователя
+    FAILED_USER_LOGIN = 1 << 2  # Неуспешная попытка входа пользователя
+    ALGORITHMS_REINITIALIZATION = 1 << 3  # Переинициализация алгоритмов
+    SIGNAL_MASK_SIM = 1 << 4  # Маскирование и имитация входных сигналов
+    LDS_MASKING = 1 << 5  # Маскирование СОУ
+    EXPORT = 1 << 6  # Экспорт и выгрузки
+    SETTINGS_CHANGE = 1 << 7  # Изменение настроек
+    LEAK_ACK = 1 << 8  # Квитирование сообщения об утечке
+    LEAK_REMOVE = 1 << 9  # Исключение неактивных утечек
+    LDS_ADMIN = 1 << 10  # Администрирование СОУ
+    PIG_CONTROL = 1 << 11  # Управление СОД
+
+
 class MessageType(IntFlag):
     AUTHENTICATION = 1  # Вход в систему
     REJECTION = 1 << 2  # Отбраковка сигналов

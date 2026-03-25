@@ -1,0 +1,63 @@
+[
+  1,
+  {
+    
+  },
+  '257',
+  'GetMessagesRequest',
+  [
+    {
+      'pagination': {
+        'limit': 50,
+        'id': None,
+        'direction': 3,
+        'eventTime': None,
+        'additionalProperties': None
+      },
+      'periodTime': None,
+      'sorting': {
+        'sortingParam': 1,
+        'sortingType': 2,
+        'additionalProperties': None
+      },
+      'search': {
+        'query': '',
+        'additionalProperties': None
+      },
+      'filtering': {
+        'priorities': 0,
+        'messageTypes': 0,
+        'userActions': 256,
+        'objects': {
+          'tuId': None,
+          'objectIds': [
+            
+          ],
+          'objectTypes': 0,
+          'additionalProperties': None
+        },
+        'additionalProperties': None
+      },
+      'columnsSelection': [
+        'Time',
+        'User',
+        'MainPipeline',
+        'TechnologicalSection',
+        'TechnologicalObject',
+        'ControlPoint',
+        'Object',
+        'SignalName',
+        'Event',
+        'Value',
+        'MessageType',
+        'Tag',
+        'Status'
+      ],
+      'availableMessageIds': [
+        
+      ],
+      'isHistorical': False,
+      'additionalProperties': None
+    }
+  ]
+]

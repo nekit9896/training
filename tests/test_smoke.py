@@ -191,7 +191,7 @@ class TestSuiteScenarios:
         tag = "MaskSignal"
         title = f"[{tag}] проверка маскирования датчиков. ЭФ: Схема"
         description = (
-            f"Проверка работы маскирования и снятия маскирования  на наборе данных {config.suite_name}, \n"
+            f"Проверка работы маскирования и снятия маскирования на наборе данных {config.suite_name}, \n"
             f"на технологическом участке {config.technological_unit.description}\n"
             f"Время проведения проверки: {config.mask_signal_test.offset} мин.\n"
             "Синхронные запросы типа: GetInputSignalsRequest, MaskSignalRequest, UnmaskSignalRequest\n"
@@ -205,6 +205,24 @@ class TestSuiteScenarios:
         )
         _apply_allure_markers(config.mask_signal_test, tag, title, description)
         await scenarios.mask_signal_msg(ws_client, config)
+
+    @pytest.mark.asyncio
+    async def test_mask_info_in_journal(
+        self, ws_client: WebSocketClient, config: SmokeSuiteConfig, imitator_start_time: datetime
+    ) -> None:
+        """[MessagesInfo] Проверка записей журнала о маскировании и размаскировании"""
+        tag = "MessagesInfo"
+        title = f"[{tag}] Проверка записей журнала о маскировании и размаскировании. ЭФ: Журнал.Реальное время"
+        description = (
+            f"Проверка записей журнала о маскировании и размаскировании на наборе данных {config.suite_name}, \n"
+            f"на технологическом участке {config.technological_unit.description}\n"
+            f"Время проведения проверки: {config.mask_info_in_journal_test.offset} мин.\n"
+            "Синхронный запрос типа: MessagesInfo\n"
+            "Проверки: структура, фильтрация по времени, совпадение тегов между маскированием и снятием.\n"
+            "Примечание: тест выполняется после теста маскирования, чтобы записи успели попасть в журнал"
+        )
+        _apply_allure_markers(config.mask_info_in_journal_test, tag, title, description)
+        await scenarios.mask_info_in_journal(ws_client, config, imitator_start_time)
 
     @pytest.mark.asyncio
     async def test_lds_status_initialization_out(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
@@ -333,6 +351,28 @@ class TestLeakScenarios:
         await scenarios.leak_info_in_journal(ws_client, config, leak, imitator_start_time)
 
     @pytest.mark.asyncio
+    async def test_possible_leak_in_journal(
+        self,
+        ws_client: WebSocketClient,
+        config: SmokeSuiteConfig,
+        leak: LeakTestConfig,
+        leak_number: int,
+    ) -> None:
+        """[MessagesInfo] Проверка наличия сообщения 'Возможна утечка' в журнале"""
+        tag = "MessagesInfo"
+        title = f"[{tag}] Проверка сообщения 'Возможна утечка' в журнале. ЭФ: Журнал.Реальное время"
+        description = (
+            f"Проверка наличия сообщения 'Возможна утечка' в журнале на наборе данных {config.suite_name}, \n"
+            f"на технологическом участке {config.technological_unit.description}\n"
+            f"Время проведения проверки: {leak.possible_leak_in_journal_test.offset} мин.\n"
+            "Синхронный запрос типа: MessagesInfo"
+        )
+        _apply_allure_markers(leak.possible_leak_in_journal_test, tag, title, description)
+        if config.has_multiple_leaks:
+            allure.dynamic.title(f"{title} (утечка #{leak_number})")
+        await scenarios.possible_leak_in_journal(ws_client, config, leak)
+
+    @pytest.mark.asyncio
     async def test_tu_leaks_info(
         self,
         ws_client: WebSocketClient,
@@ -403,6 +443,29 @@ class TestLeakScenarios:
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.acknowledge_leak_info(ws_client, config, leak)
+
+    @pytest.mark.asyncio
+    async def test_acknowledge_leak_in_journal(
+        self,
+        ws_client: WebSocketClient,
+        config: SmokeSuiteConfig,
+        leak: LeakTestConfig,
+        leak_number: int,
+        imitator_start_time: datetime,
+    ) -> None:
+        """[MessagesInfo] Проверка записи в журнале о квитировании утечки"""
+        tag = "MessagesInfo"
+        title = f"[{tag}] Проверка записи в журнале о квитировании утечки. ЭФ: Журнал.Реальное время"
+        description = (
+            f"Проверка записи о квитировании утечки в журнале на наборе данных {config.suite_name}, \n"
+            f"на технологическом участке {config.technological_unit.description}\n"
+            f"Время проведения проверки: {leak.acknowledge_leak_in_journal_test.offset} мин.\n"
+            "Синхронный запрос типа: MessagesInfo с фильтром userActions=LEAK_ACK\n"
+        )
+        _apply_allure_markers(leak.acknowledge_leak_in_journal_test, tag, title, description)
+        if config.has_multiple_leaks:
+            allure.dynamic.title(f"{title} (утечка #{leak_number})")
+        await scenarios.acknowledge_leak_in_journal(ws_client, config, leak, imitator_start_time)
 
     @pytest.mark.asyncio
     async def test_output_signals(

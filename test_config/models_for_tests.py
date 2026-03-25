@@ -142,7 +142,9 @@ class LeakTestConfig:
     all_leaks_info_test: Optional[CaseMarkers] = None
     tu_leaks_info_test: Optional[CaseMarkers] = None
     leak_info_in_journal: Optional[CaseMarkers] = None
+    possible_leak_in_journal_test: Optional[CaseMarkers] = None
     acknowledge_leak_test: Optional[CaseMarkers] = None
+    acknowledge_leak_in_journal_test: Optional[CaseMarkers] = None
     output_signals_test: Optional[CaseMarkers] = None
     lds_status_during_leak_test: Optional[CaseMarkers] = None
 
@@ -190,6 +192,9 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     expected_stationary_status: int = StationaryStatus.STATIONARY.value
     expected_main_page_signals: dict = field(default_factory=lambda: asdict(SignalsInfo()))
 
+    # ===== Название Магистрального Нефтепровода =====
+    main_pipeline: str = ""
+
     # ===== Базовые тесты =====
     basic_info_test: Optional[CaseMarkers] = None
     journal_info_test: Optional[CaseMarkers] = None
@@ -197,6 +202,7 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     main_page_info_test: Optional[CaseMarkers] = None
     main_page_info_signals_test: Optional[CaseMarkers] = None
     mask_signal_test: Optional[CaseMarkers] = None
+    mask_info_in_journal_test: Optional[CaseMarkers] = None
     lds_status_initialization_out_test: Optional[CaseMarkers] = None
 
     # ===== Конфигурации утечек =====

@@ -6,12 +6,12 @@ Pytest маркеры и allure декораторы применяются в �
 """
 
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import allure
 import pytest
 
-from constants.enums import Direction, LdsStatus, MessageType, ReplyStatus, StationaryStatus
+from constants.enums import Direction, LdsStatus, MessageType, ReplyStatus, StationaryStatus, UserActions
 from constants.test_constants import BaseTN3Constants as TestConst
 from models.get_messages_model import Filtering, Pagination
 from test_config.models_for_tests import CaseData, LDSStatusConfig, LeakTestConfig, SmokeSuiteConfig
@@ -210,7 +210,7 @@ async def main_page_info_unstationary(ws_client, cfg: SmokeSuiteConfig):
 
 async def mask_signal_msg(ws_client, cfg: SmokeSuiteConfig):
     """
-    Проверка маскирования датчиков.
+    Проверка маскирования и снятия маскирования датчиков.
     """
     with allure.step("Подключение по ws, получение и обработка данных датчиков давления и расхода"):
         payload = await t_utils.connect_and_get_msg(
@@ -355,6 +355,158 @@ async def mask_signal_msg(ws_client, cfg: SmokeSuiteConfig):
         StepCheck(f"Проверка снятия маскирования расходомера с id: {flowmeter.id}", "isMasked", soft_failures).actual(
             flowmeter_unmask_data.isMasked
         ).expected(False).equal_to()
+
+
+async def mask_info_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_time):
+    """
+    Проверка записей журнала о маскировании и размаскировании.
+    """
+    with allure.step("Запрос сообщений журнала с фильтром userActions"):
+        end_time = datetime.now()
+        request_body = t_utils.create_journal_req_body(
+            pagination=Pagination(limit=TestConst.JOURNAL_MASK_PAGINATION_LIMIT, direction=Direction.FIRST.value),
+            filtering=Filtering(userActions=int(UserActions.SIGNAL_MASK_SIM)),
+        )
+        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        parsed_payload = parser.parse_journal_msg(payload)
+        all_messages = parsed_payload.replyContent.messagesInfo
+
+    with allure.step("Фильтрация сообщений по событиям маскирования и временному диапазону"):
+        filter_start_msk = t_utils.localize_as_moscow(imitator_start_time)
+        filter_end_msk = t_utils.localize_as_moscow(end_time)
+
+        mask_unmask_msgs = [
+            msg for msg in all_messages
+            if msg.event in TestConst.JOURNAL_MASK_EXPECTED_EVENTS
+            and msg.signalName in TestConst.JOURNAL_MASK_EXPECTED_SIGNALS
+        ]
+
+        journal_messages = [
+            msg for msg in mask_unmask_msgs
+            if filter_start_msk <= t_utils.ensure_moscow_timezone(msg.time) <= filter_end_msk
+        ]
+
+        allure.attach(
+            f"Всего получено сообщений: {len(all_messages)}\n"
+            f"После фильтрации по event и signalName осталось сообщений: {len(mask_unmask_msgs)}\n"
+            f"После фильтрации по времени ({filter_start_msk} - {filter_end_msk}) осталось сообщений: {len(journal_messages)}",
+            name="Результат фильтрации сообщений журнала",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+    with allure.step("Группировка отфильтрованных сообщений"):
+        pressure_msgs = [msg for msg in journal_messages if msg.signalName == TestConst.JOURNAL_SIGNAL_PRESSURE]
+        flow_msgs = [msg for msg in journal_messages if msg.signalName == TestConst.JOURNAL_SIGNAL_FLOW]
+
+        mask_event_msgs = [msg for msg in journal_messages if msg.event == TestConst.JOURNAL_EVENT_MASK]
+        unmask_event_msgs = [msg for msg in journal_messages if msg.event == TestConst.JOURNAL_EVENT_UNMASK]
+        mask_signal_names = {msg.signalName for msg in mask_event_msgs}
+        unmask_signal_names = {msg.signalName for msg in unmask_event_msgs}
+
+    with SoftAssertions() as journal_soft_failures:
+        StepCheck(
+            "Проверка общего количества отфильтрованных сообщений",
+            "total_count",
+            journal_soft_failures,
+        ).actual(len(journal_messages)).expected(TestConst.JOURNAL_EXPECTED_MASK_MSG_TOTAL).equal_to()
+
+        StepCheck(
+            f"Проверка количества сообщений для '{TestConst.JOURNAL_SIGNAL_PRESSURE}'",
+            "count",
+            journal_soft_failures,
+        ).actual(len(pressure_msgs)).expected(TestConst.JOURNAL_EXPECTED_MSG_COUNT_PER_SIGNAL).equal_to()
+
+        StepCheck(
+            f"Проверка количества сообщений для '{TestConst.JOURNAL_SIGNAL_FLOW}'",
+            "count",
+            journal_soft_failures,
+        ).actual(len(flow_msgs)).expected(TestConst.JOURNAL_EXPECTED_MSG_COUNT_PER_SIGNAL).equal_to()
+
+        StepCheck(
+            f"Проверка: событие '{TestConst.JOURNAL_EVENT_MASK}' содержит '{TestConst.JOURNAL_SIGNAL_PRESSURE}'",
+            "signalName",
+            journal_soft_failures,
+        ).actual(TestConst.JOURNAL_SIGNAL_PRESSURE in mask_signal_names).expected(True).equal_to()
+
+        StepCheck(
+            f"Проверка: событие '{TestConst.JOURNAL_EVENT_MASK}' содержит '{TestConst.JOURNAL_SIGNAL_FLOW}'",
+            "signalName",
+            journal_soft_failures,
+        ).actual(TestConst.JOURNAL_SIGNAL_FLOW in mask_signal_names).expected(True).equal_to()
+
+        StepCheck(
+            f"Проверка: событие '{TestConst.JOURNAL_EVENT_UNMASK}' содержит '{TestConst.JOURNAL_SIGNAL_PRESSURE}'",
+            "signalName",
+            journal_soft_failures,
+        ).actual(TestConst.JOURNAL_SIGNAL_PRESSURE in unmask_signal_names).expected(True).equal_to()
+
+        StepCheck(
+            f"Проверка: событие '{TestConst.JOURNAL_EVENT_UNMASK}' содержит '{TestConst.JOURNAL_SIGNAL_FLOW}'",
+            "signalName",
+            journal_soft_failures,
+        ).actual(TestConst.JOURNAL_SIGNAL_FLOW in unmask_signal_names).expected(True).equal_to()
+
+        for signal_name in [TestConst.JOURNAL_SIGNAL_PRESSURE, TestConst.JOURNAL_SIGNAL_FLOW]:
+            mask_msg_for_signal = next((m for m in mask_event_msgs if m.signalName == signal_name), None)
+            unmask_msg_for_signal = next((m for m in unmask_event_msgs if m.signalName == signal_name), None)
+
+            if mask_msg_for_signal and unmask_msg_for_signal:
+                StepCheck(
+                    f"Проверка совпадения tag для '{signal_name}' между маскированием и снятием",
+                    "tag",
+                    journal_soft_failures,
+                ).actual(mask_msg_for_signal.tag).expected(unmask_msg_for_signal.tag).equal_to()
+
+        for msg in journal_messages:
+            msg_label = f"{msg.event} - {msg.signalName}"
+
+            StepCheck(
+                f"Проверка user не пустой [{msg_label}]",
+                "user",
+                journal_soft_failures,
+            ).actual(msg.user).is_not_none()
+
+            StepCheck(
+                f"Проверка mainPipeline [{msg_label}]",
+                "mainPipeline",
+                journal_soft_failures,
+            ).actual(msg.mainPipeline).expected(cfg.main_pipeline).equal_to()
+
+            StepCheck(
+                f"Проверка object не пустой [{msg_label}]",
+                "object",
+                journal_soft_failures,
+            ).actual(msg.object).is_not_none()
+
+            StepCheck(
+                f"Проверка technologicalObject не пустой [{msg_label}]",
+                "technologicalObject",
+                journal_soft_failures,
+            ).actual(msg.technologicalObject).is_not_none()
+
+            StepCheck(
+                f"Проверка technologicalSection [{msg_label}]",
+                "technologicalSection",
+                journal_soft_failures,
+            ).actual(msg.technologicalSection).expected(cfg.tu_name).equal_to()
+
+            StepCheck(
+                f"Проверка priority не пустой [{msg_label}]",
+                "priority",
+                journal_soft_failures,
+            ).actual(msg.priority).is_not_none()
+
+            StepCheck(
+                f"Проверка messageType [{msg_label}]",
+                "messageType",
+                journal_soft_failures,
+            ).actual(msg.messageType).expected(TestConst.JOURNAL_MESSAGE_TYPE_USER_ACTIONS).equal_to()
+
+            StepCheck(
+                f"Проверка status [{msg_label}]",
+                "status",
+                journal_soft_failures,
+            ).actual(msg.status).expected(TestConst.JOURNAL_STATUS_SUCCESS).equal_to()
 
 
 async def lds_status_initialization_out(ws_client, cfg: SmokeSuiteConfig):
@@ -511,6 +663,45 @@ async def leak_info_in_journal(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestC
             leak.allowed_volume_m3,
             f"значение допустимой погрешности по объему {leak.allowed_volume_m3}",
         )
+
+
+async def possible_leak_in_journal(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig):
+    """
+    Проверка наличия сообщения 'Возможна утечка' в журнале.
+    """
+    with allure.step("Подключение по ws, получение и обработка сообщений журнала типа: MessagesInfoContent"):
+        request_body = t_utils.create_journal_req_body(
+            pagination=Pagination(limit=TestConst.JOURNAL_LEAKS_PAGINATION_LIMIT, direction=Direction.FIRST.value),
+            filtering=Filtering(messageTypes=int(MessageType.LEAKS)),
+        )
+        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        parsed_payload = parser.parse_journal_msg(payload)
+        messages_info = parsed_payload.replyContent.messagesInfo
+
+        StepCheck("Проверка наличия сообщений в журнале", "messagesInfo").actual(
+            messages_info
+        ).is_not_empty()
+
+        possible_leak_msg = t_utils.find_object_by_field(
+            messages_info, 'event', TestConst.JOURNAL_EVENT_POSSIBLE_LEAK
+        )
+
+    with SoftAssertions() as soft_failures:
+        StepCheck(
+            "Проверка mainPipeline", "mainPipeline", soft_failures
+        ).actual(possible_leak_msg.mainPipeline).expected(cfg.main_pipeline).equal_to()
+
+        StepCheck(
+            "Проверка messageType", "messageType", soft_failures
+        ).actual(possible_leak_msg.messageType).expected(TestConst.JOURNAL_MESSAGE_TYPE_LEAKS).equal_to()
+
+        StepCheck(
+            "Проверка technologicalSection не пустой", "technologicalSection", soft_failures
+        ).actual(possible_leak_msg.technologicalSection).is_not_none()
+
+        StepCheck(
+            "Проверка technologicalObject не пустой", "technologicalObject", soft_failures
+        ).actual(possible_leak_msg.technologicalObject).is_not_none()
 
 
 async def all_leaks_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
@@ -785,6 +976,54 @@ async def acknowledge_leak_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTest
     StepCheck("Проверка отсутствия квитированной утечки в списке AllLeaksInfo", "id").does_not_contain(
         remaining_leak_ids, acknowledged_leak_id
     )
+
+
+async def acknowledge_leak_in_journal(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
+    """
+    Проверка записи в журнале о квитировании утечки.
+    """
+    with allure.step("Запрос сообщений журнала с фильтром userActions=LEAK_ACK"):
+        request_body = t_utils.create_journal_req_body(
+            pagination=Pagination(limit=TestConst.JOURNAL_ACK_PAGINATION_LIMIT, direction=Direction.FIRST.value),
+            filtering=Filtering(userActions=int(UserActions.LEAK_ACK)),
+        )
+        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        parsed_payload = parser.parse_journal_msg(payload)
+        messages_info = parsed_payload.replyContent.messagesInfo
+
+        StepCheck("Проверка наличия сообщений в журнале", "messagesInfo").actual(
+            messages_info
+        ).is_not_empty()
+
+        ack_message = t_utils.find_object_by_field(
+            messages_info, 'event', TestConst.JOURNAL_EVENT_LEAK_ACKNOWLEDGED
+        )
+
+    with allure.step("Проверка актуальности сообщения"):
+        msg_time_msk = t_utils.ensure_moscow_timezone(ack_message.time)
+        start_time_msk = t_utils.localize_as_moscow(imitator_start_time)
+
+        StepCheck(
+            "Проверка: время сообщения позднее времени старта имитатора",
+            "time",
+        ).actual(msg_time_msk > start_time_msk).expected(True).equal_to()
+
+    with SoftAssertions() as soft_failures:
+        StepCheck(
+            "Проверка event", "event", soft_failures
+        ).actual(ack_message.event).expected(TestConst.JOURNAL_EVENT_LEAK_ACKNOWLEDGED).equal_to()
+
+        StepCheck(
+            "Проверка mainPipeline", "mainPipeline", soft_failures
+        ).actual(ack_message.mainPipeline).expected(cfg.main_pipeline).equal_to()
+
+        StepCheck(
+            "Проверка technologicalSection", "technologicalSection", soft_failures
+        ).actual(ack_message.technologicalSection).expected(cfg.tu_name).equal_to()
+
+        StepCheck(
+            "Проверка technologicalObject не пустой", "technologicalObject", soft_failures
+        ).actual(ack_message.technologicalObject).is_not_none()
 
 
 async def output_signals(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):

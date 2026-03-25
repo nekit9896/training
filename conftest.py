@@ -111,6 +111,7 @@ SMOKE_SUITE_LEVEL_MAPPING = {
     'test_main_page_info': 'main_page_info_test',
     'test_main_page_info_signals': 'main_page_info_signals_test',
     'test_mask_signal_msg': 'mask_signal_test',
+    'test_mask_info_in_journal': 'mask_info_in_journal_test',
     'test_lds_status_initialization_out': 'lds_status_initialization_out_test',
     'test_main_page_info_unstationary': 'main_page_info_unstationary_test',
 }
@@ -133,7 +134,9 @@ LEAK_LEVEL_TEST_MAPPING = {
     'test_all_leaks_info': 'all_leaks_info_test',
     'test_tu_leaks_info': 'tu_leaks_info_test',
     'test_leak_info_in_journal': 'leak_info_in_journal',
+    'test_possible_leak_in_journal': 'possible_leak_in_journal_test',
     'test_acknowledge_leak_info': 'acknowledge_leak_test',
+    'test_acknowledge_leak_in_journal': 'acknowledge_leak_in_journal_test',
     'test_output_signals': 'output_signals_test',
     'test_lds_status_during_leak': 'lds_status_during_leak_test',
     'test_balance_algorithm_leak_waiting': 'balance_algorithm_leak_waiting_test',

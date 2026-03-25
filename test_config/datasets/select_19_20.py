@@ -20,6 +20,9 @@ ARCHIVE_NAME = f"{SUITE_NAME}.tar.gz"
 # Технологический участок
 TECHNOLOGICAL_UNIT = TU.TIKHORETSK_NOVOROSSIYSK_3
 
+# Название МН
+MAIN_PIPELINE = "МН Тихорецк-Новороссийск-3"
+
 # ===== Первая утечка =====
 LEAK_1_DIAGNOSTIC_AREA_NAME = "Т-Н-3.НПС-5 «Тихорецкая».УЗР вых - Т-Н-3.НПС-3 «Нововеличковская».УЗР вых"
 LEAK_1_DIAGNOSTIC_AREA_ID = 2
@@ -54,6 +57,7 @@ SELECT_19_20_CONFIG = SmokeSuiteConfig(
     suite_data_id=SUITE_DATA_ID,
     archive_name=ARCHIVE_NAME,
     technological_unit=TECHNOLOGICAL_UNIT,
+    main_pipeline=MAIN_PIPELINE,
     # ----- Ожидаемый статус стационара -----
     expected_stationary_status=StationaryStatus.STATIONARY.value,
     # ===== БАЗОВЫЕ ТЕСТЫ =====
@@ -103,6 +107,7 @@ SELECT_19_20_CONFIG = SmokeSuiteConfig(
             leaks_content_test=CaseMarkers(test_case_id="72", offset=47),
             # ----- Тест AllLeaksInfo (первая утечка) -----
             all_leaks_info_test=CaseMarkers(test_case_id="66", offset=47),
+            possible_leak_in_journal_test=CaseMarkers(test_case_id="", offset=47),
             # ----- Тест TuLeaksInfo (первая утечка) -----
             tu_leaks_info_test=CaseMarkers(test_case_id="70", offset=47),
             # ----- Тест CommonSchemeContent -----
@@ -135,6 +140,8 @@ SELECT_19_20_CONFIG = SmokeSuiteConfig(
             leaks_content_test=CaseMarkers(test_case_id="73", offset=61),
             # ----- Тест AllLeaksInfo (вторая утечка) -----
             all_leaks_info_test=CaseMarkers(test_case_id="69", offset=61),
+            # ----- Тест MessagesInfo-----
+            possible_leak_in_journal_test=CaseMarkers(test_case_id="", offset=61),
             # ----- Тест TuLeaksInfo (вторая утечка) -----
             tu_leaks_info_test=CaseMarkers(test_case_id="71", offset=61.0),
             # ----- Тест CommonSchemeContent -----
