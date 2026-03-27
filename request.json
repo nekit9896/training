@@ -3,7 +3,7 @@
   {
     
   },
-  '257',
+  '355',
   'GetMessagesRequest',
   [
     {
@@ -26,8 +26,8 @@
       },
       'filtering': {
         'priorities': 0,
-        'messageTypes': 0,
-        'userActions': 256,
+        'messageTypes': 8,
+        'userActions': 0,
         'objects': {
           'tuId': None,
           'objectIds': [

@@ -541,6 +541,120 @@ async def lds_status_initialization_out(ws_client, cfg: SmokeSuiteConfig):
     ).expected(LdsStatus.INITIALIZATION.value).is_not_equal_to()
 
 
+async def lds_status_init_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_time):
+    """
+    Проверка наличия записи в журнале о входе СОУ в режим Инициализация.
+    """
+    with allure.step("Запрос сообщений журнала с фильтром messageTypes=LDS_STATUS"):
+        request_body = t_utils.create_journal_req_body(
+            pagination=Pagination(limit=TestConst.JOURNAL_LDS_STATUS_PAGINATION_LIMIT, direction=Direction.FIRST.value),
+            filtering=Filtering(messageTypes=int(MessageType.LDS_STATUS)),
+        )
+        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        parsed_payload = parser.parse_journal_msg(payload)
+        messages_info = parsed_payload.replyContent.messagesInfo
+
+        StepCheck("Проверка наличия сообщений в журнале", "messagesInfo").actual(
+            messages_info
+        ).is_not_empty()
+
+        lds_msg = t_utils.find_object_by_field(
+            messages_info, 'event', TestConst.JOURNAL_EVENT_LDS_INITIALIZATION
+        )
+
+    with allure.step("Проверка актуальности сообщения"):
+        msg_time_msk = t_utils.ensure_moscow_timezone(lds_msg.time)
+        start_time_msk = t_utils.localize_as_moscow(imitator_start_time)
+
+        StepCheck(
+            f"Проверка: время сообщения позднее времени старта имитатора {msg_time_msk} > {start_time_msk}",
+            "time",
+        ).actual(msg_time_msk > start_time_msk).expected(True).equal_to()
+
+    with SoftAssertions() as soft_failures:
+        StepCheck(
+            "Проверка event", "event", soft_failures
+        ).actual(lds_msg.event).expected(TestConst.JOURNAL_EVENT_LDS_INITIALIZATION).equal_to()
+
+        StepCheck(
+            "Проверка mainPipeline", "mainPipeline", soft_failures
+        ).actual(lds_msg.mainPipeline).expected(cfg.main_pipeline).equal_to()
+
+        StepCheck(
+            "Проверка technologicalSection", "technologicalSection", soft_failures
+        ).actual(lds_msg.technologicalSection).expected(cfg.tu_name).equal_to()
+
+        StepCheck(
+            "Проверка technologicalObject не пустой", "technologicalObject", soft_failures
+        ).actual(lds_msg.technologicalObject).is_not_none()
+
+        StepCheck(
+            "Проверка priority не пустой", "priority", soft_failures
+        ).actual(lds_msg.priority).is_not_none()
+
+        StepCheck(
+            "Проверка messageType", "messageType", soft_failures
+        ).actual(lds_msg.messageType).expected(TestConst.JOURNAL_MESSAGE_TYPE_LDS_STATUS).equal_to()
+
+
+async def lds_status_init_out_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_time):
+    """
+    Проверка наличия записи в журнале о выходе СОУ из режима Инициализация.
+    """
+    with allure.step("Запрос сообщений журнала с фильтром messageTypes=LDS_STATUS"):
+        request_body = t_utils.create_journal_req_body(
+            pagination=Pagination(limit=TestConst.JOURNAL_LDS_STATUS_PAGINATION_LIMIT, direction=Direction.FIRST.value),
+            filtering=Filtering(messageTypes=int(MessageType.LDS_STATUS)),
+        )
+        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        parsed_payload = parser.parse_journal_msg(payload)
+        messages_info = parsed_payload.replyContent.messagesInfo
+
+        StepCheck("Проверка наличия сообщений в журнале", "messagesInfo").actual(
+            messages_info
+        ).is_not_empty()
+
+        lds_msg = next(iter(messages_info), None)
+
+        StepCheck("Проверка: первое сообщение журнала получено", "lds_msg").actual(
+            lds_msg
+        ).is_not_none()
+
+    with allure.step("Проверка актуальности сообщения"):
+        msg_time_msk = t_utils.ensure_moscow_timezone(lds_msg.time)
+        start_time_msk = t_utils.localize_as_moscow(imitator_start_time)
+
+        StepCheck(
+            f"Проверка: время сообщения позднее времени старта имитатора {msg_time_msk} > {start_time_msk}",
+            "time",
+        ).actual(msg_time_msk > start_time_msk).expected(True).equal_to()
+
+    with SoftAssertions() as soft_failures:
+        StepCheck(
+            "Проверка: event не является Инициализацией", "event", soft_failures
+        ).actual(lds_msg.event).expected(TestConst.JOURNAL_EVENT_LDS_INITIALIZATION).is_not_equal_to()
+
+        StepCheck(
+            "Проверка mainPipeline", "mainPipeline", soft_failures
+        ).actual(lds_msg.mainPipeline).expected(cfg.main_pipeline).equal_to()
+
+        StepCheck(
+            "Проверка technologicalSection", "technologicalSection", soft_failures
+        ).actual(lds_msg.technologicalSection).expected(cfg.tu_name).equal_to()
+
+        StepCheck(
+            "Проверка technologicalObject не пустой", "technologicalObject", soft_failures
+        ).actual(lds_msg.technologicalObject).is_not_none()
+
+        StepCheck(
+            "Проверка priority не пустой", "priority", soft_failures
+        ).actual(lds_msg.priority).is_not_none()
+
+        StepCheck(
+            "Проверка messageType", "messageType", soft_failures
+        ).actual(lds_msg.messageType).expected(TestConst.JOURNAL_MESSAGE_TYPE_LDS_STATUS).equal_to()
+
+
 async def leaks_content(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
     """
     Проверка утечки через сообщение LeaksContent.

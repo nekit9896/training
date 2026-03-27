@@ -199,11 +199,13 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     basic_info_test: Optional[CaseMarkers] = None
     journal_info_test: Optional[CaseMarkers] = None
     lds_status_initialization_test: Optional[CaseMarkers] = None
+    lds_status_init_in_journal_test: Optional[CaseMarkers] = None
     main_page_info_test: Optional[CaseMarkers] = None
     main_page_info_signals_test: Optional[CaseMarkers] = None
     mask_signal_test: Optional[CaseMarkers] = None
     mask_info_in_journal_test: Optional[CaseMarkers] = None
     lds_status_initialization_out_test: Optional[CaseMarkers] = None
+    lds_status_init_out_in_journal_test: Optional[CaseMarkers] = None
 
     # ===== Конфигурации утечек =====
     # Для наборов с одной утечкой

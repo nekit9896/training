@@ -58,11 +58,13 @@ SELECT_6_CONFIG = SmokeSuiteConfig(
     basic_info_test=CaseMarkers(test_case_id="1", offset=5),
     journal_info_test=CaseMarkers(test_case_id="2", offset=5),
     lds_status_initialization_test=CaseMarkers(test_case_id="29", offset=5),
+    lds_status_init_in_journal_test=CaseMarkers(test_case_id="", offset=5),
     main_page_info_test=CaseMarkers(test_case_id="3", offset=7),
     main_page_info_signals_test=CaseMarkers(test_case_id="120", offset=7),
     mask_signal_test=CaseMarkers(test_case_id="32", offset=8),
     mask_info_in_journal_test=CaseMarkers(test_case_id="", offset=9),
     lds_status_initialization_out_test=CaseMarkers(test_case_id="30", offset=30),
+    lds_status_init_out_in_journal_test=CaseMarkers(test_case_id="", offset=31),
     # ===== КОНФИГУРАЦИЯ УТЕЧКИ =====
     leak=LeakTestConfig(
         # ----- Конфигурация статусов СОУ во время утечки -----

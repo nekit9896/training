@@ -74,7 +74,9 @@ class BaseTN3Constants:
     JOURNAL_LEAKS_PAGINATION_LIMIT = 10
     JOURNAL_ACK_PAGINATION_LIMIT = 1
     JOURNAL_EVENT_LEAK_ACKNOWLEDGED = "Сообщение об утечке квитировано"
-
+    JOURNAL_EVENT_LDS_INITIALIZATION = "СОУ в инициализации (Накопление данных)"
+    JOURNAL_MESSAGE_TYPE_LDS_STATUS = "Режим работы СОУ"
+    JOURNAL_LDS_STATUS_PAGINATION_LIMIT = 1
 
     # ===== Параметры подтверждения =====
     IS_ACKNOWLEDGED_FALSE = False

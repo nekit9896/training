@@ -157,6 +157,22 @@ class TestSuiteScenarios:
         await scenarios.lds_status_initialization(ws_client, config)
 
     @pytest.mark.asyncio
+    async def test_lds_status_init_in_journal(
+        self, ws_client: WebSocketClient, config: SmokeSuiteConfig, imitator_start_time: datetime
+    ) -> None:
+        """[MessagesInfo] Проверка записи в журнале о входе СОУ в Инициализацию"""
+        tag = "MessagesInfo"
+        title = f"[{tag}] Проверка записи в журнале: СОУ в Инициализации. ЭФ: Журнал. Реальное время"
+        description = (
+            f"Проверка записи в журнале о входе СОУ в Инициализацию на наборе данных {config.suite_name}, \n"
+            f"на технологическом участке {config.technological_unit.description}\n"
+            f"Время проведения проверки: {config.lds_status_init_in_journal_test.offset} мин.\n"
+            "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
+        )
+        _apply_allure_markers(config.lds_status_init_in_journal_test, tag, title, description)
+        await scenarios.lds_status_init_in_journal(ws_client, config, imitator_start_time)
+
+    @pytest.mark.asyncio
     async def test_main_page_info(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
         """[MainPageInfo] Проверка установки режима МТ"""
         tag = "MainPageInfo"
@@ -238,6 +254,22 @@ class TestSuiteScenarios:
         )
         _apply_allure_markers(config.lds_status_initialization_out_test, tag, title, description)
         await scenarios.lds_status_initialization_out(ws_client, config)
+
+    @pytest.mark.asyncio
+    async def test_lds_status_init_out_in_journal(
+        self, ws_client: WebSocketClient, config: SmokeSuiteConfig, imitator_start_time: datetime
+    ) -> None:
+        """[MessagesInfo] Проверка записи в журнале о выходе СОУ из Инициализации"""
+        tag = "MessagesInfo"
+        title = f"[{tag}] Проверка записи в журнале: выход СОУ из Инициализации. ЭФ: Журнал.Реальное время"
+        description = (
+            f"Проверка записи в журнале о выходе СОУ из Инициализации на наборе данных {config.suite_name}, \n"
+            f"на технологическом участке {config.technological_unit.description}\n"
+            f"Время проведения проверки: {config.lds_status_init_out_in_journal_test.offset} мин.\n"
+            "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
+        )
+        _apply_allure_markers(config.lds_status_init_out_in_journal_test, tag, title, description)
+        await scenarios.lds_status_init_out_in_journal(ws_client, config, imitator_start_time)
 
     @pytest.mark.asyncio
     async def test_main_page_info_unstationary(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
