@@ -389,6 +389,7 @@ class TestLeakScenarios:
         config: SmokeSuiteConfig,
         leak: LeakTestConfig,
         leak_number: int,
+        imitator_start_time: datetime,
     ) -> None:
         """[MessagesInfo] Проверка наличия сообщения 'Возможна утечка' в журнале"""
         tag = "MessagesInfo"
@@ -402,7 +403,7 @@ class TestLeakScenarios:
         _apply_allure_markers(leak.possible_leak_in_journal_test, tag, title, description)
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
-        await scenarios.possible_leak_in_journal(ws_client, config, leak)
+        await scenarios.possible_leak_in_journal(ws_client, config, leak, imitator_start_time)
 
     @pytest.mark.asyncio
     async def test_tu_leaks_info(
