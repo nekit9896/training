@@ -364,14 +364,14 @@ async def mask_info_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_
     with allure.step("Запрос сообщений журнала с фильтром userActions"):
         end_time = datetime.now()
         request_body = t_utils.create_journal_req_body(
-            pagination=Pagination(limit=TestConst.JOURNAL_MASK_PAGINATION_LIMIT, direction=Direction.FIRST.value),
+            pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
             filtering=Filtering(userActions=int(UserActions.SIGNAL_MASK_SIM)),
         )
         payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
         parsed_payload = parser.parse_journal_msg(payload)
         all_messages = parsed_payload.replyContent.messagesInfo
 
-    with allure.step("Фильтрация сообщений по событиям маскирования и временному диапазону"):
+    with allure.step("Фильтрация сообщений по событиям, времени и technologicalSection"):
         filter_start_msk = t_utils.localize_as_moscow(imitator_start_time)
         filter_end_msk = t_utils.localize_as_moscow(end_time)
 
@@ -381,15 +381,21 @@ async def mask_info_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_
             and msg.signalName in TestConst.JOURNAL_MASK_EXPECTED_SIGNALS
         ]
 
-        journal_messages = [
+        time_filtered_msgs = [
             msg for msg in mask_unmask_msgs
             if filter_start_msk <= t_utils.ensure_moscow_timezone(msg.time) <= filter_end_msk
+        ]
+
+        journal_messages = [
+            msg for msg in time_filtered_msgs
+            if msg.technologicalSection == cfg.tu_name
         ]
 
         allure.attach(
             f"Всего получено сообщений: {len(all_messages)}\n"
             f"После фильтрации по event и signalName осталось сообщений: {len(mask_unmask_msgs)}\n"
-            f"После фильтрации по времени ({filter_start_msk} - {filter_end_msk}) осталось сообщений: {len(journal_messages)}",
+            f"После фильтрации по времени ({filter_start_msk} - {filter_end_msk}) осталось сообщений: {len(time_filtered_msgs)}\n"
+            f"После фильтрации по technologicalSection='{cfg.tu_name}' осталось сообщений: {len(journal_messages)}",
             name="Результат фильтрации сообщений журнала",
             attachment_type=allure.attachment_type.TEXT,
         )
@@ -541,6 +547,179 @@ async def lds_status_initialization_out(ws_client, cfg: SmokeSuiteConfig):
     ).expected(LdsStatus.INITIALIZATION.value).is_not_equal_to()
 
 
+async def lds_status_init_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_time):
+    """
+    Проверка наличия записи в журнале о входе СОУ в режим Инициализация.
+    """
+    with allure.step("Запрос сообщений журнала с фильтром messageTypes=LDS_STATUS"):
+        end_time = datetime.now()
+        request_body = t_utils.create_journal_req_body(
+            pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
+            filtering=Filtering(messageTypes=int(MessageType.LDS_STATUS)),
+        )
+        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        parsed_payload = parser.parse_journal_msg(payload)
+        messages_info = parsed_payload.replyContent.messagesInfo
+
+        StepCheck("Проверка наличия сообщений в журнале", "messagesInfo").actual(
+            messages_info
+        ).is_not_empty()
+
+    with allure.step("Фильтрация сообщений по времени и technologicalSection"):
+        filter_start_msk = t_utils.localize_as_moscow(imitator_start_time)
+        filter_end_msk = t_utils.localize_as_moscow(end_time)
+
+        time_filtered = [
+            msg for msg in messages_info
+            if filter_start_msk <= t_utils.ensure_moscow_timezone(msg.time) <= filter_end_msk
+        ]
+        time_filtered.sort(key=lambda msg: t_utils.ensure_moscow_timezone(msg.time), reverse=True)
+
+        lds_msg = next(
+            (msg for msg in time_filtered
+             if msg.technologicalSection == cfg.tu_name
+             and msg.event == TestConst.JOURNAL_EVENT_LDS_INITIALIZATION),
+            None,
+        )
+
+        allure.attach(
+            f"Всего получено сообщений: {len(messages_info)}\n"
+            f"После фильтрации по времени ({filter_start_msk} - {filter_end_msk}): {len(time_filtered)}\n"
+            f"Проверка: найдено ли сообщение с technologicalSection='{cfg.tu_name}' "
+            f"и event='{TestConst.JOURNAL_EVENT_LDS_INITIALIZATION}': {'True' if lds_msg else 'False'}",
+            name="Результат фильтрации сообщений журнала",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+    with allure.step(
+        f"Проверка: найдено ли сообщение с technologicalSection='{cfg.tu_name}' "
+        f"и event='{TestConst.JOURNAL_EVENT_LDS_INITIALIZATION}'"
+    ):
+        if lds_msg is None:
+            pytest.fail(
+                f"Сообщение с technologicalSection='{cfg.tu_name}' "
+                f"и event='{TestConst.JOURNAL_EVENT_LDS_INITIALIZATION}' "
+                f"не найдено среди {len(time_filtered)} отфильтрованных по времени сообщений"
+            )
+
+    with allure.step("Проверка актуальности сообщения"):
+        msg_time_msk = t_utils.ensure_moscow_timezone(lds_msg.time)
+        start_time_msk = t_utils.localize_as_moscow(imitator_start_time)
+
+        StepCheck(
+            f"Проверка: время сообщения позднее времени старта имитатора {msg_time_msk} > {start_time_msk}",
+            "time",
+        ).actual(msg_time_msk > start_time_msk).expected(True).equal_to()
+
+    with SoftAssertions() as soft_failures:
+        StepCheck(
+            "Проверка event", "event", soft_failures
+        ).actual(lds_msg.event).expected(TestConst.JOURNAL_EVENT_LDS_INITIALIZATION).equal_to()
+
+        StepCheck(
+            "Проверка mainPipeline", "mainPipeline", soft_failures
+        ).actual(lds_msg.mainPipeline).expected(cfg.main_pipeline).equal_to()
+
+        StepCheck(
+            "Проверка technologicalSection", "technologicalSection", soft_failures
+        ).actual(lds_msg.technologicalSection).expected(cfg.tu_name).equal_to()
+
+        StepCheck(
+            "Проверка technologicalObject не пустой", "technologicalObject", soft_failures
+        ).actual(lds_msg.technologicalObject).is_not_none()
+
+        StepCheck(
+            "Проверка priority не пустой", "priority", soft_failures
+        ).actual(lds_msg.priority).is_not_none()
+
+        StepCheck(
+            "Проверка messageType", "messageType", soft_failures
+        ).actual(lds_msg.messageType).expected(TestConst.JOURNAL_MESSAGE_TYPE_LDS_STATUS).equal_to()
+
+
+async def lds_status_init_out_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_time):
+    """
+    Проверка наличия записи в журнале о выходе СОУ из режима Инициализация.
+    """
+    with allure.step("Запрос сообщений журнала с фильтром messageTypes=LDS_STATUS"):
+        end_time = datetime.now()
+        request_body = t_utils.create_journal_req_body(
+            pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
+            filtering=Filtering(messageTypes=int(MessageType.LDS_STATUS)),
+        )
+        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        parsed_payload = parser.parse_journal_msg(payload)
+        messages_info = parsed_payload.replyContent.messagesInfo
+
+        StepCheck("Проверка наличия сообщений в журнале", "messagesInfo").actual(
+            messages_info
+        ).is_not_empty()
+
+    with allure.step("Фильтрация сообщений по времени и technologicalSection"):
+        filter_start_msk = t_utils.localize_as_moscow(imitator_start_time)
+        filter_end_msk = t_utils.localize_as_moscow(end_time)
+
+        time_filtered = [
+            msg for msg in messages_info
+            if filter_start_msk <= t_utils.ensure_moscow_timezone(msg.time) <= filter_end_msk
+        ]
+        time_filtered.sort(key=lambda msg: t_utils.ensure_moscow_timezone(msg.time), reverse=True)
+
+        lds_msg = next(
+            (msg for msg in time_filtered if msg.technologicalSection == cfg.tu_name),
+            None,
+        )
+
+        allure.attach(
+            f"Всего получено сообщений: {len(messages_info)}\n"
+            f"После фильтрации по времени ({filter_start_msk} - {filter_end_msk}): {len(time_filtered)}\n"
+            f"Проверка: найдено ли сообщение с technologicalSection='{cfg.tu_name}': {'True' if lds_msg else 'False'}",
+            name="Результат фильтрации сообщений журнала",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+    with allure.step(f"Проверка: найдено сообщение с technologicalSection='{cfg.tu_name}'"):
+        if lds_msg is None:
+            pytest.fail(
+                f"Сообщение с technologicalSection='{cfg.tu_name}' "
+                f"не найдено среди {len(time_filtered)} отфильтрованных по времени сообщений"
+            )
+
+    with allure.step("Проверка актуальности сообщения"):
+        msg_time_msk = t_utils.ensure_moscow_timezone(lds_msg.time)
+        start_time_msk = t_utils.localize_as_moscow(imitator_start_time)
+
+        StepCheck(
+            f"Проверка: время сообщения позднее времени старта имитатора {msg_time_msk} > {start_time_msk}",
+            "time",
+        ).actual(msg_time_msk > start_time_msk).expected(True).equal_to()
+
+    with SoftAssertions() as soft_failures:
+        StepCheck(
+            "Проверка: event не является Инициализацией", "event", soft_failures
+        ).actual(lds_msg.event).expected(TestConst.JOURNAL_EVENT_LDS_INITIALIZATION).is_not_equal_to()
+
+        StepCheck(
+            "Проверка mainPipeline", "mainPipeline", soft_failures
+        ).actual(lds_msg.mainPipeline).expected(cfg.main_pipeline).equal_to()
+
+        StepCheck(
+            "Проверка technologicalSection", "technologicalSection", soft_failures
+        ).actual(lds_msg.technologicalSection).expected(cfg.tu_name).equal_to()
+
+        StepCheck(
+            "Проверка technologicalObject не пустой", "technologicalObject", soft_failures
+        ).actual(lds_msg.technologicalObject).is_not_none()
+
+        StepCheck(
+            "Проверка priority не пустой", "priority", soft_failures
+        ).actual(lds_msg.priority).is_not_none()
+
+        StepCheck(
+            "Проверка messageType", "messageType", soft_failures
+        ).actual(lds_msg.messageType).expected(TestConst.JOURNAL_MESSAGE_TYPE_LDS_STATUS).equal_to()
+
+
 async def leaks_content(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
     """
     Проверка утечки через сообщение LeaksContent.
@@ -665,13 +844,14 @@ async def leak_info_in_journal(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestC
         )
 
 
-async def possible_leak_in_journal(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig):
+async def possible_leak_in_journal(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
     """
     Проверка наличия сообщения 'Возможна утечка' в журнале.
     """
     with allure.step("Подключение по ws, получение и обработка сообщений журнала типа: MessagesInfoContent"):
+        end_time = datetime.now()
         request_body = t_utils.create_journal_req_body(
-            pagination=Pagination(limit=TestConst.JOURNAL_LEAKS_PAGINATION_LIMIT, direction=Direction.FIRST.value),
+            pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
             filtering=Filtering(messageTypes=int(MessageType.LEAKS)),
         )
         payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
@@ -682,9 +862,42 @@ async def possible_leak_in_journal(ws_client, cfg: SmokeSuiteConfig, leak: LeakT
             messages_info
         ).is_not_empty()
 
-        possible_leak_msg = t_utils.find_object_by_field(
-            messages_info, 'event', TestConst.JOURNAL_EVENT_POSSIBLE_LEAK
+    with allure.step("Фильтрация сообщений по времени и technologicalSection"):
+        filter_start_msk = t_utils.localize_as_moscow(imitator_start_time)
+        filter_end_msk = t_utils.localize_as_moscow(end_time)
+
+        time_filtered = [
+            msg for msg in messages_info
+            if filter_start_msk <= t_utils.ensure_moscow_timezone(msg.time) <= filter_end_msk
+        ]
+        time_filtered.sort(key=lambda msg: t_utils.ensure_moscow_timezone(msg.time), reverse=True)
+
+        possible_leak_msg = next(
+            (msg for msg in time_filtered
+             if msg.technologicalSection == cfg.tu_name
+             and msg.event == TestConst.JOURNAL_EVENT_POSSIBLE_LEAK),
+            None,
         )
+
+        allure.attach(
+            f"Всего получено сообщений: {len(messages_info)}\n"
+            f"После фильтрации по времени ({filter_start_msk} - {filter_end_msk}): {len(time_filtered)}\n"
+            f"Проверка: найдено ли сообщение с technologicalSection='{cfg.tu_name}' "
+            f"и event='{TestConst.JOURNAL_EVENT_POSSIBLE_LEAK}': {'True' if possible_leak_msg else 'False'}",
+            name="Результат фильтрации сообщений журнала",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+    with allure.step(
+        f"Проверка: найдено сообщение с technologicalSection='{cfg.tu_name}' "
+        f"и event='{TestConst.JOURNAL_EVENT_POSSIBLE_LEAK}'"
+    ):
+        if possible_leak_msg is None:
+            pytest.fail(
+                f"Сообщение с technologicalSection='{cfg.tu_name}' "
+                f"и event='{TestConst.JOURNAL_EVENT_POSSIBLE_LEAK}' "
+                f"не найдено среди {len(time_filtered)} отфильтрованных по времени сообщений"
+            )
 
     with SoftAssertions() as soft_failures:
         StepCheck(
@@ -983,8 +1196,9 @@ async def acknowledge_leak_in_journal(ws_client, cfg: SmokeSuiteConfig, leak: Le
     Проверка записи в журнале о квитировании утечки.
     """
     with allure.step("Запрос сообщений журнала с фильтром userActions=LEAK_ACK"):
+        end_time = datetime.now()
         request_body = t_utils.create_journal_req_body(
-            pagination=Pagination(limit=TestConst.JOURNAL_ACK_PAGINATION_LIMIT, direction=Direction.FIRST.value),
+            pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
             filtering=Filtering(userActions=int(UserActions.LEAK_ACK)),
         )
         payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
@@ -995,9 +1209,42 @@ async def acknowledge_leak_in_journal(ws_client, cfg: SmokeSuiteConfig, leak: Le
             messages_info
         ).is_not_empty()
 
-        ack_message = t_utils.find_object_by_field(
-            messages_info, 'event', TestConst.JOURNAL_EVENT_LEAK_ACKNOWLEDGED
+    with allure.step("Фильтрация сообщений по времени и technologicalSection"):
+        filter_start_msk = t_utils.localize_as_moscow(imitator_start_time)
+        filter_end_msk = t_utils.localize_as_moscow(end_time)
+
+        time_filtered = [
+            msg for msg in messages_info
+            if filter_start_msk <= t_utils.ensure_moscow_timezone(msg.time) <= filter_end_msk
+        ]
+        time_filtered.sort(key=lambda msg: t_utils.ensure_moscow_timezone(msg.time), reverse=True)
+
+        ack_message = next(
+            (msg for msg in time_filtered
+             if msg.technologicalSection == cfg.tu_name
+             and msg.event == TestConst.JOURNAL_EVENT_LEAK_ACKNOWLEDGED),
+            None,
         )
+
+        allure.attach(
+            f"Всего получено сообщений: {len(messages_info)}\n"
+            f"После фильтрации по времени ({filter_start_msk} - {filter_end_msk}): {len(time_filtered)}\n"
+            f"Проверка: найдено ли сообщение с technologicalSection='{cfg.tu_name}' "
+            f"и event='{TestConst.JOURNAL_EVENT_LEAK_ACKNOWLEDGED}': {'True' if ack_message else 'False'}",
+            name="Результат фильтрации сообщений журнала",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+    with allure.step(
+        f"Проверка: найдено сообщение с technologicalSection='{cfg.tu_name}' "
+        f"и event='{TestConst.JOURNAL_EVENT_LEAK_ACKNOWLEDGED}'"
+    ):
+        if ack_message is None:
+            pytest.fail(
+                f"Сообщение с technologicalSection='{cfg.tu_name}' "
+                f"и event='{TestConst.JOURNAL_EVENT_LEAK_ACKNOWLEDGED}' "
+                f"не найдено среди {len(time_filtered)} отфильтрованных по времени сообщений"
+            )
 
     with allure.step("Проверка актуальности сообщения"):
         msg_time_msk = t_utils.ensure_moscow_timezone(ack_message.time)
