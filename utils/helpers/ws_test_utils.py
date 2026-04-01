@@ -6,7 +6,7 @@ import re
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum, IntFlag
-from typing import Any, List, Set, Tuple, Type, TypeVar
+from typing import Any, List, Optional, Set, Tuple, Type, TypeVar
 from zoneinfo import ZoneInfo
 
 import allure
@@ -15,10 +15,14 @@ from pytest import fail
 
 from clients.websocket_client import WebSocketClient
 from constants.enums import (
-    DegradationLdsStatusReasons,
-    FaultyLdsStatusReasons,
-    InitializationLdsStatusReasons,
     LdsStatus,
+    LdsStatusDegradation,
+    LdsStatusFaulty,
+    LdsStatusInitialization,
+    StationaryReason,
+    StationaryStatus,
+    StoppedPumpingReason,
+    UnStationaryReason,
 )
 from constants.test_constants import BaseTN3Constants as TestConst
 from models.get_messages_model import GetMessagesRequest
@@ -113,7 +117,7 @@ def ensure_moscow_timezone(input_datetime: datetime) -> None | datetime:
         input_datetime = input_datetime.replace(tzinfo=timezone.utc)
 
     # Конвертируем в московское время
-    return input_datetime.astimezone(ZoneInfo("Europe/Moscow"))
+    return input_datetime.astimezone(ZoneInfo(TestConst.ZONE_INFO))
 
 
 def localize_as_moscow(input_datetime: datetime) -> None | datetime:
@@ -124,7 +128,7 @@ def localize_as_moscow(input_datetime: datetime) -> None | datetime:
     if input_datetime is None:
         return input_datetime
 
-    moscow_tz = ZoneInfo("Europe/Moscow")
+    moscow_tz = ZoneInfo(TestConst.ZONE_INFO)
     if input_datetime.tzinfo is None:
         return input_datetime.replace(tzinfo=moscow_tz)
     return input_datetime.astimezone(moscow_tz)
@@ -147,7 +151,7 @@ def get_longest_flow_area(flow_areas: List[FlowArea]) -> FlowArea:
     Получает самый протяженный участок карты течения по количеству ДУ из списка всех участков
     """
     if not flow_areas:
-        fail("Cписок flow_areas пустой")
+        fail("Список flow_areas пустой")
     try:
         longest_flow_area = max(flow_areas, key=lambda flow_area: len(flow_area.diagnosticAreas))
         return longest_flow_area
@@ -219,16 +223,23 @@ def find_object_by_field(item_list: List[ObjectType], field_name: str, value: An
 
 def find_diagnostic_area_by_id(flow_areas: List[FlowArea], id_value: int) -> DiagnosticArea:
     """
-    Ищет ДУ по id в списке участков карты течений
+    Ищет ДУ по id в списке участков карты течений, исключает дубликаты по количеству pipeIds
     """
+    candidates = []
     if not flow_areas:
         fail("Пустой список flow_areas")
     try:
         for flow_area in flow_areas:
             for diagnostic_area in flow_area.diagnosticAreas:
                 if diagnostic_area.id == id_value:
-                    return diagnostic_area
-        fail(f"Не найден ДУ по id: {id_value}.")
+                    candidates.append(diagnostic_area)
+        if not candidates:
+            fail(f"Не найден ДУ по id: {id_value}.")
+        elif len(candidates) == 1:
+            return candidates[0]
+        else:
+            # Среди дубликатов ищет ДУ с наибольшим количеством pipeIds
+            return max(candidates, key=lambda candidate: len(candidate.pipeIds))
     except (AttributeError, KeyError, RuntimeError, TypeError, ValueError):
         fail(f"Не найден ДУ по id: {id_value}.")
 
@@ -264,7 +275,7 @@ def find_leak_by_coordinate(
 ) -> ObjectType:
     """
     Ищет утечку в списке по координатам с допустимой погрешностью
-    Рейзит pytest.fail если список пуст или утечка не найдена
+    поднимает pytest.fail если список пуст или утечка не найдена
     """
     if not leaks_list:
         fail("Список утечек пуст")
@@ -294,7 +305,7 @@ def to_moscow_timezone(date_str: str) -> datetime:
             date_str = date_str.strip().strip("'").strip('"')
 
         date_utc = datetime.strptime(date_str, TestConst.OUTPUT_TIME_FORMAT).replace(tzinfo=timezone.utc)
-        return date_utc.astimezone(ZoneInfo("Europe/Moscow"))
+        return date_utc.astimezone(ZoneInfo(TestConst.ZONE_INFO))
 
     except (AttributeError, TypeError, ValueError):
         fail(f"Не удалось преобразовать время в московское: {date_str}.")
@@ -338,7 +349,9 @@ def parse_journal_msg_value(value: str) -> Tuple[float, float]:
         fail("Ошибка распаковки данных из поля value в сообщении журнала")
 
 
-def parse_bit_flags(value: int, enum_cls: Type[IntEnum | IntFlag]) -> List[IntFlag]:  # переименовал "кусающиеся" фаги
+def parse_bit_flags(
+    value: int, enum_cls: Type[IntEnum | IntFlag], failures: Optional[List[str]] = None
+) -> List[IntFlag]:
     """
     Распаковка битовых флагов
     """
@@ -352,13 +365,17 @@ def parse_bit_flags(value: int, enum_cls: Type[IntEnum | IntFlag]) -> List[IntFl
 
     if known_bits != value:
         unknown_bits = value ^ known_bits
-        fail(f"Неизвестные биты при распаковке {enum_cls.__name__}: {unknown_bits}")
+        error_message = f"Неизвестные биты при распаковке {enum_cls.__name__}: {unknown_bits}"
+        if failures is not None:
+            failures.append(error_message)
+        else:
+            fail(f"Неизвестные биты при распаковке {enum_cls.__name__}: {unknown_bits}")
 
-    # та же сортировка только не цифры а их текстовое значение
+    # та же сортировка только не цифры, а их текстовое значение
     return sorted(found_flags, key=lambda flag: flag.value)
 
 
-def get_reason_enum_by_lds_status(lds_status: int | LdsStatus) -> Type[IntFlag]:
+def get_reason_enum_by_lds_status(lds_status: int | LdsStatus, failures: Optional[List[str]] = None) -> Type[IntFlag]:
     """
     Получение класса причин по режимам СОУ
     """
@@ -367,25 +384,76 @@ def get_reason_enum_by_lds_status(lds_status: int | LdsStatus) -> Type[IntFlag]:
         try:
             lds_status = LdsStatus(lds_status)
         except ValueError:
-            fail(f"Неизвестный LdsStatus: {lds_status}")
+            error_message = f"Неизвестный LdsStatus: {lds_status}"
+            if failures is not None:
+                failures.append(error_message)
+            else:
+                fail(error_message)
 
     reason_by_lds_status = {
-        LdsStatus.FAULTY: FaultyLdsStatusReasons,
-        LdsStatus.INITIALIZATION: InitializationLdsStatusReasons,
-        LdsStatus.DEGRADATION: DegradationLdsStatusReasons,
+        LdsStatus.FAULTY: LdsStatusFaulty,
+        LdsStatus.INITIALIZATION: LdsStatusInitialization,
+        LdsStatus.DEGRADATION: LdsStatusDegradation,
     }
     enum_class = reason_by_lds_status.get(lds_status)
     if enum_class is None:
-        fail(f"Для LdsStatus{lds_status.name} не определены причины")
+        error_message = f"Для LdsStatus{lds_status.name} не определены причины"
+        if failures is not None:
+            failures.append(error_message)
+        else:
+            fail(error_message)
     return enum_class
 
 
-def parse_lds_status_reasons(lds_status: int, lds_status_reasons: int):
+def get_reason_enum_by_stationary_status(
+    stationary_status: int | StationaryStatus, failures: Optional[List[str]] = None
+) -> Type[IntFlag]:
+    """
+    Получение класса причин по режимам МТ
+    """
+
+    if isinstance(stationary_status, int):
+        try:
+            stationary_status = StationaryStatus(stationary_status)
+        except ValueError:
+            error_message = f"Неизвестный StationaryStatus: {stationary_status}"
+            if failures is not None:
+                failures.append(error_message)
+            else:
+                fail(error_message)
+
+    reason_by_stationary_status = {
+        StationaryStatus.STATIONARY: StationaryReason,
+        StationaryStatus.UNSTATIONARY: UnStationaryReason,
+        StationaryStatus.STOPPED: StoppedPumpingReason,
+    }
+    enum_class = reason_by_stationary_status.get(stationary_status)
+    if enum_class is None:
+        error_message = f"Для StationaryStatus{stationary_status.name} не определены причины"
+        if failures is not None:
+            failures.append(error_message)
+        else:
+            fail(error_message)
+    return enum_class
+
+
+def parse_lds_status_reasons(lds_status: int, lds_status_reasons: int, failures: Optional[List[str]] = None):
     """
     Получение списка ldsStatusReasons, соответствующего ldsStatus
     """
-    enum_cls = get_reason_enum_by_lds_status(lds_status)
-    flags = parse_bit_flags(lds_status_reasons, enum_cls)
+    enum_cls = get_reason_enum_by_lds_status(lds_status, failures)
+    flags = parse_bit_flags(lds_status_reasons, enum_cls, failures)
+    return flags
+
+
+def parse_stationary_status_reasons(
+    stationary_status: int, stationary_status_reasons: int, failures: Optional[List[str]] = None
+):
+    """
+    Получение списка stationaryStatusReasons, соответствующего stationaryStatus
+    """
+    enum_cls = get_reason_enum_by_lds_status(stationary_status, failures)
+    flags = parse_bit_flags(stationary_status_reasons, enum_cls, failures)
     return flags
 
 
@@ -529,4 +597,3 @@ def get_leak_diagnostic_area_samples(
     if not leak_diagnostic_area_samples:
         fail(f"За {total_wait} секунд не пришло ни одного сообщения для ДУ с id={leak_diagnostic_area_id}.")
     return leak_diagnostic_area_samples
-    

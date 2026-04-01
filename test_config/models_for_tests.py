@@ -37,6 +37,11 @@ class BaseSuiteConfig:
     allowed_distance_diff_meters: int = BaseTN3Constants.ALLOWED_DISTANCE_DIFF_METERS
     precision: int = BaseTN3Constants.PRECISION
     basic_message_timeout: float = BaseTN3Constants.BASIC_MESSAGE_TIMEOUT
+    mask_message_timeout: float = BaseTN3Constants.MASK_MESSAGE_TIMEOUT
+    mask_du_name: Optional[str] = None
+    main_pipe_line: Optional[str] = None
+    mask_du_event: Optional[str] = None
+    unmask_du_event: Optional[str] = None
 
     # ===== Свойства для удобства =====
     @property
@@ -85,6 +90,7 @@ class DiagnosticAreaStatusConfig:
 
     leak_diagnostic_area_id: int
     leak_du_expected_lds_status: int
+    leak_du_expected_lds_status_after_leak: int = None
 
     # Соседние ДУ и их статусы: словари {diagnostic_area_id: leak_du_expected_lds_status}
     # Позволяет указывать 0..N соседей независимо от in/out.
@@ -134,6 +140,7 @@ class LeakTestConfig:
 
     # ===== Конфигурация статусов СОУ во время утечки =====
     lds_status_during_leak_config: Optional[DiagnosticAreaStatusConfig] = None
+    lds_status_after_leak: Optional[DiagnosticAreaStatusConfig] = None
 
     # ===== Тест-кейсы для этой утечки =====
     balance_algorithm_leak_waiting_test: Optional[CaseMarkers] = None
@@ -147,6 +154,7 @@ class LeakTestConfig:
     acknowledge_leak_in_journal_test: Optional[CaseMarkers] = None
     output_signals_test: Optional[CaseMarkers] = None
     lds_status_during_leak_test: Optional[CaseMarkers] = None
+    lds_status_after_leak_check_test: Optional[CaseMarkers] = None
 
     @property
     def leak_diagnostic_area_id(self) -> Optional[int]:
@@ -188,24 +196,32 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     2. Конфигурации утечек (LeakTestConfig)
     """
 
-    # ===== Ожидаемый статус стационара (для main_page_info) =====
+    # ===== Ожидаемый статусы для main_page_info =====
     expected_stationary_status: int = StationaryStatus.STATIONARY.value
     expected_main_page_signals: dict = field(default_factory=lambda: asdict(SignalsInfo()))
 
     # ===== Название Магистрального Нефтепровода =====
     main_pipeline: str = ""
 
+    # ===== Ожидаемые переменные при маскировании ДУ =====
+    mask_reason: Optional[str] = None
+    unmask_reason: Optional[str] = None
+    mask_one_du: Optional[int] = None
+    not_mask_du: Optional[int] = None
+    linear_part_identifier_for_mask: Optional[int] = None
+    technological_section: Optional[str] = None
+
     # ===== Базовые тесты =====
     basic_info_test: Optional[CaseMarkers] = None
     journal_info_test: Optional[CaseMarkers] = None
     lds_status_initialization_test: Optional[CaseMarkers] = None
-    lds_status_init_in_journal_test: Optional[CaseMarkers] = None
     main_page_info_test: Optional[CaseMarkers] = None
     main_page_info_signals_test: Optional[CaseMarkers] = None
     mask_signal_test: Optional[CaseMarkers] = None
     mask_info_in_journal_test: Optional[CaseMarkers] = None
     lds_status_initialization_out_test: Optional[CaseMarkers] = None
-    lds_status_init_out_in_journal_test: Optional[CaseMarkers] = None
+    mask_du_on_mini_scheme_test: Optional[CaseMarkers] = None
+    unmask_du_on_mini_scheme_test: Optional[CaseMarkers] = None
 
     # ===== Конфигурации утечек =====
     # Для наборов с одной утечкой
@@ -255,7 +271,15 @@ class LDSStatusConfig(BaseSuiteConfig):
     lds_status_deg_exceeding_distance_between_pressure_sensors_test_data: Optional[CaseData] = None
     lds_status_deg_gravity_section_pumping_test_data: Optional[CaseData] = None
     lds_status_deg_pig_sensor_passage_test_data: Optional[CaseData] = None
+    lds_status_faulty_absence_min_flow_meters_test_data: Optional[CaseData] = None
+    lds_status_deg_starting_pumping_out_pumps_test_data: Optional[CaseData] = None
     lds_status_deg_exceeding_distance_between_flow_meters_test_data: Optional[CaseData] = None
+    lds_status_deg_rejection_temperature_sensor_on_du_2_test_data: Optional[CaseData] = None
+    lds_status_deg_rejection_temperature_sensor_on_du_3_test_data: Optional[CaseData] = None
+    lds_status_deg_rejection_temperature_sensor_on_du_5_test_data: Optional[CaseData] = None
+    lds_status_deg_rejection_density_and_viscosity_on_du_2_test_data: Optional[CaseData] = None
+    lds_status_deg_rejection_density_and_viscosity_on_du_3_test_data: Optional[CaseData] = None
+    lds_status_deg_rejection_density_and_viscosity_on_du_5_test_data: Optional[CaseData] = None
     # ===== Тесты =====
     lds_status_basic_info_test: Optional[CaseMarkers] = None
     lds_status_init_cold_start_test: Optional[CaseMarkers] = None
@@ -264,4 +288,12 @@ class LDSStatusConfig(BaseSuiteConfig):
     lds_status_deg_not_enough_pressure_sensors_test: Optional[CaseMarkers] = None
     lds_status_deg_gravity_section_pumping_test: Optional[CaseMarkers] = None
     lds_status_deg_pig_sensor_passage_test: Optional[CaseMarkers] = None
+    lds_status_faulty_absence_min_flow_meters_test: Optional[CaseMarkers] = None
+    lds_status_deg_starting_pumping_out_pumps_test: Optional[CaseMarkers] = None
     lds_status_deg_exceeding_distance_between_flow_meters_test: Optional[CaseMarkers] = None
+    lds_status_deg_rejection_temperature_sensor_on_du_2_test: Optional[CaseMarkers] = None
+    lds_status_deg_rejection_temperature_sensor_on_du_3_test: Optional[CaseMarkers] = None
+    lds_status_deg_rejection_temperature_sensor_on_du_5_test: Optional[CaseMarkers] = None
+    lds_status_deg_rejection_density_and_viscosity_on_du_2_test: Optional[CaseMarkers] = None
+    lds_status_deg_rejection_density_and_viscosity_on_du_3_test: Optional[CaseMarkers] = None
+    lds_status_deg_rejection_density_and_viscosity_on_du_5_test: Optional[CaseMarkers] = None
