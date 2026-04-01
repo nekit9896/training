@@ -65,7 +65,6 @@ class WebSocketClient:
     async def __aexit__(self, exc_type, exc, tb):
         self._stop_event.set()
         if self._ws:
-            self._ws.ping_interval = None
             await self._ws.close()
         if self._recv_task:
             await self._recv_task

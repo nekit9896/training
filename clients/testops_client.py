@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import tarfile
 from pathlib import Path
 from typing import BinaryIO, Optional
 
@@ -16,23 +17,37 @@ logger = logging.getLogger(__name__)
 class AllureResultsFileManager:
     """
     Подготавливает файлы allure отчета для отправки по http
+    Архивирует allure-results в tar.gz перед отправкой.
     """
+
+    ALLURE_ARCHIVE_NAME = "allure-results.tar.gz"
 
     def __init__(self):
         self._script_dir_path = self._get_script_dir_path()
         self._allure_results_path = self._get_allure_results_path()
-        self._allure_results_files_list = self._get_allure_results_files_list()
+        self._archive_path = self._script_dir_path.parent / self.ALLURE_ARCHIVE_NAME
 
     def setup_allure_results_for_upload(self) -> list[tuple[str, tuple[str, Optional[BinaryIO]]]]:
         """
-        Финальная стадия подготовки файлов allure отчета для отправки по http
-        :return: финальная версия списка файлов
+        Подготовка allure отчета для отправки: создание environment.properties,
+        архивация в tar.gz и открытие архива для upload/
         """
-        files = []
-        for file in self._allure_results_files_list:
-            file_obj = self._get_file_object(file)
-            files.append((T_const.TESTOPS_UPLOAD_FILES_KEY, (file.name, file_obj)))
-        return files
+        self._create_environment_properties()
+        self._archive_allure_results()
+        file_obj = self._get_file_object(self._archive_path)
+        return [(T_const.TESTOPS_UPLOAD_FILES_KEY, (self._archive_path.name, file_obj))]
+
+    def _archive_allure_results(self) -> None:
+        """
+        Архивирует директорию allure-results в tar.gz.
+        """
+        try:
+            with tarfile.open(self._archive_path, "w:gz") as tar:
+                tar.add(self._allure_results_path, arcname=self._allure_results_path.name)
+            logger.info(f"[TEARDOWN] [OK] Allure-results архивирован в {self._archive_path}")
+        except tarfile.TarError:
+            logger.exception("[TEARDOWN] [ERROR] Ошибка при архивации allure-results в tar.gz")
+            raise
 
     @staticmethod
     def _get_file_object(file_path: Path) -> Optional[BinaryIO]:
@@ -87,16 +102,6 @@ class AllureResultsFileManager:
             logger.info(f"[TEARDOWN] [OK] Создан файл environment.properties в {env_prop_file}")
         except Exception:
             logger.exception(f"[TEARDOWN] [ERROR] Не удалось создать {env_prop_file}")
-
-    def _get_allure_results_files_list(self) -> list[Path]:
-        """
-        :return: список всех файлов в директории allure-results
-        Перед сбором файлов создаем environment.properties
-        """
-        self._create_environment_properties()
-
-        files_list = list(self._allure_results_path.rglob("*"))
-        return files_list
 
 
 class AllureResultsUploader:
