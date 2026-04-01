@@ -108,14 +108,14 @@ SMOKE_SUITE_LEVEL_MAPPING = {
     'test_basic_info': 'basic_info_test',
     'test_journal_info': 'journal_info_test',
     'test_lds_status_initialization': 'lds_status_initialization_test',
-    'test_lds_status_init_in_journal': 'lds_status_init_in_journal_test',
     'test_main_page_info': 'main_page_info_test',
     'test_main_page_info_signals': 'main_page_info_signals_test',
     'test_mask_signal_msg': 'mask_signal_test',
     'test_mask_info_in_journal': 'mask_info_in_journal_test',
     'test_lds_status_initialization_out': 'lds_status_initialization_out_test',
-    'test_lds_status_init_out_in_journal': 'lds_status_init_out_in_journal_test',
     'test_main_page_info_unstationary': 'main_page_info_unstationary_test',
+    'test_mask_du_on_mini_scheme': 'mask_du_on_mini_scheme_test',
+    'test_unmask_du_on_mini_scheme': 'unmask_du_on_mini_scheme_test',
 }
 
 # Regress-тесты режимов СОУ (маркеры из LDSStatusConfig)
@@ -127,7 +127,15 @@ LDS_STATUS_SUITE_LEVEL_MAPPING = {
     'test_lds_status_degradation_not_enough_pressure_sensors': 'lds_status_deg_not_enough_pressure_sensors_test',
     'test_lds_status_degradation_gravity_section_pumping': 'lds_status_deg_gravity_section_pumping_test',
     'test_lds_status_degradation_pig_sensor_passage': 'lds_status_deg_pig_sensor_passage_test',
+    'test_lds_status_degradation_starting_pumping_out_pumps': 'lds_status_deg_starting_pumping_out_pumps_test',
+    'test_lds_status_faulty_absence_min_flow_meters': 'lds_status_faulty_absence_min_flow_meters_test',
     'test_lds_status_degradation_exceeding_distance_between_flow_meters': 'lds_status_deg_exceeding_distance_between_flow_meters_test',  # noqa: E501
+    'test_lds_status_degradation_rejection_temperature_sensor_on_du_2': 'lds_status_deg_rejection_temperature_sensor_on_du_2_test',  # noqa: E501
+    'test_lds_status_degradation_rejection_temperature_sensor_on_du_3': 'lds_status_deg_rejection_temperature_sensor_on_du_3_test',  # noqa: E501
+    'test_lds_status_degradation_rejection_temperature_sensor_on_du_5': 'lds_status_deg_rejection_temperature_sensor_on_du_5_test',  # noqa: E501
+    'test_lds_status_degradation_rejection_density_and_viscosity_on_du_2': 'lds_status_deg_rejection_density_and_viscosity_on_du_2_test',  # noqa: E501
+    'test_lds_status_degradation_rejection_density_and_viscosity_on_du_3': 'lds_status_deg_rejection_density_and_viscosity_on_du_3_test',  # noqa: E501
+    'test_lds_status_degradation_rejection_density_and_viscosity_on_du_5': 'lds_status_deg_rejection_density_and_viscosity_on_du_5_test',  # noqa: E501
 }
 
 # Тесты уровня утечки (маркеры из LeakTestConfig - параметр leak)
@@ -143,6 +151,7 @@ LEAK_LEVEL_TEST_MAPPING = {
     'test_lds_status_during_leak': 'lds_status_during_leak_test',
     'test_balance_algorithm_leak_waiting': 'balance_algorithm_leak_waiting_test',
     'test_balance_algorithm_leak_detected': 'balance_algorithm_leak_detected_test',
+    'test_lds_status_after_leak_check': 'lds_status_after_leak_check_test',
 }
 
 # Мержим все вместе чтобы не переписывать логику коллектора айтемов (тестов)

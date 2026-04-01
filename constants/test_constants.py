@@ -42,6 +42,7 @@ class BaseTN3Constants:
     OUTPUT_IS_ACK_LEAK = "1"
     OUTPUT_IS_LEAK = "1"
     OUTPUT_IS_NOT_MASK = "0"
+    OUTPUT_IS_MASK = "1"
 
     MASS_KG = 3600  # Коэффициент массы, нужно умножить, чтобы получить объем в м3/час
     ALLOWED_VOLUME_DIFF = 0.3  # Относительная погрешность по объему
@@ -65,15 +66,15 @@ class BaseTN3Constants:
     JOURNAL_MESSAGE_TYPE_USER_ACTIONS = "Действия пользователя"
     JOURNAL_STATUS_SUCCESS = "Успешно"
     JOURNAL_EXPECTED_MSG_COUNT_PER_SIGNAL = 2
-    JOURNAL_EXPECTED_MASK_MSG_TOTAL = 4
-    JOURNAL_PAGINATION_LIMIT = 50
-    JOURNAL_MASK_EXPECTED_EVENTS = {"Установка признака маскирования", "Снятие признака маскирования"}
-    JOURNAL_MASK_EXPECTED_SIGNALS = {"Значение давления", "Расход"}
+    JOURNAL_MASK_PAGINATION_LIMIT = 10
     JOURNAL_EVENT_POSSIBLE_LEAK = "Возможна утечка"
     JOURNAL_MESSAGE_TYPE_LEAKS = "Утечки"
+    JOURNAL_LEAKS_PAGINATION_LIMIT = 10
+    JOURNAL_EXPECTED_MASK_MSG_TOTAL = 4
+    JOURNAL_MASK_EXPECTED_EVENTS = {"Установка признака маскирования", "Снятие признака маскирования"}
+    JOURNAL_MASK_EXPECTED_SIGNALS = {"Значение давления", "Расход"}
+    JOURNAL_ACK_PAGINATION_LIMIT = 1
     JOURNAL_EVENT_LEAK_ACKNOWLEDGED = "Сообщение об утечке квитировано"
-    JOURNAL_EVENT_LDS_INITIALIZATION = "СОУ в инициализации (Накопление данных)"
-    JOURNAL_MESSAGE_TYPE_LDS_STATUS = "Режим работы СОУ"
 
     # ===== Параметры подтверждения =====
     IS_ACKNOWLEDGED_FALSE = False
@@ -85,9 +86,10 @@ class BaseTN3Constants:
 
     # ===== Прочие константы =====
     BASIC_MESSAGE_TIMEOUT = 10.0  # Таймаут ожидания сообщений в секундах
+    MASK_MESSAGE_TIMEOUT = 180.0  # Таймаут ожидания сообщений в секундах
     PRECISION = 3  # Точность округления для координат
     KM_TO_METERS = 1000  # Перевод в метры
     DIGITS_WITH_DOT_PATTERN = r'\d+(?:\.\d+)?'  # Регулярное выражение для поиска чисел с точкой
     DIAGNOSTIC_AREA_BASE_IDS = [2, 3, 4, 5, 6, 7, 8]  # Список ДУ с isBase = true из конфигурации Тн-3
     REPRESENTATIVE_DIAGNOSTIC_AREA_IDS = [2, 3]  # Список показательных ДУ для определения режима СОУ
-    
+    ZONE_INFO: str = "Europe/Moscow"

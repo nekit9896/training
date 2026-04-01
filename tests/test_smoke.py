@@ -22,7 +22,7 @@ import allure
 import pytest
 
 from clients.websocket_client import WebSocketClient
-from constants.test_constants import BaseTN3Constants
+from constants.test_constants import BaseTN3Constants as base_const
 from test_config.datasets import ALL_SMOKE_CONFIGS
 from test_config.models_for_tests import CaseMarkers, LeakTestConfig, SmokeSuiteConfig
 from test_scenarios import scenarios
@@ -102,9 +102,7 @@ LEAK_PARAMS: List[Any] = _generate_leak_params()
 def _apply_allure_markers(test_config: CaseMarkers, tag: str, title: str, description: Optional[str] = None) -> None:
     """Применяет allure-маркеры из конфига теста."""
     if not test_config:
-        msg = "Не заполнена конфигурация теста: запуск остановлен"
-        allure.attach(msg, name="Ошибка подготовки тестрана", attachment_type=allure.attachment_type.TEXT)
-        pytest.exit(msg)
+        pytest.skip("Не заполнена конфигурация теста: тест пропущен")
     allure.dynamic.tag(tag)
     allure.dynamic.tag("SMOKE")
     allure.dynamic.title(title)
@@ -137,8 +135,12 @@ class TestSuiteScenarios:
         """[MessagesInfo] Проверка наличия сообщений в журнале"""
         tag = "MessagesInfo"
         title = f"[{tag}] Проверка наличия сообщений в журнале. ЭФ: Журнал.Реальное время"
-        description = "Проверка наличия сообщений в журнале.\n" "Синхронный запрос типа: MessagesInfo"
-        _apply_allure_markers(config.journal_info_test, tag, title, description)
+        _apply_allure_markers(
+            config.journal_info_test,
+            tag,
+            title,
+            "Проверка наличия сообщений в журнале.\n" "Синхронный запрос типа: MessagesInfo",
+        )
         await scenarios.journal_info(ws_client)
 
     @pytest.mark.asyncio
@@ -146,45 +148,38 @@ class TestSuiteScenarios:
         """[CommonScheme] Проверка режима работы СОУ: Инициализация"""
         tag = "CommonScheme"
         title = f"[{tag}] Проверка режима работы СОУ: 'Инициализация'. ЭФ: Схема"
-        description = (
-            f"Проверка режима работы СОУ на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки : {config.lds_status_initialization_test.offset} мин.\n"
-            "Подписка на сообщения типа: CommonScheme\n"
-            "Ожидаемый режим работы СОУ: Инициализация"
+        _apply_allure_markers(
+            config.lds_status_initialization_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы СОУ на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки : {config.lds_status_initialization_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Ожидаемый режим работы СОУ: Инициализация"
+            ),
         )
-        _apply_allure_markers(config.lds_status_initialization_test, tag, title, description)
         await scenarios.lds_status_initialization(ws_client, config)
 
-    @pytest.mark.asyncio
-    async def test_lds_status_init_in_journal(
-        self, ws_client: WebSocketClient, config: SmokeSuiteConfig, imitator_start_time: datetime
-    ) -> None:
-        """[MessagesInfo] Проверка записи в журнале о входе СОУ в Инициализацию"""
-        tag = "MessagesInfo"
-        title = f"[{tag}] Проверка записи в журнале: СОУ в Инициализации. ЭФ: Журнал. Реальное время"
-        description = (
-            f"Проверка записи в журнале о входе СОУ в Инициализацию на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: {config.lds_status_init_in_journal_test.offset} мин.\n"
-            "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
-        )
-        _apply_allure_markers(config.lds_status_init_in_journal_test, tag, title, description)
-        await scenarios.lds_status_init_in_journal(ws_client, config, imitator_start_time)
-
+    @pytest.mark.skip(reason="ждем повторный фикс баги LDS-10226")
     @pytest.mark.asyncio
     async def test_main_page_info(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
         """[MainPageInfo] Проверка установки режима МТ"""
         tag = "MainPageInfo"
         title = f"[{tag}] Проверка установки режима работы МТ: стационарный. ЭФ: Главная страница.Контент таблица по ТУ"
-        description = (
-            f"Проверка установки режима работы МТ: стационарный на данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: {config.main_page_info_test.offset} мин.\n"
-            "Подписка на сообщения типа: MainPageInfo\n"
-            "Ожидаемый режим работы МТ: Стационарный"
+        _apply_allure_markers(
+            config.main_page_info_test,
+            tag,
+            title,
+            (
+                f"Проверка установки режима работы МТ: стационарный на данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки: {config.main_page_info_test.offset} мин.\n"
+                "Подписка на сообщения типа: MainPageInfo\n"
+                "Ожидаемый режим работы МТ: Стационарный"
+            ),
         )
-        _apply_allure_markers(config.main_page_info_test, tag, title, description)
         await scenarios.main_page_info(ws_client, config)
 
     @pytest.mark.asyncio
@@ -192,13 +187,17 @@ class TestSuiteScenarios:
         """[MainPageSignalsInfo] Проверка счетчиков состояния сигналов"""
         tag = "MainPageSignalsInfo"
         title = f"[{tag}] Проверка счетчиков состояния сигналов. ЭФ: Главная страница.Контент таблица по ТУ"
-        description = (
-            f"Проверка счетчиков состояния сигналов на данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: {config.main_page_info_signals_test.offset} мин.\n"
-            "Подписка на сообщения типа: MainPageSignalsInfo\n"
+        _apply_allure_markers(
+            config.main_page_info_signals_test,
+            tag,
+            title,
+            (
+                f"Проверка счетчиков состояния сигналов на данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки: {config.main_page_info_signals_test.offset} мин.\n"
+                "Подписка на сообщения типа: MainPageSignalsInfo\n"
+            ),
         )
-        _apply_allure_markers(config.main_page_info_signals_test, tag, title, description)
         await scenarios.main_page_info_signals(ws_client, config)
 
     @pytest.mark.asyncio
@@ -206,20 +205,25 @@ class TestSuiteScenarios:
         """[MaskSignal] Проверка маскирования датчиков"""
         tag = "MaskSignal"
         title = f"[{tag}] проверка маскирования датчиков. ЭФ: Схема"
-        description = (
-            f"Проверка работы маскирования и снятия маскирования на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: {config.mask_signal_test.offset} мин.\n"
-            "Синхронные запросы типа: GetInputSignalsRequest, MaskSignalRequest, UnmaskSignalRequest\n"
-            "Подписка на сообщения типа: InputSignalsContent\n"
-            "Проверки:\n"
-            "Статус-код ответа на синхронный запрос маскирования.\n"
-            "Значение в поле isMasked сигнала во входных сигналах после маскирования.\n"
-            "Статус-код ответа на синхронный запрос снятия маскирования.\n"
-            "Значение в поле isMasked сигнала во входных сигналах после снятия маскирования.\n"
-            "Примечание: что бы не повлиять на проверки утечек, тест на маскирование выполняется во время инициализации"
+        _apply_allure_markers(
+            config.mask_signal_test,
+            tag,
+            title,
+            (
+                f"Проверка работы маскирования и снятия маскирования  на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки: {config.mask_signal_test.offset} мин.\n"
+                "Синхронные запросы типа: GetInputSignalsRequest, MaskSignalRequest, UnmaskSignalRequest\n"
+                "Подписка на сообщения типа: InputSignalsContent\n"
+                "Проверки:\n"
+                "Статус-код ответа на синхронный запрос маскирования.\n"
+                "Значение в поле isMasked сигнала во входных сигналах после маскирования.\n"
+                "Статус-код ответа на синхронный запрос снятия маскирования.\n"
+                "Значение в поле isMasked сигнала во входных сигналах после снятия маскирования.\n"
+                "Примечание: что бы не повлиять на проверки утечек, тест на маскирование выполняется во время "
+                "инициализации"
+            ),
         )
-        _apply_allure_markers(config.mask_signal_test, tag, title, description)
         await scenarios.mask_signal_msg(ws_client, config)
 
     @pytest.mark.asyncio
@@ -241,35 +245,60 @@ class TestSuiteScenarios:
         await scenarios.mask_info_in_journal(ws_client, config, imitator_start_time)
 
     @pytest.mark.asyncio
+    async def test_mask_du_on_mini_scheme(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
+        """Проверка маскирования ДУ"""
+        tag = "MaskDuOnMiniScheme"
+        title = f"[{tag}] проверка маскирования линейного участка. ЭФ: Схема"
+        description = (
+            f"Проверка маскирования линейного участка, \n"
+            f"на технологическом участке {config.technological_unit.description}\n"
+            f"Время проведения проверки: {config.mask_signal_test.offset} мин.\n"
+            "Синхронные запросы типа: MaskLdsCommandRequest\n"
+            "Проверки:\n"
+            "Статус-код ответа на синхронный запрос маскирования.\n"
+            "Проверка маскирования ДУ в выходных сигналах.\n"
+            "Проверка маскирования на схеме.\n"
+            "Проверка сообщения о маскировании в журнале.\n"
+        )
+        _apply_allure_markers(config.mask_du_on_mini_scheme_test, tag, title, description)
+        await scenarios.mask_du_on_mini_scheme(ws_client, config, config.leak)
+
+    @pytest.mark.asyncio
+    async def test_unmask_du_on_mini_scheme(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
+        """Проверка размаскирования ДУ"""
+        tag = "UnmaskDuOnMiniScheme"
+        title = f"[{tag}] проверка снятия маскирования линейному участку. ЭФ: Схема"
+        description = (
+            f"Проверка снятия маскирования линейному участку, \n"
+            f"на технологическом участке {config.technological_unit.description}\n"
+            f"Время проведения проверки: {config.unmask_du_on_mini_scheme_test.offset} мин.\n"
+            "Синхронные запросы типа: UnmaskDuOnMiniScheme\n"
+            "Проверки:\n"
+            "Статус-код ответа на синхронный запрос снятия маски.\n"
+            "Проверка тега с маской в выходных сигналах.\n"
+            "Проверка сообщения о снятии маскирования в журнале.\n"
+        )
+        _apply_allure_markers(config.unmask_du_on_mini_scheme_test, tag, title, description)
+        await scenarios.unmask_du_on_mini_scheme(ws_client, config, config.leak)
+
+    @pytest.mark.asyncio
     async def test_lds_status_initialization_out(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
         """[CommonScheme] Проверка выхода СОУ из Инициализации"""
         tag = "CommonScheme"
         title = f"[{tag}] Проверка выхода СОУ из Инициализации. ЭФ: Схема"
-        description = (
-            f"Проверка выхода СОУ из Инициализации на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: {config.lds_status_initialization_out_test.offset} мин.\n"
-            "Подписка на сообщения типа: CommonScheme\n"
-            "Ожидаемый режим работы СОУ: не Инициализация"
+        _apply_allure_markers(
+            config.lds_status_initialization_out_test,
+            tag,
+            title,
+            (
+                f"Проверка выхода СОУ из Инициализации на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки: {config.lds_status_initialization_out_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Ожидаемый режим работы СОУ: не Инициализация"
+            ),
         )
-        _apply_allure_markers(config.lds_status_initialization_out_test, tag, title, description)
         await scenarios.lds_status_initialization_out(ws_client, config)
-
-    @pytest.mark.asyncio
-    async def test_lds_status_init_out_in_journal(
-        self, ws_client: WebSocketClient, config: SmokeSuiteConfig, imitator_start_time: datetime
-    ) -> None:
-        """[MessagesInfo] Проверка записи в журнале о выходе СОУ из Инициализации"""
-        tag = "MessagesInfo"
-        title = f"[{tag}] Проверка записи в журнале: выход СОУ из Инициализации. ЭФ: Журнал.Реальное время"
-        description = (
-            f"Проверка записи в журнале о выходе СОУ из Инициализации на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: {config.lds_status_init_out_in_journal_test.offset} мин.\n"
-            "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
-        )
-        _apply_allure_markers(config.lds_status_init_out_in_journal_test, tag, title, description)
-        await scenarios.lds_status_init_out_in_journal(ws_client, config, imitator_start_time)
 
     @pytest.mark.asyncio
     async def test_main_page_info_unstationary(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
@@ -278,14 +307,18 @@ class TestSuiteScenarios:
         title = (
             f"[{tag}] Проверка установки режима работы МТ: нестационарный. ЭФ: Главная страница. Контент таблица по ТУ"
         )
-        description = (
-            f"Проверка установки режима работы МТ: нестационарный на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: {config.main_page_info_unstationary_test.offset} мин.\n"
-            "Подписка на сообщения типа: MainPageInfo\n"
-            "Ожидаемый режим работы МТ: Нестационарный"
+        _apply_allure_markers(
+            config.main_page_info_unstationary_test,
+            tag,
+            title,
+            (
+                f"Проверка установки режима работы МТ: нестационарный на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки: {config.main_page_info_unstationary_test.offset} мин.\n"
+                "Подписка на сообщения типа: MainPageInfo\n"
+                "Ожидаемый режим работы МТ: Нестационарный"
+            ),
         )
-        _apply_allure_markers(config.main_page_info_unstationary_test, tag, title, description)
         await scenarios.main_page_info_unstationary(ws_client, config)
 
 
@@ -313,17 +346,20 @@ class TestLeakScenarios:
         """[AllLeaksInfo] Проверка утечки в пуше"""
         tag = "AllLeaksInfo"
         title = f"[{tag}] Проверка сообщения об утечке. ЭФ: Пуш-сообщение об утечке на всех ЭФ"
-        description = (
-            f"Проверка пуш-сообщения об утечке на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: {leak.all_leaks_info_test.offset} мин.\n"
-            "Подписка на сообщения типа: AllLeaksInfo\n"
-            f"Допустимое время обнаружения {leak.allowed_time_diff_minutes} мин. с момента начала утечки, "
-            f"т к для данных {config.suite_name} интенсивность утечки {leak.leak_rate_percentages}%.\n"
-            "Примечание: тесты сообщений об утечке должны выполняться раньше теста на квитирование"
+        _apply_allure_markers(
+            leak.all_leaks_info_test,
+            tag,
+            title,
+            (
+                f"Проверка пуш-сообщения об утечке на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки: {leak.all_leaks_info_test.offset} мин.\n"
+                "Подписка на сообщения типа: AllLeaksInfo\n"
+                f"Допустимое время обнаружения {leak.allowed_time_diff_minutes} мин. с момента начала утечки, "
+                f"т к для данных {config.suite_name} интенсивность утечки {leak.leak_rate_percentages}%.\n"
+                "Примечание: тесты сообщений об утечке должны выполняться раньше теста на квитирование"
+            ),
         )
-
-        _apply_allure_markers(leak.all_leaks_info_test, tag, title, description)
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.all_leaks_info(ws_client, config, leak, imitator_start_time)
@@ -340,16 +376,20 @@ class TestLeakScenarios:
         """[LeaksContent] Проверка сообщения об утечке в таблице КГ"""
         tag = "LeaksContent"
         title = f"[{tag}] Проверка сообщения об утечке. ЭФ: КГ.Табличное представление"
-        description = (
-            f"Проверка сообщения об утечке в таблице КГ на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: {leak.leaks_content_test.offset} мин.\n"
-            "Подписка на сообщения типа: LeaksContent\n"
-            f"Допустимое время обнаружения {leak.allowed_time_diff_minutes} мин. с момента начала утечки, "
-            f"т к для данных {config.suite_name} интенсивность утечки {leak.leak_rate_percentages}%.\n"
-            "Примечание: тесты сообщений об утечке должны выполняться раньше теста на квитирование"
+        _apply_allure_markers(
+            leak.leaks_content_test,
+            tag,
+            title,
+            (
+                f"Проверка сообщения об утечке в таблице КГ на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки: {leak.leaks_content_test.offset} мин.\n"
+                "Подписка на сообщения типа: LeaksContent\n"
+                f"Допустимое время обнаружения {leak.allowed_time_diff_minutes} мин. с момента начала утечки, "
+                f"т к для данных {config.suite_name} интенсивность утечки {leak.leak_rate_percentages}%.\n"
+                "Примечание: тесты сообщений об утечке должны выполняться раньше теста на квитирование"
+            ),
         )
-        _apply_allure_markers(leak.leaks_content_test, tag, title, description)
         # Добавляем номер утечки в title для multi-leak
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
@@ -367,16 +407,20 @@ class TestLeakScenarios:
         """[MessagesInfo] Проверка сообщения об утечке в журнале"""
         tag = "MessagesInfo"
         title = f"[{tag}] Проверка сообщения об утечке в журнале. ЭФ: Журнал.Реальное время"
-        description = (
-            f"Проверка сообщения об утечке в журнале на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: {leak.leak_info_in_journal.offset} мин.\n"
-            "Синхронный запрос типа: MessagesInfo\n"
-            f"Допустимое время обнаружения {leak.allowed_time_diff_minutes} мин. с момента начала утечки, "
-            f"т к для данных {config.suite_name} интенсивность утечки {leak.leak_rate_percentages}%.\n"
-            "Примечание: тесты сообщений об утечке должны выполняться раньше теста на квитирование"
+        _apply_allure_markers(
+            leak.leak_info_in_journal,
+            tag,
+            title,
+            (
+                f"Проверка сообщения об утечке в журнале на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки: {leak.leak_info_in_journal.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo\n"
+                f"Допустимое время обнаружения {leak.allowed_time_diff_minutes} мин. с момента начала утечки, "
+                f"т к для данных {config.suite_name} интенсивность утечки {leak.leak_rate_percentages}%.\n"
+                "Примечание: тесты сообщений об утечке должны выполняться раньше теста на квитирование"
+            ),
         )
-        _apply_allure_markers(leak.leak_info_in_journal, tag, title, description)
         # Добавляем номер утечки в title для multi-leak
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
@@ -389,11 +433,10 @@ class TestLeakScenarios:
         config: SmokeSuiteConfig,
         leak: LeakTestConfig,
         leak_number: int,
-        imitator_start_time: datetime,
     ) -> None:
         """[MessagesInfo] Проверка наличия сообщения 'Возможна утечка' в журнале"""
         tag = "MessagesInfo"
-        title = f"[{tag}] Проверка сообщения 'Возможна утечка' в журнале. ЭФ: Журнал.Реальное время"
+        title = f"[{tag}] Проверка сообщения 'Возможна утечка' в журнале. ЭФ: Журнал. Реальное время"
         description = (
             f"Проверка наличия сообщения 'Возможна утечка' в журнале на наборе данных {config.suite_name}, \n"
             f"на технологическом участке {config.technological_unit.description}\n"
@@ -403,7 +446,7 @@ class TestLeakScenarios:
         _apply_allure_markers(leak.possible_leak_in_journal_test, tag, title, description)
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
-        await scenarios.possible_leak_in_journal(ws_client, config, leak, imitator_start_time)
+        await scenarios.possible_leak_in_journal(ws_client, config)
 
     @pytest.mark.asyncio
     async def test_tu_leaks_info(
@@ -417,16 +460,20 @@ class TestLeakScenarios:
         """[TuLeaksInfo] Проверка утечки на ТУ"""
         tag = "TuLeaksInfo"
         title = f"[{tag}] Проверка сообщения об утечке. Сообщения на ЭФ: Схема, Минисхема, Гидроуклон"
-        description = (
-            f"Проверка сообщения об утечке на схемах и гидроуклоне на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {leak.diagnostic_area_name}\n"
-            f"Время проведения проверки: {leak.tu_leaks_info_test.offset} мин.\n"
-            "Подписка на сообщения типа: TuLeaksInfo\n"
-            f"Допустимое время обнаружения {leak.allowed_time_diff_minutes} мин. с момента начала утечки, "
-            f"т к для данных {config.suite_name} интенсивность утечки {leak.leak_rate_percentages}%.\n"
-            "Примечание: тесты сообщений об утечке должны выполняться раньше теста на квитирование"
+        _apply_allure_markers(
+            leak.tu_leaks_info_test,
+            tag,
+            title,
+            (
+                f"Проверка сообщения об утечке на схемах и гидроуклоне на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {leak.diagnostic_area_name}\n"
+                f"Время проведения проверки: {leak.tu_leaks_info_test.offset} мин.\n"
+                "Подписка на сообщения типа: TuLeaksInfo\n"
+                f"Допустимое время обнаружения {leak.allowed_time_diff_minutes} мин. с момента начала утечки, "
+                f"т к для данных {config.suite_name} интенсивность утечки {leak.leak_rate_percentages}%.\n"
+                "Примечание: тесты сообщений об утечке должны выполняться раньше теста на квитирование"
+            ),
         )
-        _apply_allure_markers(leak.tu_leaks_info_test, tag, title, description)
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.tu_leaks_info(ws_client, config, leak, imitator_start_time)
@@ -442,18 +489,50 @@ class TestLeakScenarios:
         """[CommonScheme] Проверка режима работы СОУ во время утечки"""
         tag = "CommonScheme"
         title = f"[{tag}] Проверка режима работы СОУ во время утечки. ЭФ: Схема"
-        description = (
-            f"Проверка режима работы СОУ во время утечки на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: {leak.lds_status_during_leak_test.offset} мин.\n"
-            "Подписка на сообщения типа: CommonScheme\n"
-            "Примечание: проверка режимов СОУ во время утечки должна выполняться раньше теста на квитирование\n"
-            "В рамках данного теста проверяется режим СОУ на ДУ с утечкой и на соседних ДУ"
+        _apply_allure_markers(
+            leak.lds_status_during_leak_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы СОУ во время утечки на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки: {leak.lds_status_during_leak_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Примечание: проверка режимов СОУ во время утечки должна выполняться раньше теста на квитирование\n"
+                "В рамках данного теста проверяется режим СОУ на ДУ с утечкой и на соседних ДУ"
+            ),
         )
-        _apply_allure_markers(leak.lds_status_during_leak_test, tag, title, description)
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.lds_status_during_leak(ws_client, config, leak)
+
+    @pytest.mark.asyncio
+    async def test_lds_status_after_leak_check(
+        self,
+        ws_client: WebSocketClient,
+        config: SmokeSuiteConfig,
+        leak: LeakTestConfig,
+        leak_number: int,
+    ) -> None:
+        """[CommonScheme] Проверка режима работы СОУ после обнаружения утечки"""
+        tag = "CommonScheme"
+        title = f"[{tag}] Проверка режима работы СОУ после обнаружения утечки. ЭФ: Схема"
+        _apply_allure_markers(
+            leak.lds_status_after_leak,
+            tag,
+            title,
+            (
+                f"Проверка режима работы СОУ во время утечки на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки: {leak.lds_status_after_leak.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Примечание: проверка режимов СОУ во время утечки должна выполняться раньше теста на квитирование\n"
+                "В рамках данного теста проверяется режим СОУ на ДУ с утечкой и на соседних ДУ"
+            ),
+        )
+        if config.has_multiple_leaks:
+            allure.dynamic.title(f"{title} (утечка #{leak_number})")
+        await scenarios.lds_status_after_leak_check(ws_client, config, leak)
 
     @pytest.mark.asyncio
     async def test_acknowledge_leak_info(
@@ -462,17 +541,21 @@ class TestLeakScenarios:
         """[AcknowledgeLeak] Проверка квитирования утечки"""
         tag = "AcknowledgeLeak"
         title = f"[{tag}] Проверка квитирования утечки. Отсутствие Пуш-сообщений об утечке на всех ЭФ"
-        description = (
-            "Проверка квитирования утечки на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: {leak.acknowledge_leak_test.offset} мин.\n"
-            "Синхронный запрос типа: AcknowledgeLeak\n"
-            "Подписка на сообщения типа: TuLeaksInfo, AllLeaksInfo\n"
-            "Проверки:\n"
-            "Статус-код ответа на синхронный запрос о квитировании,\n"
-            "Отсутствие пуш-сообщений об утечках после квитирования"
+        _apply_allure_markers(
+            leak.acknowledge_leak_test,
+            tag,
+            title,
+            (
+                "Проверка квитирования утечки на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки: {leak.acknowledge_leak_test.offset} мин.\n"
+                "Синхронный запрос типа: AcknowledgeLeak\n"
+                "Подписка на сообщения типа: TuLeaksInfo, AllLeaksInfo\n"
+                "Проверки:\n"
+                "Статус-код ответа на синхронный запрос о квитировании,\n"
+                "Отсутствие пуш-сообщений об утечках после квитирования"
+            ),
         )
-        _apply_allure_markers(leak.acknowledge_leak_test, tag, title, description)
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.acknowledge_leak_info(ws_client, config, leak)
@@ -488,7 +571,7 @@ class TestLeakScenarios:
     ) -> None:
         """[MessagesInfo] Проверка записи в журнале о квитировании утечки"""
         tag = "MessagesInfo"
-        title = f"[{tag}] Проверка записи в журнале о квитировании утечки. ЭФ: Журнал.Реальное время"
+        title = f"[{tag}] Проверка записи в журнале о квитировании утечки. ЭФ: Журнал. Реальное время"
         description = (
             f"Проверка записи о квитировании утечки в журнале на наборе данных {config.suite_name}, \n"
             f"на технологическом участке {config.technological_unit.description}\n"
@@ -498,7 +581,7 @@ class TestLeakScenarios:
         _apply_allure_markers(leak.acknowledge_leak_in_journal_test, tag, title, description)
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
-        await scenarios.acknowledge_leak_in_journal(ws_client, config, leak, imitator_start_time)
+        await scenarios.acknowledge_leak_in_journal(ws_client, config, imitator_start_time)
 
     @pytest.mark.asyncio
     async def test_output_signals(
@@ -515,20 +598,25 @@ class TestLeakScenarios:
             f"[{tag}] Проверка наличия данных об утечке в выходных сигналах. ЭФ: Диагностика сигналов.Выходные "
             f"сигналы"
         )
-        description = (
-            f"Проверка наличия данных об утечке в выходных сигналах на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: {leak.output_signals_test.offset} мин.\n"
-            "Синхронный запрос типа: GetOutputSignals\n"
-            "Подписка на сообщения типа: SubscribeOutputSignals\n"
-            f"Допустимое время обнаружения {leak.allowed_time_diff_minutes} мин. с момента начала утечки, "
-            f"т к для данных {config.suite_name} интенсивность утечки {leak.leak_rate_percentages}%.\n"
-            "Примечание: "
-            "В offset указано время проверок сообщения выходных сигналов + 1 минута "
-            "для корректной отработки проверок.\n"
-            "Данный тест так же проверяет квитирование, offset выставлять после запуска теста на квитирование утечки"
+        _apply_allure_markers(
+            leak.output_signals_test,
+            tag,
+            title,
+            (
+                f"Проверка наличия данных об утечке в выходных сигналах на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки: {leak.output_signals_test.offset} мин.\n"
+                "Синхронный запрос типа: GetOutputSignals\n"
+                "Подписка на сообщения типа: SubscribeOutputSignals\n"
+                f"Допустимое время обнаружения {leak.allowed_time_diff_minutes} мин. с момента начала утечки, "
+                f"т к для данных {config.suite_name} интенсивность утечки {leak.leak_rate_percentages}%.\n"
+                "Примечание: "
+                "В offset указано время проверок сообщения выходных сигналов + 1 минута "
+                "для корректной отработки проверок.\n"
+                "Данный тест так же проверяет квитирование, offset выставлять после запуска теста на квитирование "
+                "утечки"
+            ),
         )
-        _apply_allure_markers(leak.output_signals_test, tag, title, description)
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.output_signals(ws_client, config, leak, imitator_start_time)
@@ -545,16 +633,20 @@ class TestLeakScenarios:
         """[BalanceAlgorithmResultsContent] Проверка сообщения 'подозрение на утечку' в таблице КГ"""
         tag = "BalanceAlgorithmResultsContent"
         title = f"[{tag}] Проверка сообщения 'подозрение на утечку'. ЭФ: КГ.Графическое представление"
-        description = (
-            f"Проверка сообщения 'подозрение на утечку' в таблице КГ, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: "
-            f"{leak.balance_algorithm_leak_waiting_test.offset} - "
-            f"{leak.balance_algorithm_leak_waiting_test.offset + BaseTN3Constants.BALANCE_ALGORITHM_TOTAL_WAIT / 60} "
-            f"мин.\n"
-            "Подписка на сообщения типа: BalanceAlgorithmResultsContent\n"
+        _apply_allure_markers(
+            leak.balance_algorithm_leak_waiting_test,
+            tag,
+            title,
+            (
+                f"Проверка сообщения 'подозрение на утечку' в таблице КГ, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки: "
+                f"{leak.balance_algorithm_leak_waiting_test.offset} - "
+                f"{leak.balance_algorithm_leak_waiting_test.offset + base_const.BALANCE_ALGORITHM_TOTAL_WAIT / 60} "
+                f"мин.\n"
+                "Подписка на сообщения типа: BalanceAlgorithmResultsContent\n"
+            ),
         )
-        _apply_allure_markers(leak.balance_algorithm_leak_waiting_test, tag, title, description)
         # Добавляем номер утечки в title для multi-leak
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
@@ -571,13 +663,17 @@ class TestLeakScenarios:
         """[BalanceAlgorithmResultsContent] Проверка наличия утечки (isLeakDetected) в графическом представлении КГ"""
         tag = "BalanceAlgorithmResultsContent"
         title = f"[{tag}] Проверка наличия утечки (isLeakDetected). ЭФ: КГ Графическое представление"
-        description = (
-            f"Проверка наличия утечки (isLeakDetected) в графическом представлении КГ, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: {leak.balance_algorithm_leak_detected_test.offset} мин.\n"
-            "Подписка на сообщения типа: BalanceAlgorithmResultsContent\n"
+        _apply_allure_markers(
+            leak.balance_algorithm_leak_detected_test,
+            tag,
+            title,
+            (
+                f"Проверка наличия утечки (isLeakDetected) в графическом представлении КГ, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки: {leak.balance_algorithm_leak_detected_test.offset} мин.\n"
+                "Подписка на сообщения типа: BalanceAlgorithmResultsContent\n"
+            ),
         )
-        _apply_allure_markers(leak.balance_algorithm_leak_detected_test, tag, title, description)
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.balance_algorithm_leak_detected(ws_client, config, leak)

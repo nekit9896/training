@@ -91,14 +91,14 @@ class StepMessageBuilder:
         act_value: Any,
     ) -> str:
         message_parts = [
-            f"Ожидаемый результат: {self.field_name} = {self._format_val(exp_value)} не равен фактическому",
+            f"Ожидаемый результат: {self.field_name} = {self._format_val(exp_value)} не равно фактическому",
             f"Фактический результат: {self.field_name} = {self._format_val(act_value)}",
         ]
         return self._build_message(message_parts)
 
     def is_not_none(self, act_value: Any) -> str:
         message_parts = [
-            f"Ожидаемый результат: {self.field_name} не пустой",
+            f"Ожидаемый результат: {self.field_name} не пустое",
             f"Фактический результат: {self.field_name} = {self._format_val(act_value)}",
         ]
         return self._build_message(message_parts)
@@ -106,7 +106,7 @@ class StepMessageBuilder:
     def is_not_empty(self, act_value: Any) -> str:
         item_count = self._item_count(act_value)
         message_parts = [
-            f"Ожидаемый результат: {self.field_name} содержит хотя бы один элемент",
+            f"Ожидаемый результат: {self.field_name} не пустое",
             f"Фактический результат: количество элементов в {self.field_name} = {item_count}",
         ]
         return self._build_message(message_parts)
@@ -114,7 +114,7 @@ class StepMessageBuilder:
     def is_empty(self, act_value: Any) -> str:
         item_count = self._item_count(act_value)
         message_parts = [
-            f"Ожидаемый результат: {self.field_name} не содержит элементов",
+            f"Ожидаемый результат: {self.field_name} пустое",
             f"Фактический результат: количество элементов в {self.field_name} = {item_count}",
         ]
         return self._build_message(message_parts)

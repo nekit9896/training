@@ -58,7 +58,7 @@ SUITE_PARAMS: List[Any] = _generate_suite_params()
 def _apply_allure_markers(test_config: CaseMarkers, tag: str, title: str, description: Optional[str] = None) -> None:
     """Применяет allure-маркеры из конфига теста."""
     if not test_config:
-        pytest.skip("Тест не сконфигурирован для данного набора данных")
+        pytest.skip("Не заполнена конфигурация теста: тест пропущен")
     allure.dynamic.tag(tag)
     allure.dynamic.tag("REGRESS")
     allure.dynamic.title(title)
@@ -87,22 +87,24 @@ class TestSuiteScenarios:
         await scenarios.basic_info(ws_client, config)
 
     @pytest.mark.asyncio
-    async def test_lds_status_initialization_cold_start(
-        self, ws_client: WebSocketClient, config: LDSStatusConfig
-    ) -> None:
+    async def test_lds_status_init_cold_start(self, ws_client: WebSocketClient, config: LDSStatusConfig) -> None:
         """
         [CommonScheme] Проверка режима работы СОУ: Инициализация,
         Причина: Холодный пуск
         """
         tag = "CommonScheme"
         title = f"[{tag}] Проверка режима работы СОУ: 'Инициализация', по причине: 'Холодный пуск'. ЭФ: Схема"
-        _apply_allure_markers(config.lds_status_init_cold_start_test, tag, title)
-        allure.dynamic.description(
-            f"Проверка режима работы СОУ на базовых ДУ, на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки : {config.lds_status_init_cold_start_test.offset} мин.\n"
-            "Подписка на сообщения типа: CommonScheme\n"
-            "Ожидаемый режим работы СОУ: Инициализация\n Ожидаемая причина режима работы СОУ: Холодный пуск"
+        _apply_allure_markers(
+            config.lds_status_init_cold_start_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы СОУ на базовых ДУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки : {config.lds_status_init_cold_start_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Ожидаемый режим работы СОУ: Инициализация\n Ожидаемая причина режима работы СОУ: Холодный пуск"
+            ),
         )
         test_data = config.lds_status_init_cold_start_test_data
         await scenarios.lds_status_check_on_base_diagnostic_areas(ws_client, config, test_data)
@@ -112,18 +114,23 @@ class TestSuiteScenarios:
         self, ws_client: WebSocketClient, config: LDSStatusConfig
     ) -> None:
         """
-        [CommonScheme] Проверка перехода СОУ в режим Исправна, после второй Инициализации и выхода из Неисправности.
+        [CommonScheme] Проверка режима работы СОУ: Исправна.
+        Установка режима Исправна после Инициализации, по причине выхода из Неисправности.
         """
         tag = "CommonScheme"
         title = f"[{tag}] Проверка режима работы СОУ: 'Исправна' на базовых ДУ. ЭФ: Схема"
-        _apply_allure_markers(config.lds_status_serviceable_after_faulty_test, tag, title)
-        allure.dynamic.description(
-            "Проверка выхода СОУ из повторной Инициализации, после Неисправности, на базовых ДУ,"
-            f" на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки: {config.lds_status_serviceable_after_faulty_test.offset} мин.\n"
-            "Подписка на сообщения типа: CommonScheme\n"
-            "Ожидаемый режим работы СОУ: Исправна"
+        _apply_allure_markers(
+            config.lds_status_serviceable_after_faulty_test,
+            tag,
+            title,
+            (
+                "Проверка выхода СОУ из повторной Инициализации, после Неисправности, на показательных ДУ,"
+                f" на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки: {config.lds_status_serviceable_after_faulty_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Ожидаемый режим работы СОУ: Исправна"
+            ),
         )
         test_data = config.lds_status_serviceable_all_test_data
         await scenarios.lds_status_check_on_representative(ws_client, config, test_data)
@@ -134,7 +141,7 @@ class TestSuiteScenarios:
     ) -> None:
         """
         [CommonScheme] Проверка режима работы СОУ: Ухудшение характеристик
-        по причине расстояние между СИ давления более 50 км
+        Причина: расстояние между СИ давления более 50 км
         """
 
         tag = "CommonScheme"
@@ -143,16 +150,18 @@ class TestSuiteScenarios:
             "по причине: 'Расстояние между СИ давления более 50 км'. ЭФ: Схема"
         )
         _apply_allure_markers(
-            config.lds_status_deg_exceeding_distance_between_pressure_sensors_test, tag, title
-        )
-        allure.dynamic.description(
-            f"Проверка режима работы СОУ на базовых ДУ, на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            "Время проведения проверки : "
-            f"{config.lds_status_deg_exceeding_distance_between_pressure_sensors_test.offset} мин.\n"
-            "Подписка на сообщения типа: CommonScheme\n"
-            "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
-            "Ожидаемая причина режима работы СОУ: Расстояние между СИ давления более 50 км"
+            config.lds_status_deg_exceeding_distance_between_pressure_sensors_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы СОУ на выбранном ДУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                "Время проведения проверки : "
+                f"{config.lds_status_deg_exceeding_distance_between_pressure_sensors_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
+                "Ожидаемая причина режима работы СОУ: Расстояние между СИ давления более 50 км"
+            ),
         )
         test_data = config.lds_status_deg_exceeding_distance_between_pressure_sensors_test_data
         await scenarios.lds_status_check_with_reasons(ws_client, config, test_data)
@@ -162,7 +171,8 @@ class TestSuiteScenarios:
         self, ws_client: WebSocketClient, config: LDSStatusConfig
     ) -> None:
         """
-        [CommonScheme] Проверка режима работы СОУ: Ухудшение характеристик по причине менее 4 исправных СИ давления
+        [CommonScheme] Проверка режима работы СОУ: Ухудшение характеристик
+        Причина: менее 4 исправных СИ давления
         """
 
         tag = "CommonScheme"
@@ -170,17 +180,21 @@ class TestSuiteScenarios:
             f"[{tag}] Проверка режима работы СОУ: 'Ухудшение характеристик', "
             "по причине: 'менее 4 исправных СИ давления'. ЭФ: Схема"
         )
-        _apply_allure_markers(config.lds_status_deg_not_enough_pressure_sensors_test, tag, title)
-        allure.dynamic.description(
-            f"Проверка режима работы СОУ на базовых ДУ, на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            "Время проведения проверки : "
-            f"{config.lds_status_deg_not_enough_pressure_sensors_test.offset} мин.\n"
-            "Подписка на сообщения типа: CommonScheme\n"
-            "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
-            "Ожидаемая причина режима работы СОУ: Ухудшение При наличии менее четырех (3, 6) исправных СИ давления "
-            "на разных КП ЛЧ МТ/НПС на диагностическом участке (кроме случая нахождения трубопровода "
-            "в режиме остановленной перекачки)"
+        _apply_allure_markers(
+            config.lds_status_deg_not_enough_pressure_sensors_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы СОУ на выбранном ДУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                "Время проведения проверки : "
+                f"{config.lds_status_deg_not_enough_pressure_sensors_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
+                "Ожидаемая причина режима работы СОУ: Ухудшение При наличии менее четырех (3, 6) исправных СИ давления "
+                "на разных КП ЛЧ МТ/НПС на диагностическом участке (кроме случая нахождения трубопровода "
+                "в режиме остановленной перекачки)"
+            ),
         )
         test_data = config.lds_status_deg_not_enough_pressure_sensors_test_data
         await scenarios.lds_status_check_with_reasons(ws_client, config, test_data)
@@ -190,18 +204,23 @@ class TestSuiteScenarios:
         self, ws_client: WebSocketClient, config: LDSStatusConfig
     ) -> None:
         """
-        [CommonScheme] Проверка режима работы СОУ: Ухудшение характеристик по причине прохождения СОД
+        [CommonScheme] Проверка режима работы СОУ: Ухудшение характеристик
+        Причина: прохождение СОД
         """
         tag = "CommonScheme"
         title = f"[{tag}] Проверка режима работы СОУ: 'Ухудшение характеристик', по причине: 'прохождение СОД'"
-        _apply_allure_markers(config.lds_status_deg_pig_sensor_passage_test, tag, title)
-        allure.dynamic.description(
-            f"Проверка режима работы СОУ на базовых ДУ, на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки : {config.lds_status_deg_pig_sensor_passage_test.offset} мин.\n"
-            "Подписка на сообщения типа: CommonScheme\n"
-            "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
-            "Ожидаемая причина режима работы СОУ: прохождение СОД "
+        _apply_allure_markers(
+            config.lds_status_deg_pig_sensor_passage_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы СОУ на выбранном ДУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки : {config.lds_status_deg_pig_sensor_passage_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
+                "Ожидаемая причина режима работы СОУ: прохождение СОД "
+            ),
         )
         test_data = config.lds_status_deg_pig_sensor_passage_test_data
         await scenarios.lds_status_check_degradation_pig_sensor_passage(ws_client, config, test_data)
@@ -212,31 +231,66 @@ class TestSuiteScenarios:
     ) -> None:
         """
         [CommonScheme] Проверка режима работы СОУ: Ухудшение характеристик
-        по причине Наличие самотечного участка/участка с неполным сечением
+        Причина: Наличие самотечного участка/участка с неполным сечением
         """
         tag = "CommonScheme"
         title = (
             f"[{tag}] Проверка режима работы СОУ: 'Ухудшение характеристик', "
             "по причине: 'Наличие самотечного участка/участка с неполным сечением'"
         )
-        _apply_allure_markers(config.lds_status_deg_gravity_section_pumping_test, tag, title)
-        allure.dynamic.description(
-            f"Проверка режима работы СОУ на базовых ДУ, на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            f"Время проведения проверки : {config.lds_status_deg_gravity_section_pumping_test.offset} мин.\n"
-            "Подписка на сообщения типа: CommonScheme\n"
-            "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
-            "Ожидаемая причина режима работы СОУ: Наличие самотечного участка/участка с неполным сечением "
+        _apply_allure_markers(
+            config.lds_status_deg_gravity_section_pumping_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы СОУ на выбранном ДУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки : {config.lds_status_deg_gravity_section_pumping_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
+                "Ожидаемая причина режима работы СОУ: Наличие самотечного участка/участка с неполным сечением "
+            ),
         )
         test_data = config.lds_status_deg_gravity_section_pumping_test_data
         await scenarios.lds_status_check_with_reasons(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_lds_status_degradation_starting_pumping_out_pumps(
+        self, ws_client: WebSocketClient, config: LDSStatusConfig
+    ) -> None:
+        """
+        [CommonScheme] Проверка режима работы СОУ и МТ
+        Причина: Работа насосов откачки
+        """
+
+        tag = "CommonScheme"
+        title = f"[{tag}] Проверка режимов работы СОУ и МТ, по причине: 'Работа насосов откачки'. ЭФ: Схема"
+        _apply_allure_markers(
+            config.lds_status_deg_starting_pumping_out_pumps_test,
+            tag,
+            title,
+            (
+                f"Проверка режимов работы СОУ и МТ на выбранном ДУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                "Время проведения проверки : "
+                f"{config.lds_status_deg_starting_pumping_out_pumps_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
+                "Ожидаемый режим работы МТ: Нестационарный\n "
+                "Ожидаемая причина режима работы СОУ: Работа насосов откачки"
+                "Ожидаемая причина режима работы МТ: Работа насосов откачки"
+            ),
+        )
+        test_data = config.lds_status_deg_starting_pumping_out_pumps_test_data
+        await scenarios.lds_and_stationary_status_check_with_reasons(ws_client, config, test_data)
 
     @pytest.mark.asyncio
     async def test_lds_status_degradation_exceeding_distance_between_flow_meters(
         self, ws_client: WebSocketClient, config: LDSStatusConfig
     ) -> None:
         """
-        [CommonScheme] Проверка режима работы СОУ: Расстояние между СИ расхода на пути перекачки более 200 км
+        [CommonScheme] Проверка режима работы СОУ: Ухудшение характеристик
+        Причина: Расстояние между СИ расхода на пути перекачки более 200 км
         """
 
         tag = "CommonScheme"
@@ -245,16 +299,242 @@ class TestSuiteScenarios:
             "по причине: 'Расстояние между СИ расхода на пути перекачки более 200 км'. ЭФ: Схема"
         )
         _apply_allure_markers(
-            config.lds_status_deg_exceeding_distance_between_flow_meters_test, tag, title
-        )
-        allure.dynamic.description(
-            f"Проверка режима работы СОУ на базовых ДУ, на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
-            "Время проведения проверки : "
-            f"{config.lds_status_deg_exceeding_distance_between_flow_meters_test.offset} мин.\n"
-            "Подписка на сообщения типа: CommonScheme\n"
-            "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
-            "Ожидаемая причина режима работы СОУ: Расстояние между СИ расхода на пути перекачки более 200 км"
+            config.lds_status_deg_exceeding_distance_between_flow_meters_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы СОУ на выбранном ДУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                "Время проведения проверки : "
+                f"{config.lds_status_deg_exceeding_distance_between_flow_meters_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
+                "Ожидаемая причина режима работы СОУ: Расстояние между СИ расхода на пути перекачки более 200 км"
+            ),
         )
         test_data = config.lds_status_deg_exceeding_distance_between_flow_meters_test_data
         await scenarios.lds_status_check_with_reasons(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_lds_status_faulty_absence_min_flow_meters(
+        self, ws_client: WebSocketClient, config: LDSStatusConfig
+    ) -> None:
+        """
+        [CommonScheme] Проверка режима работы СОУ: Неисправна
+        Причина: Отсутствие минимального количества СИ Расхода
+        """
+
+        tag = "CommonScheme"
+        title = (
+            f"[{tag}] Проверка режима работы СОУ: 'Неисправна', "
+            "по причине: 'Отсутствие минимального количества СИ Расхода'. ЭФ: Схема"
+        )
+        _apply_allure_markers(
+            config.lds_status_faulty_absence_min_flow_meters_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы СОУ на выбранном ДУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                "Время проведения проверки : "
+                f"{config.lds_status_faulty_absence_min_flow_meters_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Ожидаемый режим работы СОУ: Неисправна\n "
+                "Ожидаемая причина режима работы СОУ: При одновременном выполнении следующих условий:"
+                "- отсутствие достоверных показаний граничного на диагностическом участке СИ расхода (кроме "
+                "отсеченных от рассматриваемого участка СИ расхода для трубопровода в режиме остановленной перекачки);"
+                "- отсутствие смежного с данным СИ расхода диагностического участка "
+                "с достоверными показаниями СИ расхода2"
+            ),
+        )
+        test_data = config.lds_status_faulty_absence_min_flow_meters_test_data
+        await scenarios.lds_status_check_with_reasons(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_lds_status_degradation_rejection_temperature_sensor_on_du_2(
+        self, ws_client: WebSocketClient, config: LDSStatusConfig
+    ) -> None:
+        """
+        [CommonScheme] Проверка режима работы СОУ: Ухудшение характеристик
+        Причина: Отказ СИ температуры
+        """
+
+        tag = "CommonScheme"
+        title = (
+            f"[{tag}] Проверка режима работы СОУ на ДУ 2: 'Ухудшение характеристик', "
+            "по причине: 'Отказ СИ температуры'. ЭФ: Схема"
+        )
+        _apply_allure_markers(
+            config.lds_status_deg_rejection_temperature_sensor_on_du_2_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы СОУ на ДУ 2, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                "Время проведения проверки : "
+                f"{config.lds_status_deg_rejection_temperature_sensor_on_du_2_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
+                "Ожидаемая причина режима работы СОУ: Отказ СИ температуры"
+            ),
+        )
+        test_data = config.lds_status_deg_rejection_temperature_sensor_on_du_2_test_data
+        await scenarios.lds_status_check_with_reasons(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_lds_status_degradation_rejection_temperature_sensor_on_du_3(
+        self, ws_client: WebSocketClient, config: LDSStatusConfig
+    ) -> None:
+        """
+        [CommonScheme] Проверка режима работы СОУ: Ухудшение характеристик
+        Причина: Отказ СИ температуры
+        """
+
+        tag = "CommonScheme"
+        title = (
+            f"[{tag}] Проверка режима работы СОУ на ДУ 3: 'Ухудшение характеристик', "
+            "по причине: 'Отказ СИ температуры'. ЭФ: Схема"
+        )
+        _apply_allure_markers(
+            config.lds_status_deg_rejection_temperature_sensor_on_du_3_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы СОУ на ДУ 3, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                "Время проведения проверки : "
+                f"{config.lds_status_deg_rejection_temperature_sensor_on_du_3_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
+                "Ожидаемая причина режима работы СОУ: Отказ СИ температуры"
+            ),
+        )
+        test_data = config.lds_status_deg_rejection_temperature_sensor_on_du_3_test_data
+        await scenarios.lds_status_check_with_reasons(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_lds_status_degradation_rejection_temperature_sensor_on_du_5(
+        self, ws_client: WebSocketClient, config: LDSStatusConfig
+    ) -> None:
+        """
+        [CommonScheme] Проверка режима работы СОУ: Ухудшение характеристик
+        Причина: Отказ СИ температуры
+        """
+
+        tag = "CommonScheme"
+        title = (
+            f"[{tag}] Проверка режима работы СОУ на ДУ 5: 'Ухудшение характеристик', "
+            "по причине: 'Отказ СИ температуры'. ЭФ: Схема"
+        )
+        _apply_allure_markers(
+            config.lds_status_deg_rejection_temperature_sensor_on_du_5_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы СОУ на ДУ 5, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                "Время проведения проверки : "
+                f"{config.lds_status_deg_rejection_temperature_sensor_on_du_5_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
+                "Ожидаемая причина режима работы СОУ: Отказ СИ температуры"
+            ),
+        )
+        test_data = config.lds_status_deg_rejection_temperature_sensor_on_du_5_test_data
+        await scenarios.lds_status_check_with_reasons(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_lds_status_degradation_rejection_density_and_viscosity_on_du_2(
+        self, ws_client: WebSocketClient, config: LDSStatusConfig
+    ) -> None:
+        """
+        [CommonScheme] Проверка режима работы СОУ: Ухудшение характеристик
+        Причины: Отказ СИ плотности и СИ вязкости
+        """
+
+        tag = "CommonScheme"
+        title = (
+            f"[{tag}] Проверка режима работы СОУ на ДУ 2: 'Ухудшение характеристик', "
+            "по причинам: 'Отказ СИ плотности' и 'Отказ СИ вязкости'. ЭФ: Схема"
+        )
+        _apply_allure_markers(
+            config.lds_status_deg_rejection_density_and_viscosity_on_du_2_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы СОУ на ДУ 2, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                "Время проведения проверки : "
+                f"{config.lds_status_deg_rejection_density_and_viscosity_on_du_2_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
+                "Ожидаемая причина режима работы СОУ: Отказ СИ плотности"
+                "Ожидаемая причина режима работы СОУ: Отказ СИ вязкости"
+            ),
+        )
+        test_data = config.lds_status_deg_rejection_density_and_viscosity_on_du_2_test_data
+        await scenarios.lds_status_check_with_2_reasons(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_lds_status_degradation_rejection_density_and_viscosity_on_du_3(
+        self, ws_client: WebSocketClient, config: LDSStatusConfig
+    ) -> None:
+        """
+        [CommonScheme] Проверка режима работы СОУ: Ухудшение характеристик
+        Причины: Отказ СИ плотности и СИ вязкости
+        """
+
+        tag = "CommonScheme"
+        title = (
+            f"[{tag}] Проверка режима работы СОУ на ДУ 3: 'Ухудшение характеристик', "
+            "по причинам: 'Отказ СИ плотности' и 'Отказ СИ вязкости'. ЭФ: Схема"
+        )
+        _apply_allure_markers(
+            config.lds_status_deg_rejection_density_and_viscosity_on_du_3_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы СОУ на ДУ 3, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                "Время проведения проверки : "
+                f"{config.lds_status_deg_rejection_density_and_viscosity_on_du_3_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
+                "Ожидаемая причина режима работы СОУ: Отказ СИ плотности"
+                "Ожидаемая причина режима работы СОУ: Отказ СИ вязкости"
+            ),
+        )
+        test_data = config.lds_status_deg_rejection_density_and_viscosity_on_du_3_test_data
+        await scenarios.lds_status_check_with_2_reasons(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_lds_status_degradation_rejection_density_and_viscosity_on_du_5(
+        self, ws_client: WebSocketClient, config: LDSStatusConfig
+    ) -> None:
+        """
+        [CommonScheme] Проверка режима работы СОУ: Ухудшение характеристик
+        Причины: Отказ СИ плотности и СИ вязкости
+        """
+
+        tag = "CommonScheme"
+        title = (
+            f"[{tag}] Проверка режима работы СОУ на ДУ 5: 'Ухудшение характеристик', "
+            "по причинам: 'Отказ СИ плотности' и 'Отказ СИ вязкости'. ЭФ: Схема"
+        )
+        _apply_allure_markers(
+            config.lds_status_deg_rejection_density_and_viscosity_on_du_5_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы СОУ на ДУ 5, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                "Время проведения проверки : "
+                f"{config.lds_status_deg_rejection_density_and_viscosity_on_du_5_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
+                "Ожидаемая причина режима работы СОУ: Отказ СИ плотности"
+                "Ожидаемая причина режима работы СОУ: Отказ СИ вязкости"
+            ),
+        )
+        test_data = config.lds_status_deg_rejection_density_and_viscosity_on_du_5_test_data
+        await scenarios.lds_status_check_with_2_reasons(ws_client, config, test_data)
