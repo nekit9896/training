@@ -108,11 +108,13 @@ SMOKE_SUITE_LEVEL_MAPPING = {
     'test_basic_info': 'basic_info_test',
     'test_journal_info': 'journal_info_test',
     'test_lds_status_initialization': 'lds_status_initialization_test',
+    'test_lds_status_init_in_journal': 'lds_status_init_in_journal_test',
     'test_main_page_info': 'main_page_info_test',
     'test_main_page_info_signals': 'main_page_info_signals_test',
     'test_mask_signal_msg': 'mask_signal_test',
     'test_mask_info_in_journal': 'mask_info_in_journal_test',
     'test_lds_status_initialization_out': 'lds_status_initialization_out_test',
+    'test_lds_status_init_out_in_journal': 'lds_status_init_out_in_journal_test',
     'test_main_page_info_unstationary': 'main_page_info_unstationary_test',
     'test_mask_du_on_mini_scheme': 'mask_du_on_mini_scheme_test',
     'test_unmask_du_on_mini_scheme': 'unmask_du_on_mini_scheme_test',
@@ -151,7 +153,6 @@ LEAK_LEVEL_TEST_MAPPING = {
     'test_lds_status_during_leak': 'lds_status_during_leak_test',
     'test_balance_algorithm_leak_waiting': 'balance_algorithm_leak_waiting_test',
     'test_balance_algorithm_leak_detected': 'balance_algorithm_leak_detected_test',
-    'test_lds_status_after_leak_check': 'lds_status_after_leak_check_test',
 }
 
 # Мержим все вместе чтобы не переписывать логику коллектора айтемов (тестов)

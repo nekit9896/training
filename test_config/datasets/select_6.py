@@ -58,18 +58,19 @@ SELECT_6_CONFIG = SmokeSuiteConfig(
     basic_info_test=CaseMarkers(test_case_id="1", offset=5),
     journal_info_test=CaseMarkers(test_case_id="2", offset=5),
     lds_status_initialization_test=CaseMarkers(test_case_id="29", offset=5),
+    lds_status_init_in_journal_test=CaseMarkers(test_case_id="", offset=5),
     main_page_info_test=CaseMarkers(test_case_id="3", offset=7),
     main_page_info_signals_test=CaseMarkers(test_case_id="120", offset=7),
     mask_signal_test=CaseMarkers(test_case_id="32", offset=8),
     mask_info_in_journal_test=CaseMarkers(test_case_id="", offset=9),
     lds_status_initialization_out_test=CaseMarkers(test_case_id="30", offset=30),
+    lds_status_init_out_in_journal_test=CaseMarkers(test_case_id="", offset=31),
     # ===== КОНФИГУРАЦИЯ УТЕЧКИ =====
     leak=LeakTestConfig(
         # ----- Конфигурация статусов СОУ во время утечки -----
         lds_status_during_leak_config=DiagnosticAreaStatusConfig(
             leak_diagnostic_area_id=LEAK_DIAGNOSTIC_AREA_ID,
             leak_du_expected_lds_status=LdsStatus.INITIALIZATION.value,
-            leak_du_expected_lds_status_after_leak=LdsStatus.INITIALIZATION.value,
             in_neighbors={
                 IN_NEIGHBOR_DIAGNOSTIC_AREA_ID: LdsStatus.DEGRADATION.value,
             },
@@ -106,7 +107,6 @@ SELECT_6_CONFIG = SmokeSuiteConfig(
         tu_leaks_info_test=CaseMarkers(test_case_id="5", offset=59),
         # ----- Тест CommonSchemeContent -----
         lds_status_during_leak_test=CaseMarkers(test_case_id="31", offset=59.5),
-        lds_status_after_leak_check_test=CaseMarkers(test_case_id="", offset=65),
         # ----- Тест AcknowledgeLeak -----
         acknowledge_leak_test=CaseMarkers(test_case_id="6", offset=60),
         # ----- Тест OutputSignals -----

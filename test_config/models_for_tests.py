@@ -90,7 +90,6 @@ class DiagnosticAreaStatusConfig:
 
     leak_diagnostic_area_id: int
     leak_du_expected_lds_status: int
-    leak_du_expected_lds_status_after_leak: int = None
 
     # Соседние ДУ и их статусы: словари {diagnostic_area_id: leak_du_expected_lds_status}
     # Позволяет указывать 0..N соседей независимо от in/out.
@@ -140,7 +139,6 @@ class LeakTestConfig:
 
     # ===== Конфигурация статусов СОУ во время утечки =====
     lds_status_during_leak_config: Optional[DiagnosticAreaStatusConfig] = None
-    lds_status_after_leak: Optional[DiagnosticAreaStatusConfig] = None
 
     # ===== Тест-кейсы для этой утечки =====
     balance_algorithm_leak_waiting_test: Optional[CaseMarkers] = None
@@ -154,7 +152,6 @@ class LeakTestConfig:
     acknowledge_leak_in_journal_test: Optional[CaseMarkers] = None
     output_signals_test: Optional[CaseMarkers] = None
     lds_status_during_leak_test: Optional[CaseMarkers] = None
-    lds_status_after_leak_check_test: Optional[CaseMarkers] = None
 
     @property
     def leak_diagnostic_area_id(self) -> Optional[int]:
@@ -215,11 +212,13 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     basic_info_test: Optional[CaseMarkers] = None
     journal_info_test: Optional[CaseMarkers] = None
     lds_status_initialization_test: Optional[CaseMarkers] = None
+    lds_status_init_in_journal_test: Optional[CaseMarkers] = None
     main_page_info_test: Optional[CaseMarkers] = None
     main_page_info_signals_test: Optional[CaseMarkers] = None
     mask_signal_test: Optional[CaseMarkers] = None
     mask_info_in_journal_test: Optional[CaseMarkers] = None
     lds_status_initialization_out_test: Optional[CaseMarkers] = None
+    lds_status_init_out_in_journal_test: Optional[CaseMarkers] = None
     mask_du_on_mini_scheme_test: Optional[CaseMarkers] = None
     unmask_du_on_mini_scheme_test: Optional[CaseMarkers] = None
 
