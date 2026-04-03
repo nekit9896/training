@@ -77,6 +77,7 @@ class BaseTN3Constants:
     JOURNAL_EVENT_LDS_INIT_ACCUM_DATA = "СОУ в инициализации (Накопление данных)"
     JOURNAL_EVENT_LDS_INIT_COLD_START = "СОУ в инициализации (Одновременный «холодный» запуск нескольких серверов СОУ)"
     JOURNAL_MESSAGE_TYPE_LDS_STATUS = "Режим работы СОУ"
+    JOURNAL_MESSAGE_TYPE_REJECTION = "Отбраковка"
 
     # ===== Параметры подтверждения =====
     IS_ACKNOWLEDGED_FALSE = False

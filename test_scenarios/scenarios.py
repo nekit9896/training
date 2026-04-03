@@ -14,7 +14,14 @@ import pytest
 from constants.enums import Direction, LdsStatus, MessageType, ReplyStatus, StationaryStatus, UserActions
 from constants.test_constants import BaseTN3Constants as TestConst
 from models.get_messages_model import Filtering, FilteringObjects, Pagination
-from test_config.models_for_tests import CaseData, LDSStatusConfig, LeakTestConfig, SmokeSuiteConfig
+from test_config.models_for_tests import (
+    CaseData,
+    IsRejectedConfig,
+    LDSStatusConfig,
+    LeakTestConfig,
+    RejectionTestCase,
+    SmokeSuiteConfig,
+)
 from utils.helpers import ws_test_utils as t_utils
 from utils.helpers.asserts import SoftAssertions, StepCheck
 from utils.helpers.ws_message_parser import ws_message_parser as parser
@@ -2086,3 +2093,215 @@ async def balance_algorithm_leak_detected(ws_client, cfg: SmokeSuiteConfig, leak
                 soft_failures,
             ).actual(abs(leak_diagnostic_area.debalance)).is_greater_than(threshold)
 
+
+# ===== Сценарии отбраковки сигналов =====
+async def rejection_input_signals(ws_client, cfg: IsRejectedConfig, rejection_case: RejectionTestCase):
+    """
+    Проверка отбраковки сигнала по подписке SubscribeInputSignalsRequest.
+    Проверяет isRejected=True для указанного датчика.
+    """
+    sensor = rejection_case.sensor
+    with allure.step(
+        f"Подключение по ws, получение данных InputSignalsContent для датчика {sensor.description} (id={sensor.id})"
+    ):
+        payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "InputSignalsContent",
+            "SubscribeInputSignalsRequest",
+            {
+                'signalIds': [sensor.id],
+                'tuId': cfg.tu_id,
+                'additionalProperties': None,
+            },
+        )
+        parsed_payload = parser.parse_input_signals_info_msg(payload)
+        sensor_data = parsed_payload.replyContent.inputSignals
+        target_signal = t_utils.find_object_by_field(sensor_data, "id", sensor.id)
+
+    with SoftAssertions() as soft_failures:
+        StepCheck(
+            f"Проверка отбраковки датчика {sensor.description} (id={sensor.id})", "isRejected", soft_failures
+        ).actual(target_signal.isRejected).expected(True).equal_to()
+
+
+async def rejection_journal(
+    ws_client, cfg: IsRejectedConfig, rejection_case: RejectionTestCase, imitator_start_time
+):
+    """
+    Проверка наличия записи об отбраковке в журнале по GetMessagesRequest.
+    """
+    sensor = rejection_case.sensor
+    with allure.step("Запрос сообщений журнала с фильтром messageTypes=REJECTION"):
+        end_time = datetime.now()
+        request_body = t_utils.create_journal_req_body(
+            pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
+            filtering=Filtering(
+                messageTypes=int(MessageType.REJECTION),
+                objects=FilteringObjects(tuId=cfg.tu_id),
+            ),
+        )
+        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        parsed_payload = parser.parse_journal_msg(payload)
+        messages_info = parsed_payload.replyContent.messagesInfo
+
+        StepCheck("Проверка наличия сообщений в журнале", "messagesInfo").actual(messages_info).is_not_empty()
+
+    with allure.step("Фильтрация сообщений по времени и technologicalSection"):
+        filter_start_msk = t_utils.localize_as_moscow(imitator_start_time)
+        filter_end_msk = t_utils.localize_as_moscow(end_time)
+
+        time_filtered = [
+            msg
+            for msg in messages_info
+            if filter_start_msk <= t_utils.ensure_moscow_timezone(msg.time) <= filter_end_msk
+        ]
+        time_filtered.sort(key=lambda msg: t_utils.ensure_moscow_timezone(msg.time), reverse=True)
+
+        target_msg = next(
+            (
+                msg
+                for msg in time_filtered
+                if msg.technologicalSection == cfg.tu_name and msg.tag == sensor.description
+            ),
+            None,
+        )
+
+        allure.attach(
+            f"Всего получено сообщений: {len(messages_info)}\n"
+            f"После фильтрации по времени ({filter_start_msk} - {filter_end_msk}): {len(time_filtered)}\n"
+            f"Проверка: найдено ли сообщение с technologicalSection='{cfg.tu_name}' "
+            f"и tag='{sensor.description}' (id={sensor.id}): {'True' if target_msg else 'False'}",
+            name="Результат фильтрации сообщений журнала",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+    with allure.step(
+        f"Проверка: найдено ли сообщение с tag='{sensor.description}' (id={sensor.id}) "
+        f"и technologicalSection='{cfg.tu_name}'"
+    ):
+        if target_msg is None:
+            pytest.fail(
+                f"Сообщение с technologicalSection='{cfg.tu_name}' и tag='{sensor.description}' (id={sensor.id}) "
+                f"не найдено среди {len(time_filtered)} отфильтрованных по времени сообщений"
+            )
+
+    with SoftAssertions() as soft_failures:
+        StepCheck("Проверка mainPipeline", "mainPipeline", soft_failures).actual(
+            target_msg.mainPipeline
+        ).expected(cfg.main_pipeline).equal_to()
+
+        StepCheck("Проверка messageType", "messageType", soft_failures).actual(
+            target_msg.messageType
+        ).expected(TestConst.JOURNAL_MESSAGE_TYPE_REJECTION).equal_to()
+
+        StepCheck("Проверка technologicalSection не пустой", "technologicalSection", soft_failures).actual(
+            target_msg.technologicalSection
+        ).is_not_none()
+
+        StepCheck("Проверка technologicalObject не пустой", "technologicalObject", soft_failures).actual(
+            target_msg.technologicalObject
+        ).is_not_none()
+
+        StepCheck(f"Проверка tag для {sensor.description} (id={sensor.id})", "tag", soft_failures).actual(
+            target_msg.tag
+        ).expected(sensor.description).equal_to()
+
+        if rejection_case.expected_signal_name:
+            StepCheck("Проверка signalName", "signalName", soft_failures).actual(
+                target_msg.signalName
+            ).expected(rejection_case.expected_signal_name).equal_to()
+
+        if rejection_case.expected_event:
+            StepCheck("Проверка event", "event", soft_failures).actual(
+                target_msg.event
+            ).expected(rejection_case.expected_event).equal_to()
+
+
+async def rejection_main_page(ws_client, cfg: IsRejectedConfig):
+    """
+    Проверка numberOfRejectedSignals > 0 по подписке subscribeMainPageSignalsInfoRequest.
+    """
+    with allure.step("Подключение по ws, получение и обработка сообщения типа: MainPageSignalsInfoContent"):
+        payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "MainPageSignalsInfoContent",
+            "subscribeMainPageSignalsInfoRequest",
+            {'tuIds': [cfg.tu_id], 'additionalProperties': None},
+        )
+        parsed_payload = parser.parse_main_page_signals_msg(payload)
+
+    with SoftAssertions() as soft_failures:
+        StepCheck("Проверка id полученного ТУ", "tu_id", soft_failures).actual(
+            parsed_payload.replyContent.tuId
+        ).expected(cfg.tu_id).equal_to()
+
+        StepCheck(
+            f"Проверка numberOfRejectedSignals > 0 для ТУ {cfg.tu_name}",
+            "numberOfRejectedSignals",
+            soft_failures,
+        ).actual(
+            parsed_payload.replyContent.signalsInfo.numberOfRejectedSignals
+        ).is_greater_than(0)
+
+
+async def rejection_scheme_signals_state(
+    ws_client, cfg: IsRejectedConfig, rejection_case: RejectionTestCase
+):
+    """
+    Проверка отбраковки сигнала по подписке SubscribeSchemeSignalsStateRequest.
+    Проверяет isRejected, isMasked, isImitated и rejection.criteriaNames.
+    """
+    sensor = rejection_case.sensor
+    with allure.step(
+        f"Подключение по ws, получение данных SchemeSignalsStateContent для датчика {sensor.description} (id={sensor.id})"
+    ):
+        payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "SchemeSignalsStateContent",
+            "SubscribeSchemeSignalsStateRequest",
+            {'tuId': cfg.tu_id},
+        )
+        parsed_payload = parser.parse_scheme_signals_state_msg(payload)
+        signals = parsed_payload.replyContent.signalsStates
+
+        target_signal = next(
+            (signal for signal in signals if signal.id == sensor.id),
+            None,
+        )
+
+        allure.attach(
+            f"Всего сигналов получено: {len(signals)}\n"
+            f"Поиск сигнала с id={sensor.id} ({sensor.description}): "
+            f"{'Найден' if target_signal else 'Не найден'}",
+            name="Результат поиска сигнала в SchemeSignalsState",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+    with allure.step(f"Проверка: найден ли сигнал с id={sensor.id} ({sensor.description})"):
+        if target_signal is None:
+            pytest.fail(
+                f"Сигнал с id={sensor.id} ({sensor.description}) "
+                f"не найден среди {len(signals)} полученных сигналов"
+            )
+
+    with SoftAssertions() as soft_failures:
+        StepCheck(
+            f"Проверка isRejected для {sensor.description} (id={sensor.id})", "isRejected", soft_failures
+        ).actual(target_signal.isRejected).expected(True).equal_to()
+
+        StepCheck(
+            f"Проверка isMasked для {sensor.description} (id={sensor.id})", "isMasked", soft_failures
+        ).actual(target_signal.isMasked).expected(False).equal_to()
+
+        StepCheck(
+            f"Проверка isImitated для {sensor.description} (id={sensor.id})", "isImitated", soft_failures
+        ).actual(target_signal.isImitated).expected(False).equal_to()
+
+        if target_signal.rejection is not None:
+            StepCheck(
+                f"Проверка rejection.criteriaNames для {sensor.description} (id={sensor.id})",
+                "criteriaNames",
+                soft_failures,
+            ).actual(
+                target_signal.rejection.get('criteriaNames') if isinstance(target_signal.rejection, dict) else None
+            ).expected(rejection_case.expected_criteria_names).equal_to()

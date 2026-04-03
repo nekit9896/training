@@ -23,6 +23,7 @@ from models.subscribe_balance_algorithm_results_model import SubscribeBalanceAlg
 from models.subscribe_common_scheme_model import SubscribeCommonSchemeReply
 from models.subscribe_input_signals_model import InputSignal, SubscribeInputSignalsContent, SubscribeInputSignalsReply
 from models.subscribe_leaks_model import SubscribeLeaksReply
+import models.subscribe_scheme_signals_state_model as signals_state_model
 from models.subscribe_main_page_info_model import SubscribeMainPageInfoReply
 from models.subscribe_main_page_signals_info_model import SubscribeMainPageSignalsInfoReply
 from models.subscribe_output_signals_model import SubscribeOutputSignalsReply
@@ -31,6 +32,10 @@ from models.unmask_signal_model import UnmaskSignalReply
 
 MessageType = TypeVar("MessageType")  # создает типовую переменную для парсинга сообщений
 ContentType = TypeVar("ContentType")
+
+
+_SIGNAL_DATA_POSITION = 1
+_MIN_SIGNAL_TUPLE_LENGTH = 2
 
 
 class WsMessageParser:
@@ -112,11 +117,10 @@ class WsMessageParser:
             replyErrors=payload.get('replyErrors'),
             replyContent=SubscribeInputSignalsContent(
                 tuId=reply_content.get('tuId'),
-                # Получает второй элемент из списка и парсит его
                 inputSignals=[
-                    self._parse_message(InputSignal, item[1])
+                    self._parse_message(InputSignal, item[_SIGNAL_DATA_POSITION])
                     for item in input_signals_list
-                    if isinstance(item, list) and isinstance(item[1], dict)
+                    if self._is_valid_signal_tuple(item)
                 ],
             ),
         )
@@ -190,6 +194,20 @@ class WsMessageParser:
         """
         return self._find_and_parse_message(data_class=SubscribeTuLeaksInfoReply, data=data)
 
+    def parse_scheme_signals_state_msg(self, data: list) -> signals_state_model.SchemeSignalsStateReply:
+        """
+        Парсит сообщение SchemeSignalsStateContent.
+        signalsStates приходят как [[signal_type, data_dict], ...] - конвертируем кортежи в словари.
+        """
+        payload = self._find_reply_status_in_ws_msg(data)
+        reply_content = payload.get('replyContent', {})
+        reply_content['signalsStates'] = [
+            item[_SIGNAL_DATA_POSITION]
+            for item in reply_content.get('signalsStates', [])
+            if self._is_valid_signal_tuple(item)
+        ]
+        return self._parse_message(data_class=signals_state_model.SchemeSignalsStateReply, data=payload)
+
     def parse_unmask_signal_msg(self, data: list) -> UnmaskSignalReply:
         """
         Парсит сообщение UnmaskSignal
@@ -239,6 +257,15 @@ class WsMessageParser:
             return message
         except DaciteError as error:
             fail(f"Ошибка парсинга сообщения типа: {data_class_name} текст ошибки: {error}")
+
+    @staticmethod
+    def _is_valid_signal_tuple(item: Any) -> bool:
+        """Проверяет, что элемент - кортеж/список [signal_type, signal_data_dict]."""
+        return (
+            isinstance(item, (list, tuple))
+            and len(item) >= _MIN_SIGNAL_TUPLE_LENGTH
+            and isinstance(item[_SIGNAL_DATA_POSITION], dict)
+        )
 
     @staticmethod
     def _find_reply_status_in_ws_msg(data: List[Any]) -> Optional[Dict[str, Any]]:

@@ -1,0 +1,359 @@
+asyncapi: 3.0.0
+info:
+  title: |
+    API Gateway Websockets API for subscribing signal's dynamic data on scheme.
+  version: '1.0.0'
+  description: WebSockets API for API-GW
+servers:
+  prod:
+    host: localhost
+    pathname: "/"
+    protocol: https
+    description: |
+      Public server available without authorization.
+      Once the socket is open you can subscribe to a public channel by sending
+      a subscribe request message.
+  develop:
+    host: "192.168.1.1"
+    pathname: "/"
+    protocol: wss
+    description: |
+      Public server available without authorization.
+      Once the socket is open you can subscribe to a public channel by sending
+      a subscribe request message.
+channels:
+  ldsMain:
+    address: "/hub"
+    messages:
+      subscribeSchemeSignalsStateRequest:
+        $ref: '#/components/messages/subscribeSchemeSignalsStateRequest'
+      subscribeSchemeSignalsStateReply:
+        $ref: '#/components/messages/subscribeSchemeSignalsStateReply'
+operations:
+  subscribeSchemeSignalsState:
+    title: subscribeSchemeSignalsState
+    description: Метод позволяет получить данные об измении состояния сигналов.
+    action: send
+    channel:
+      $ref: '#/channels/ldsMain'
+    messages:
+      - $ref: '#/channels/ldsMain/messages/subscribeSchemeSignalsStateRequest'
+    reply:
+      messages:
+        - $ref: '#/channels/ldsMain/messages/subscribeSchemeSignalsStateReply'
+components:
+  messages:
+    subscribeSchemeSignalsStateRequest:
+      title: subscribeSchemeSignalsStateRequest
+      description: Запрос передаёт идентификатор схемы.
+      payload:
+        $ref: '#/components/schemas/subscribeSchemeSignalsStateRequest'
+      x-response:
+        $ref: '#/components/schemas/subscribeSchemeSignalsStateReply'
+      examples:
+        - payload:
+            tuId: 123
+    subscribeSchemeSignalsStateReply:
+      title: subscribeSchemeSignalsStateRequest
+      summary: Ответ на запрос subscribeTiEquipmentStateRequest
+      payload:
+        $ref: '#/components/schemas/subscribeSchemeSignalsStateReply'
+      examples:
+        - name: OK
+          payload:
+            replyStatus: 200
+            replyContent:
+              signalsStates:
+                - id: 123
+                  value: 1
+                  quality: 2
+                  isMasked: true
+                  imitation:
+                    isImitated: true
+                    imitationValue: 3
+                    imitationQuality: 4
+                  rejection:
+                    isRejected: true
+                    rejectionCriteriaNames:
+                      - qualityRejection
+              toStates:
+                - id: 123
+                  isInWork: true
+        - name: Bad request
+          payload:
+            replyStatus: 400
+            replyErrors:
+              - errorType: UNKNOWN
+                reason: Иная ошибка клиента, не описанная в примерах
+        - name: Unauthorized
+          payload:
+            replyStatus: 401
+            replyErrors:
+              - errorType: UNAUTHORIZED
+                reason: Неавторизованный запрос
+        - name: Permission denied
+          payload:
+            replyStatus: 403
+            replyErrors:
+              - errorType: PERMISSION_DENIED
+                reason: Недостаточно полномочий
+        - name: Not found
+          payload:
+            replyStatus: 404
+            replyErrors:
+              - errorType: NOT_FOUND
+                reason: ТУ не найден
+                location: tuId
+        - name: Request timeout
+          payload:
+            replyStatus: 408
+            replyErrors:
+              - errorType: REQUEST_TIMEOUT
+                reason: Время ожидания ответа сервером истекло
+        - name: Too many requests
+          payload:
+            replyStatus: 429
+            replyErrors:
+              - errorType: TOO_MANY_REQUESTS
+                reason: Слишком много запросов
+        - name: Internal server error
+          payload:
+            replyStatus: 500
+            replyErrors:
+              - errorType: INTERNAL
+                reason: Иная ошибка сервера, не описанная в примерах
+        - name: Not implemented
+          payload:
+            replyStatus: 501
+            replyErrors:
+              - errorType: NOT_IMPLEMENTED
+                reason: Метод не поддерживается
+        - name: Service unavailable
+          payload:
+            replyStatus: 503
+            replyErrors:
+              - errorType: UNAVAILABLE
+                reason: Сервис временно недоступен
+        - name: Gateway timeout
+          payload:
+            replyStatus: 504
+            replyErrors:
+              - errorType: DEADLINE_EXCEEDED
+                reason: Превышено время ожидания от сервера
+        - name: Unknown error
+          payload:
+            replyStatus: 520
+            replyErrors:
+              - errorType: UNKNOWN_ERROR
+                reason: Сервер не может обработать ошибку
+  schemas:
+    subscribeSchemeSignalsStateRequest:
+      title: subscribeSchemeSignalsStateRequest
+      description: Запрос передаёт идентификатор схемы.
+      type: object
+      properties:
+        tuId:
+          $ref: '#/components/schemas/tuId'
+      required: [tuId]
+    subscribeSchemeSignalsStateReply:
+      title: subscribeSchemeSignalsStateReply
+      description: Ответ возвращает данные о состоянии сигналов.
+      type: object
+      properties:
+        replyStatus:
+          $ref: '#/components/schemas/replyStatus'
+        replyErrors:
+          $ref: '#/components/schemas/replyErrors'
+        replyContent:
+          $ref: '#/components/schemas/subscribeSchemeSignalsStateReplyContent'
+      required: [replyStatus]
+    subscribeSchemeSignalsStateReplyContent:
+      title: subscribeSchemeSignalsStateReplyContent
+      description: Информация берется из выходного слоя lb
+      type: object
+      properties:
+        signalsStates:
+          $ref: '#/components/schemas/signalsStates'
+        toStates:
+          $ref: '#/components/schemas/toStates'
+      required: [signalsStates, toStates]
+    signalsStates:
+      title: signalsStates
+      description: Данные о состоянии сигналов.
+      type: array
+      items:
+        $ref: '#/components/schemas/signalsState'
+    signalsState:
+      title: signalsState
+      type: object
+      description: Данные о состоянии сигнала.
+      properties:
+        id:
+          title: id
+          description: Идентификатор сигнала.
+          type: integer
+          format: int32
+          examples: [123]
+        value:
+          title: value
+          description: Значение сигнала.
+          type: string
+          examples: [1]
+        quality:
+          title: quality
+          description: Качество передаваемого сигнала.
+          type: integer
+          format: int32
+          examples: [1]
+        isMasked:
+          title: isMasked
+          description: Статус маскирования.
+          type: boolean
+          examples: [true]
+        imitation:
+          title: imitation
+          description: Режим имитации.
+          type: object
+          properties:
+            isImitated:
+              title: isImitated
+              description: Статус имитации.
+              type: boolean
+              examples: [true]
+            imitationValue:
+              title: imitationValue
+              description: Имитируемое значение.
+              type: string
+              examples: [1]
+            imitationQuality:
+              title: imitationQuality
+              description: Имитируемое качество.
+              type: integer
+              format: int64
+              examples: [1]
+          required: [isImitated]
+        rejection:
+          title: rejection
+          type: object
+          description: Статус исправности сигнала.
+          properties:
+            isRejected:
+              title: isRejected
+              description: Статус отбраковки
+              type: boolean
+              examples: [true]
+            rejectionCriteriaNames:
+              title: rejectionCriteriaNames
+              description: |
+                Наименование критерия(-ев), по которому произошла отбраковка.
+              type: array
+              items:
+                $ref: '#/components/schemas/rejectionCriteriaName'
+          required: [isRejected]
+      required: [id, value, quality, isMasked, imitation, rejection]
+    rejectionCriteriaName:
+      title: rejectionCriteriaName
+      description: |
+        Наименование критерия, по которому произошла отбраковка.
+      type: string
+      enum:
+        - qualityRejection
+        - rangeRejection
+        - emptyRejection
+        - timeRejection
+        - constantSignalRejection
+        - dischargeRejection
+        - sigma3Rejection
+        - VTORRejection
+        - nearbyRejection
+        - diagnInfoRejection
+      examples: [qualityRejection]
+    toStates:
+      title: toStates
+      description: >
+        Состояние ПО.
+        Определяется по pumps. Перечень pumps для ПО определяется по assembly.technologicalObjects.pumpIds, если pumps.type in (1,2) (ПНА, МНА), то он используется для определения состояния ПО
+        Состояние isInWork - True, если хотя бы у одного pump из перечня определенного ранее pumps.status in (1, 2, 8) or pumps.isOn == True or pumps.startProgram == True or pumps.stopProgram == True
+        В остальных случаях состояние False
+      type: array
+      items:
+        $ref: '#/components/schemas/toState'
+    toState:
+      title: toState
+      type: object
+      properties:
+        id:
+          title: id
+          description: Идентификатор сигнала.
+          type: integer
+          format: int32
+          examples: [123]
+        isInWork:
+          title: isInWork
+          description: Рабочее состояние.
+          type: boolean
+          examples: [true]
+      required: [id, isInWork]
+    tuId:
+      title: tuId
+      description: Идентификатор схемы.
+      type: number
+      format: int64
+      examples: [123]
+    replyStatus:
+      title: replyStatus
+      type: integer
+      format: int32
+      enum:
+        - 200
+        - 400
+        - 401
+        - 403
+        - 404
+        - 408
+        - 409
+        - 412
+        - 416
+        - 429
+        - 500
+        - 501
+        - 503
+        - 504
+        - 520
+      x-enumNames:
+        "200": OK
+        "400": Bad request
+        "401": Unauthorized
+        "403": Permission denied
+        "404": Not found
+        "408": Request timeout
+        "409": Conflict
+        "412": Precondition failed
+        "416": Range not satisfiable
+        "429": Too many requests
+        "500": Internal server error
+        "501": Not implemented
+        "503": Service unavailable
+        "504": Gateway timeout
+        "520": Unknown error
+    replyErrors:
+      title: replyErrors
+      type: array
+      items:
+        title: replyError
+        type: object
+        description: Информация об ошибке.
+        properties:
+          errorType:
+            description: Тип ошибки.
+            type: string
+            examples: [ALREADY_EXISTS]
+          reason:
+            description: Причина ошибки.
+            type: string
+            examples: [Конфигурация  с таким названием уже существует]
+          location:
+            description: Место возникновения ошибки.
+            type: string
+            examples: [configurationName]
+        required: [reason]

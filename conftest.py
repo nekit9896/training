@@ -155,6 +155,14 @@ LEAK_LEVEL_TEST_MAPPING = {
     'test_balance_algorithm_leak_detected': 'balance_algorithm_leak_detected_test',
 }
 
+# Тесты уровня отбраковки (маркеры из RejectionTestCase - параметр rejection_case)
+IS_REJECTED_LEVEL_TEST_MAPPING = {
+    'test_rejection_input_signals': 'rejection_input_signals_test',
+    'test_rejection_journal': 'rejection_journal_test',
+    'test_rejection_main_page': 'rejection_main_page_test',
+    'test_rejection_scheme_signals_state': 'rejection_scheme_signals_state_test',
+}
+
 # Мержим все вместе чтобы не переписывать логику коллектора айтемов (тестов)
 SUITE_LEVEL_TEST_MAPPING = {**SMOKE_SUITE_LEVEL_MAPPING, **LDS_STATUS_SUITE_LEVEL_MAPPING}
 
@@ -178,6 +186,12 @@ def _get_test_markers_config(item, test_name):
         leak = params['leak']
         attr_name = LEAK_LEVEL_TEST_MAPPING[test_name]
         return getattr(leak, attr_name, None)
+
+    # Проверяем, есть ли параметр rejection_case для тестов отбраковки
+    if 'rejection_case' in params and test_name in IS_REJECTED_LEVEL_TEST_MAPPING:
+        rejection_case = params['rejection_case']
+        attr_name = IS_REJECTED_LEVEL_TEST_MAPPING[test_name]
+        return getattr(rejection_case, attr_name, None)
 
     # Для suite-level тестов берём из config
     if 'config' in params:
@@ -235,7 +249,7 @@ def pytest_collection_modifyitems(session, config, items):
             # Добавляем маркер test_case_id
             if hasattr(test_config, 'test_case_id') and test_config.test_case_id is not None:
                 item.add_marker(pytest.mark.test_case_id(test_config.test_case_id))
-        elif test_name in SUITE_LEVEL_TEST_MAPPING or test_name in LEAK_LEVEL_TEST_MAPPING:
+        elif test_name in SUITE_LEVEL_TEST_MAPPING or test_name in LEAK_LEVEL_TEST_MAPPING or test_name in IS_REJECTED_LEVEL_TEST_MAPPING:  # noqa: E501
             # Конфиг теста = None - исключаем тест из прогона
             deselected_items.append(item)
             continue
