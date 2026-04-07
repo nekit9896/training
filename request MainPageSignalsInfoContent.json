@@ -1,0 +1,17 @@
+
+  [
+    1,
+    {
+      
+    },
+    '13',
+    'subscribeMainPageSignalsInfoRequest',
+    [
+      {
+        'tuIds': [
+          3
+        ],
+        'additionalProperties': None
+      }
+    ]
+  ]

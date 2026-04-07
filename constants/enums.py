@@ -239,6 +239,39 @@ class StoppedPumpingReason(IntFlag):
     CUTOFF_AREA = 1 << 1  # Участок отсечен запорной арматурой от подкачек/откачек
 
 
+class RejectionCriteria(IntFlag):
+    """Критерии отбраковки сигналов criteriaNames"""
+
+    QUALITY = 1 << 0           # qualityRejection
+    RANGE = 1 << 1             # rangeRejection
+    EMPTY = 1 << 2             # emptyRejection
+    TIME = 1 << 3              # timeRejection
+    CONSTANT_SIGNAL = 1 << 4   # constantSignalRejection
+    DISCHARGE = 1 << 5         # dischargeRejection
+    SIGMA3 = 1 << 6            # sigma3Rejection
+    VTOR = 1 << 7              # VTORRejection
+    NEARBY = 1 << 8            # nearbyRejection
+    DIAGNOSTIC_INFO = 1 << 9   # diagnInfoRejection
+
+
+class RejectionSensorTag(Enum):
+    """Теги датчиков для тестов отбраковки (id, description=tag)"""
+
+    KP_8_Pin = (31439, "AK.CHTN.LU_TIHVEL.KP_8.SW_8-3.Pin")
+    NPS_TIH_5_Vmom = (30145, "AK.CHTN.NPS_TIH_5.UZR_1.Vmom")
+    KP_8_Pout = (31440, "AK.CHTN.LU_TIHVEL.KP_8.SW_8-3.Pout")
+    KP_209_1_Pin = (31488, "AK.CHTN.LU_VELKRIM.KP_209-1.SW_215-3-1.Pin")
+    KP_7_Pin = (31437, "AK.CHTN.LU_TIHVEL.KP_7.SW_6-3.Pin")
+    NPS_KRIM_P_Vmom = (30157, "AK.CHTN.NPS_KRIM_P.UZR_1.Vmom")
+
+    def __init__(self, sensor_id: int, description: str) -> None:
+        self.id = sensor_id
+        self.description = description
+
+    def __str__(self):
+        return f"{self.id} - {self.description}"
+
+
 class UserActions(IntFlag):
     USER_LOGIN = 1  # Вход пользователя
     USER_EXIT = 1 << 1  # Выход пользователя

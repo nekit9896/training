@@ -27,4 +27,8 @@ __all__ = [
     scenarios.acknowledge_leak_info,
     scenarios.acknowledge_leak_in_journal,
     scenarios.output_signals,
+    scenarios.rejection_input_signals,
+    scenarios.rejection_journal,
+    scenarios.rejection_main_page,
+    scenarios.rejection_scheme_signals_state,
 ]

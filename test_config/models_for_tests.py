@@ -12,7 +12,15 @@
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, Optional
 
-from constants.enums import TU, ConfirmationStatus, LdsStatus, ReservedType, StationaryStatus
+from constants.enums import (
+    TU,
+    ConfirmationStatus,
+    LdsStatus,
+    RejectionCriteria,
+    RejectionSensorTag,
+    ReservedType,
+    StationaryStatus,
+)
 from constants.test_constants import BaseTN3Constants
 from models.subscribe_main_page_signals_info_model import SignalsInfo
 
@@ -90,7 +98,6 @@ class DiagnosticAreaStatusConfig:
 
     leak_diagnostic_area_id: int
     leak_du_expected_lds_status: int
-    leak_du_expected_lds_status_after_leak: int = None
 
     # Соседние ДУ и их статусы: словари {diagnostic_area_id: leak_du_expected_lds_status}
     # Позволяет указывать 0..N соседей независимо от in/out.
@@ -140,7 +147,6 @@ class LeakTestConfig:
 
     # ===== Конфигурация статусов СОУ во время утечки =====
     lds_status_during_leak_config: Optional[DiagnosticAreaStatusConfig] = None
-    lds_status_after_leak: Optional[DiagnosticAreaStatusConfig] = None
 
     # ===== Тест-кейсы для этой утечки =====
     balance_algorithm_leak_waiting_test: Optional[CaseMarkers] = None
@@ -154,7 +160,6 @@ class LeakTestConfig:
     acknowledge_leak_in_journal_test: Optional[CaseMarkers] = None
     output_signals_test: Optional[CaseMarkers] = None
     lds_status_during_leak_test: Optional[CaseMarkers] = None
-    lds_status_after_leak_check_test: Optional[CaseMarkers] = None
 
     @property
     def leak_diagnostic_area_id(self) -> Optional[int]:
@@ -215,11 +220,13 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     basic_info_test: Optional[CaseMarkers] = None
     journal_info_test: Optional[CaseMarkers] = None
     lds_status_initialization_test: Optional[CaseMarkers] = None
+    lds_status_init_in_journal_test: Optional[CaseMarkers] = None
     main_page_info_test: Optional[CaseMarkers] = None
     main_page_info_signals_test: Optional[CaseMarkers] = None
     mask_signal_test: Optional[CaseMarkers] = None
     mask_info_in_journal_test: Optional[CaseMarkers] = None
     lds_status_initialization_out_test: Optional[CaseMarkers] = None
+    lds_status_init_out_in_journal_test: Optional[CaseMarkers] = None
     mask_du_on_mini_scheme_test: Optional[CaseMarkers] = None
     unmask_du_on_mini_scheme_test: Optional[CaseMarkers] = None
 
@@ -297,3 +304,44 @@ class LDSStatusConfig(BaseSuiteConfig):
     lds_status_deg_rejection_density_and_viscosity_on_du_2_test: Optional[CaseMarkers] = None
     lds_status_deg_rejection_density_and_viscosity_on_du_3_test: Optional[CaseMarkers] = None
     lds_status_deg_rejection_density_and_viscosity_on_du_5_test: Optional[CaseMarkers] = None
+
+
+@dataclass
+class RejectionTestCase:
+    """
+    Описание одного события отбраковки для тестирования.
+
+    Содержит:
+    - Тег и id датчика (из RejectionSensorTag)
+    - Ожидаемые значения для проверок журнала и схемы
+    - Маркеры (offset и test_case_id)
+    """
+
+    name: str = ""
+    sensor: RejectionSensorTag = RejectionSensorTag.NPS_TIH_5_Vmom
+    expected_event: str = ""
+    expected_signal_name: str = ""
+    expected_criteria_names: RejectionCriteria = RejectionCriteria(0)
+    time_range_start_s: float = 0
+    time_range_end_s: float = 0
+    rejection_input_signals_test: Optional[CaseMarkers] = None
+    rejection_journal_test: Optional[CaseMarkers] = None
+    rejection_main_page_test: Optional[CaseMarkers] = None
+    rejection_scheme_signals_state_test: Optional[CaseMarkers] = None
+
+
+@dataclass
+class IsRejectedConfig(BaseSuiteConfig):
+    """
+    Конфигурация тестового набора отбраковки сигналов.
+
+    Один конфиг = один набор данных = один файл в test_config/datasets/
+
+    Структура:
+    1. Метаданные набора
+    2. Название МН
+    3. Список случаев отбраковки (RejectionTestCase) - по 4 теста на каждый
+    """
+
+    main_pipeline: str = ""
+    rejection_cases: list[RejectionTestCase] = field(default_factory=list)

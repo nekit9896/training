@@ -108,11 +108,13 @@ SMOKE_SUITE_LEVEL_MAPPING = {
     'test_basic_info': 'basic_info_test',
     'test_journal_info': 'journal_info_test',
     'test_lds_status_initialization': 'lds_status_initialization_test',
+    'test_lds_status_init_in_journal': 'lds_status_init_in_journal_test',
     'test_main_page_info': 'main_page_info_test',
     'test_main_page_info_signals': 'main_page_info_signals_test',
     'test_mask_signal_msg': 'mask_signal_test',
     'test_mask_info_in_journal': 'mask_info_in_journal_test',
     'test_lds_status_initialization_out': 'lds_status_initialization_out_test',
+    'test_lds_status_init_out_in_journal': 'lds_status_init_out_in_journal_test',
     'test_main_page_info_unstationary': 'main_page_info_unstationary_test',
     'test_mask_du_on_mini_scheme': 'mask_du_on_mini_scheme_test',
     'test_unmask_du_on_mini_scheme': 'unmask_du_on_mini_scheme_test',
@@ -151,7 +153,14 @@ LEAK_LEVEL_TEST_MAPPING = {
     'test_lds_status_during_leak': 'lds_status_during_leak_test',
     'test_balance_algorithm_leak_waiting': 'balance_algorithm_leak_waiting_test',
     'test_balance_algorithm_leak_detected': 'balance_algorithm_leak_detected_test',
-    'test_lds_status_after_leak_check': 'lds_status_after_leak_check_test',
+}
+
+# Тесты уровня отбраковки (маркеры из RejectionTestCase - параметр rejection_case)
+IS_REJECTED_LEVEL_TEST_MAPPING = {
+    'test_rejection_input_signals': 'rejection_input_signals_test',
+    'test_rejection_journal': 'rejection_journal_test',
+    'test_rejection_main_page': 'rejection_main_page_test',
+    'test_rejection_scheme_signals_state': 'rejection_scheme_signals_state_test',
 }
 
 # Мержим все вместе чтобы не переписывать логику коллектора айтемов (тестов)
@@ -177,6 +186,12 @@ def _get_test_markers_config(item, test_name):
         leak = params['leak']
         attr_name = LEAK_LEVEL_TEST_MAPPING[test_name]
         return getattr(leak, attr_name, None)
+
+    # Проверяем, есть ли параметр rejection_case для тестов отбраковки
+    if 'rejection_case' in params and test_name in IS_REJECTED_LEVEL_TEST_MAPPING:
+        rejection_case = params['rejection_case']
+        attr_name = IS_REJECTED_LEVEL_TEST_MAPPING[test_name]
+        return getattr(rejection_case, attr_name, None)
 
     # Для suite-level тестов берём из config
     if 'config' in params:
@@ -234,7 +249,7 @@ def pytest_collection_modifyitems(session, config, items):
             # Добавляем маркер test_case_id
             if hasattr(test_config, 'test_case_id') and test_config.test_case_id is not None:
                 item.add_marker(pytest.mark.test_case_id(test_config.test_case_id))
-        elif test_name in SUITE_LEVEL_TEST_MAPPING or test_name in LEAK_LEVEL_TEST_MAPPING:
+        elif test_name in SUITE_LEVEL_TEST_MAPPING or test_name in LEAK_LEVEL_TEST_MAPPING or test_name in IS_REJECTED_LEVEL_TEST_MAPPING:  # noqa: E501
             # Конфиг теста = None - исключаем тест из прогона
             deselected_items.append(item)
             continue
@@ -384,7 +399,7 @@ def pytest_runtest_setup(item):
 
         # start new
         cfg["current_suite"] = current_test_suite
-        cfg["suite_start_time"] = time.monotonic() + ImConst.CORE_START_DELAY_S
+        cfg["suite_start_time"] = time.monotonic() + ImConst.ALL_MS_START_DELAY_S
 
         data_id = item.get_closest_marker("test_suite_data_id").args[0]
         test_data_name = item.get_closest_marker("test_data_name").args[0]
