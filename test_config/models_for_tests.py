@@ -12,7 +12,15 @@
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, Optional
 
-from constants.enums import TU, ConfirmationStatus, LdsStatus, RejectionSensorTag, ReservedType, StationaryStatus
+from constants.enums import (
+    TU,
+    ConfirmationStatus,
+    LdsStatus,
+    RejectionCriteria,
+    RejectionSensorTag,
+    ReservedType,
+    StationaryStatus,
+)
 from constants.test_constants import BaseTN3Constants
 from models.subscribe_main_page_signals_info_model import SignalsInfo
 
@@ -313,7 +321,9 @@ class RejectionTestCase:
     sensor: RejectionSensorTag = RejectionSensorTag.NPS_TIH_5_Vmom
     expected_event: str = ""
     expected_signal_name: str = ""
-    expected_criteria_names: int = 0
+    expected_criteria_names: RejectionCriteria = RejectionCriteria(0)
+    time_range_start_s: float = 0
+    time_range_end_s: float = 0
     rejection_input_signals_test: Optional[CaseMarkers] = None
     rejection_journal_test: Optional[CaseMarkers] = None
     rejection_main_page_test: Optional[CaseMarkers] = None

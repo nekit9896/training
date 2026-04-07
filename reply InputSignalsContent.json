@@ -1,1 +1,47 @@
-[1, {}, None, 'InputSignalsContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 3, 'inputSignals': [[3, {'id': 31539, 'quality': 1, 'isRejected': False, 'isMasked': True, 'isImitated': False, 'rejection': {'criteriaNames': 0}, 'generationTime': [Timestamp(seconds=1774836255, nanoseconds=0), 0], 'receivedTime': [Timestamp(seconds=1774836311, nanoseconds=586000000), 0], 'value': 1426411.648923722, 'imitation': None}], [3, {'id': 30154, 'quality': 1, 'isRejected': False, 'isMasked': True, 'isImitated': False, 'rejection': {'criteriaNames': 0}, 'generationTime': [Timestamp(seconds=1774836289, nanoseconds=0), 0], 'receivedTime': [Timestamp(seconds=1774836345, nanoseconds=563000000), 0], 'value': 0.349676344129775, 'imitation': None}]]}}], []]
+[
+    1,
+    {
+      
+    },
+    None,
+    'InputSignalsContent',
+    [
+      {
+        'replyStatus': 200,
+        'replyErrors': None,
+        'replyContent': {
+          'tuId': 3,
+          'inputSignals': [
+            [
+              3,
+              {
+                'id': 30157,
+                'quality': 1,
+                'isRejected': True,
+                'isMasked': False,
+                'isImitated': False,
+                'rejection': {
+                  'criteriaNames': 16
+                },
+                'generationTime': [
+                  Timestamp(seconds=1775140229,
+                  nanoseconds=0),
+                  0
+                ],
+                'receivedTime': [
+                  Timestamp(seconds=1775140287,
+                  nanoseconds=200000000),
+                  0
+                ],
+                'value': 2.9916337925447225e-13,
+                'imitation': None
+              }
+            ]
+          ]
+        }
+      }
+    ],
+    [
+      
+    ]
+  ]

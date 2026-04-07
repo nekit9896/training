@@ -2123,6 +2123,18 @@ async def rejection_input_signals(ws_client, cfg: IsRejectedConfig, rejection_ca
             f"Проверка отбраковки датчика {sensor.description} (id={sensor.id})", "isRejected", soft_failures
         ).actual(target_signal.isRejected).expected(True).equal_to()
 
+        if rejection_case.expected_criteria_names:
+            criteria = (
+                target_signal.rejection.criteriaNames
+                if isinstance(target_signal.rejection, dict)
+                else None
+            )
+            StepCheck(
+                f"Проверка rejection.criteriaNames для {sensor.description} (id={sensor.id})",
+                "criteriaNames",
+                soft_failures,
+            ).actual(criteria).expected(rejection_case.expected_criteria_names).equal_to()
+
 
 async def rejection_journal(
     ws_client, cfg: IsRejectedConfig, rejection_case: RejectionTestCase, imitator_start_time
@@ -2132,7 +2144,6 @@ async def rejection_journal(
     """
     sensor = rejection_case.sensor
     with allure.step("Запрос сообщений журнала с фильтром messageTypes=REJECTION"):
-        end_time = datetime.now()
         request_body = t_utils.create_journal_req_body(
             pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
             filtering=Filtering(
@@ -2146,43 +2157,47 @@ async def rejection_journal(
 
         StepCheck("Проверка наличия сообщений в журнале", "messagesInfo").actual(messages_info).is_not_empty()
 
-    with allure.step("Фильтрация сообщений по времени и technologicalSection"):
-        filter_start_msk = t_utils.localize_as_moscow(imitator_start_time)
-        filter_end_msk = t_utils.localize_as_moscow(end_time)
+    with allure.step(
+        f"Фильтрация сообщений по диапазону слоя данных "
+        f"({rejection_case.time_range_start_s}-{rejection_case.time_range_end_s} с от старта имитатора)"
+    ):
+        imitator_msk = t_utils.localize_as_moscow(imitator_start_time)
+        range_start = imitator_msk + timedelta(seconds=rejection_case.time_range_start_s)
+        range_end = imitator_msk + timedelta(seconds=rejection_case.time_range_end_s)
 
         time_filtered = [
             msg
             for msg in messages_info
-            if filter_start_msk <= t_utils.ensure_moscow_timezone(msg.time) <= filter_end_msk
+            if msg.tag == sensor.description
+            and range_start <= t_utils.ensure_moscow_timezone(msg.time) <= range_end
         ]
         time_filtered.sort(key=lambda msg: t_utils.ensure_moscow_timezone(msg.time), reverse=True)
 
         target_msg = next(
-            (
-                msg
-                for msg in time_filtered
-                if msg.technologicalSection == cfg.tu_name and msg.tag == sensor.description
-            ),
+            (msg for msg in time_filtered if msg.technologicalSection == cfg.tu_name),
             None,
         )
 
         allure.attach(
             f"Всего получено сообщений: {len(messages_info)}\n"
-            f"После фильтрации по времени ({filter_start_msk} - {filter_end_msk}): {len(time_filtered)}\n"
-            f"Проверка: найдено ли сообщение с technologicalSection='{cfg.tu_name}' "
-            f"и tag='{sensor.description}' (id={sensor.id}): {'True' if target_msg else 'False'}",
+            f"Диапазон фильтрации: {range_start} - {range_end}\n"
+            f"После фильтрации по tag='{sensor.description}' и времени: {len(time_filtered)}\n"
+            f"Найдено ли сообщение с technologicalSection='{cfg.tu_name}': "
+            f"{'True' if target_msg else 'False'}",
             name="Результат фильтрации сообщений журнала",
             attachment_type=allure.attachment_type.TEXT,
         )
 
     with allure.step(
         f"Проверка: найдено ли сообщение с tag='{sensor.description}' (id={sensor.id}) "
-        f"и technologicalSection='{cfg.tu_name}'"
+        f"в диапазоне {rejection_case.time_range_start_s}-{rejection_case.time_range_end_s} с"
     ):
         if target_msg is None:
             pytest.fail(
-                f"Сообщение с technologicalSection='{cfg.tu_name}' и tag='{sensor.description}' (id={sensor.id}) "
-                f"не найдено среди {len(time_filtered)} отфильтрованных по времени сообщений"
+                f"Сообщение с tag='{sensor.description}' (id={sensor.id}) "
+                f"и technologicalSection='{cfg.tu_name}' не найдено в диапазоне "
+                f"{range_start} - {range_end} "
+                f"(всего сообщений: {len(messages_info)}, после фильтрации: {len(time_filtered)})"
             )
 
     with SoftAssertions() as soft_failures:
@@ -2213,7 +2228,7 @@ async def rejection_journal(
 
         if rejection_case.expected_event:
             StepCheck("Проверка event", "event", soft_failures).actual(
-                target_msg.event
+                (target_msg.event or "").strip()
             ).expected(rejection_case.expected_event).equal_to()
 
 
@@ -2250,32 +2265,47 @@ async def rejection_scheme_signals_state(
     """
     Проверка отбраковки сигнала по подписке SubscribeSchemeSignalsStateRequest.
     Проверяет isRejected, isMasked, isImitated и rejection.criteriaNames.
+    Логирование больших ответов подавляется suppress_recv_logging.
     """
     sensor = rejection_case.sensor
-    with allure.step(
-        f"Подключение по ws, получение данных SchemeSignalsStateContent для датчика {sensor.description} (id={sensor.id})"
-    ):
-        payload = await t_utils.connect_and_subscribe_msg(
-            ws_client,
-            "SchemeSignalsStateContent",
-            "SubscribeSchemeSignalsStateRequest",
-            {'tuId': cfg.tu_id},
-        )
-        parsed_payload = parser.parse_scheme_signals_state_msg(payload)
-        signals = parsed_payload.replyContent.signalsStates
+    ws_client.suppress_recv_logging = True
+    parser.suppress_recv_logging = True
+    try:
+        with allure.step(
+            f"Подключение по ws, получение данных SchemeSignalsStateContent "
+            f"для датчика {sensor.description} (id={sensor.id})"
+        ):
+            payload = await t_utils.connect_and_subscribe_msg(
+                ws_client,
+                "SchemeSignalsStateContent",
+                "SubscribeSchemeSignalsStateRequest",
+                {'tuId': cfg.tu_id},
+            )
+            parsed_payload = parser.parse_scheme_signals_state_msg(payload)
+            signals = parsed_payload.replyContent.signalsStates
 
-        target_signal = next(
-            (signal for signal in signals if signal.id == sensor.id),
-            None,
-        )
+            target_signal = next(
+                (signal for signal in signals if signal.id == sensor.id),
+                None,
+            )
 
-        allure.attach(
-            f"Всего сигналов получено: {len(signals)}\n"
-            f"Поиск сигнала с id={sensor.id} ({sensor.description}): "
-            f"{'Найден' if target_signal else 'Не найден'}",
-            name="Результат поиска сигнала в SchemeSignalsState",
-            attachment_type=allure.attachment_type.TEXT,
-        )
+            allure.attach(
+                f"Всего сигналов получено: {len(signals)}\n"
+                f"Поиск сигнала с id={sensor.id} ({sensor.description}): "
+                f"{'Найден' if target_signal else 'Не найден'}",
+                name="Результат поиска сигнала в SchemeSignalsState",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+
+            if target_signal is not None:
+                allure.attach(
+                    str(target_signal),
+                    name=f"Тестируемый фрагмент ответа с бэка: сигнал id={sensor.id} ({sensor.description})",
+                    attachment_type=allure.attachment_type.TEXT,
+                )
+    finally:
+        ws_client.suppress_recv_logging = False
+        parser.suppress_recv_logging = False
 
     with allure.step(f"Проверка: найден ли сигнал с id={sensor.id} ({sensor.description})"):
         if target_signal is None:
@@ -2297,11 +2327,11 @@ async def rejection_scheme_signals_state(
             f"Проверка isImitated для {sensor.description} (id={sensor.id})", "isImitated", soft_failures
         ).actual(target_signal.isImitated).expected(False).equal_to()
 
-        if target_signal.rejection is not None:
+        if rejection_case.expected_criteria_names and target_signal.rejection is not None:
             StepCheck(
                 f"Проверка rejection.criteriaNames для {sensor.description} (id={sensor.id})",
                 "criteriaNames",
                 soft_failures,
             ).actual(
-                target_signal.rejection.get('criteriaNames') if isinstance(target_signal.rejection, dict) else None
+                target_signal.rejection.criteriaNames if isinstance(target_signal.rejection, dict) else None
             ).expected(rejection_case.expected_criteria_names).equal_to()

@@ -239,6 +239,21 @@ class StoppedPumpingReason(IntFlag):
     CUTOFF_AREA = 1 << 1  # Участок отсечен запорной арматурой от подкачек/откачек
 
 
+class RejectionCriteria(IntFlag):
+    """Критерии отбраковки сигналов criteriaNames"""
+
+    QUALITY = 1 << 0           # qualityRejection
+    RANGE = 1 << 1             # rangeRejection
+    EMPTY = 1 << 2             # emptyRejection
+    TIME = 1 << 3              # timeRejection
+    CONSTANT_SIGNAL = 1 << 4   # constantSignalRejection
+    DISCHARGE = 1 << 5         # dischargeRejection
+    SIGMA3 = 1 << 6            # sigma3Rejection
+    VTOR = 1 << 7              # VTORRejection
+    NEARBY = 1 << 8            # nearbyRejection
+    DIAGNOSTIC_INFO = 1 << 9   # diagnInfoRejection
+
+
 class RejectionSensorTag(Enum):
     """Теги датчиков для тестов отбраковки (id, description=tag)"""
 

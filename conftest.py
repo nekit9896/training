@@ -399,7 +399,7 @@ def pytest_runtest_setup(item):
 
         # start new
         cfg["current_suite"] = current_test_suite
-        cfg["suite_start_time"] = time.monotonic() + ImConst.CORE_START_DELAY_S
+        cfg["suite_start_time"] = time.monotonic() + ImConst.ALL_MS_START_DELAY_S
 
         data_id = item.get_closest_marker("test_suite_data_id").args[0]
         test_data_name = item.get_closest_marker("test_data_name").args[0]

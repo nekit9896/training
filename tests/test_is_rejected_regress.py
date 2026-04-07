@@ -96,7 +96,7 @@ class TestIsRejectedScenarios:
         sensor = rejection_case.sensor
         tag = "InputSignals"
         title = (
-            f"[{tag}] Проверка отбраковки во входных сигналах: isRejected=True для {sensor.description} (id={sensor.id}) "
+            f"[{tag}] Проверка: {rejection_case.expected_event} для {sensor.description} (id={sensor.id}) "
             f"({rejection_case.name}). ЭФ: Входные сигналы"
         )
         _apply_allure_markers(
@@ -126,7 +126,7 @@ class TestIsRejectedScenarios:
         sensor = rejection_case.sensor
         tag = "MessagesInfo"
         title = (
-            f"[{tag}] Проверка записи об отбраковке {sensor.description} (id={sensor.id}) "
+            f"[{tag}] Проверка: {rejection_case.expected_event} для {sensor.description} (id={sensor.id}) "
             f"({rejection_case.name}) в журнале. ЭФ: Журнал"
         )
         _apply_allure_markers(
@@ -154,7 +154,7 @@ class TestIsRejectedScenarios:
         """[MainPageSignalsInfo] Проверка счетчика отбраковки на состоянии МТ"""
         tag = "MainPageSignalsInfo"
         title = (
-            f"[{tag}] Проверка счетчика отбраковки на состоянии МТ "
+            f"[{tag}] Проверка: {rejection_case.expected_event} - счетчик отбраковки на состоянии МТ показывает отбраковку"
             f"({rejection_case.name}). ЭФ: Состояние МТ"
         )
         _apply_allure_markers(
@@ -182,7 +182,7 @@ class TestIsRejectedScenarios:
         sensor = rejection_case.sensor
         tag = "SchemeSignalsState"
         title = (
-            f"[{tag}] Проверка отбраковки на схеме: isRejected=True для {sensor.description} (id={sensor.id}) "
+            f"[{tag}] Проверка: {rejection_case.expected_event} для {sensor.description} (id={sensor.id}) "
             f"({rejection_case.name}). ЭФ: Схема"
         )
         _apply_allure_markers(
