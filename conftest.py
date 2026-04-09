@@ -318,7 +318,7 @@ def allure_tms_link(request):
 @pytest.fixture(autouse=True)
 def offset_wait(request):
     """
-    Offset‑ожидание перед каждым тестом относительно старта имитатора
+    Offset‑ожидание перед каждым тестом относительно фактического старта core
     """
     if offset_marker := request.node.get_closest_marker("offset"):
         offset_sec = float(offset_marker.args[0]) * 60
@@ -399,7 +399,7 @@ def pytest_runtest_setup(item):
 
         # start new
         cfg["current_suite"] = current_test_suite
-        cfg["suite_start_time"] = time.monotonic() + ImConst.ALL_MS_START_DELAY_S
+        cfg["suite_start_time"] = None
 
         data_id = item.get_closest_marker("test_suite_data_id").args[0]
         test_data_name = item.get_closest_marker("test_data_name").args[0]
@@ -435,6 +435,7 @@ def pytest_runtest_setup(item):
             pytest.exit(f"[SETUP] [ERROR] ошибка запуска имитатора: {error}")
         time.sleep(ImConst.CORE_START_DELAY_S)
         try:
+            cfg["suite_start_time"] = time.monotonic()
             core_thread.start()
             core_thread.join(timeout=5)
         except Exception as error:
@@ -465,6 +466,8 @@ def pytest_runtest_teardown(item, nextitem):
                 stand_manager.server_test_data_remover()
             cfg["stand_manager"] = None
         cfg["current_suite"] = None
+        cfg["suite_start_time"] = None
+        cfg["imitator_start_time"] = None
 
         # опционально дождаться завершения потока (если не daemon) — безопасный join
         imitator_thread = cfg.get("imitator_thread")
