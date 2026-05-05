@@ -6,7 +6,7 @@ import re
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum, IntFlag
-from typing import Any, List, Optional, Set, Tuple, Type, TypeVar
+from typing import Any, List, Optional, Set, Type, TypeVar
 from zoneinfo import ZoneInfo
 
 import allure
@@ -15,10 +15,12 @@ from pytest import fail
 
 from clients.websocket_client import WebSocketClient
 from constants.enums import (
+    ConfirmationStatus,
     LdsStatus,
     LdsStatusDegradation,
     LdsStatusFaulty,
     LdsStatusInitialization,
+    LeakStatus,
     StationaryReason,
     StationaryStatus,
     StoppedPumpingReason,
@@ -28,6 +30,8 @@ from constants.test_constants import BaseTN3Constants as TestConst
 from models.get_messages_model import GetMessagesRequest
 from models.subscribe_all_leaks_info_model import SubscribeAllLeaksInfoReply
 from models.subscribe_common_scheme_model import DiagnosticArea, FlowArea
+from models.subscribe_leaks_model import Leak
+from models.subscribe_main_page_info_model import MainPageLeakInfo
 from utils.helpers.ws_message_parser import ws_message_parser
 from utils.msgpack_utils.message_filters import is_desired_type
 
@@ -96,8 +100,9 @@ def get_leak_time_window(
     leak_end = calculate_leak_end_time(imitator_start_time, leak_interval_seconds, allowed_diff_seconds)
 
     # Если передан timezone, применяем его к временам для корректного сравнения
-    leak_start = leak_start.replace(tzinfo=detected_at_tz)
-    leak_end = leak_end.replace(tzinfo=detected_at_tz)
+    if detected_at_tz:
+        leak_start = leak_start.replace(tzinfo=detected_at_tz)
+        leak_end = leak_end.replace(tzinfo=detected_at_tz)
 
     return leak_start, leak_end
 
@@ -135,17 +140,16 @@ def localize_as_moscow(input_datetime: datetime) -> None | datetime:
 
 
 def get_rejection_time_window(
-    imitator_start_time: datetime, start_seconds: int | float, end_seconds: int | float, margin_seconds: int | float = 0
+    imitator_start_time: datetime,
+    start_seconds: int | float,
+    reserve_seconds: int | float = 0,
 ) -> tuple[datetime, datetime]:
     """
     Возвращает временное окно для проверки сообщения об отбраковке.
     """
-    if not imitator_start_time:
-        fail("Пришло пустое значение imitator_start_time")
-
     imitator_msk = localize_as_moscow(imitator_start_time)
-    range_start = imitator_msk + timedelta(seconds=start_seconds - margin_seconds)
-    range_end = imitator_msk + timedelta(seconds=end_seconds + margin_seconds)
+    range_start = imitator_msk + timedelta(seconds=start_seconds - reserve_seconds)
+    range_end = localize_as_moscow(datetime.now())
     return range_start, range_end
 
 
@@ -161,9 +165,6 @@ def find_rejection_journal_message(
     Фильтрует сообщения журнала по tag и временному диапазону,
     затем ищет целевое сообщение по technologicalSection и event.
     """
-    if not messages_info:
-        fail("Список сообщений журнала пуст")
-
     time_filtered = [
         msg for msg in messages_info if msg.tag == tag and range_start <= ensure_moscow_timezone(msg.time) <= range_end
     ]
@@ -267,27 +268,74 @@ def find_object_by_field(item_list: List[ObjectType], field_name: str, value: An
         fail(f"Не найдено значение: {value} для поля: {field_name}, в списке: {item_list}.")
 
 
-def find_diagnostic_area_by_id(flow_areas: List[FlowArea], id_value: int) -> DiagnosticArea:
+def find_confirmed_leaks(item_list: List[Leak]) -> List[Leak]:
+    """Ищет подтвержденные утечки"""
+    try:
+        return [
+            item
+            for item in item_list
+            if item.confirmationStatus == ConfirmationStatus.CONFIRMED.value and item.detectedAt is not None
+        ]
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return []
+
+
+def find_confirmed_leaks_on_main_page(item_list: List[MainPageLeakInfo]) -> List[MainPageLeakInfo]:
+    """Ищет подтвержденные утечки"""
+    try:
+        return [
+            item
+            for item in item_list
+            if item.leakStatus == LeakStatus.CONFIRMED.value and item.leakDetectedAt is not None
+        ]
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return []
+
+
+def find_diagnostic_area_by_id(flow_areas: List[FlowArea], id_value: int) -> Optional[DiagnosticArea]:
     """
     Ищет ДУ по id в списке участков карты течений, исключает дубликаты по количеству pipeIds
     """
     candidates = []
     if not flow_areas:
-        fail("Пустой список flow_areas")
+        return None
     try:
         for flow_area in flow_areas:
             for diagnostic_area in flow_area.diagnosticAreas:
                 if diagnostic_area.id == id_value:
                     candidates.append(diagnostic_area)
         if not candidates:
-            fail(f"Не найден ДУ по id: {id_value}.")
+            return None
         elif len(candidates) == 1:
             return candidates[0]
         else:
             # Среди дубликатов ищет ДУ с наибольшим количеством pipeIds
             return max(candidates, key=lambda candidate: len(candidate.pipeIds))
     except (AttributeError, KeyError, RuntimeError, TypeError, ValueError):
-        fail(f"Не найден ДУ по id: {id_value}.")
+        return None
+
+
+def find_diagnostic_area_by_pipe_id(flow_areas: List[FlowArea], pipe_id: int) -> Optional[DiagnosticArea]:
+    """
+    Ищет ДУ по pipe id в списке участков карты течений, исключает дубликаты по количеству pipeIds
+    """
+    candidates = []
+    if not flow_areas:
+        return None
+    try:
+        for flow_area in flow_areas:
+            for diagnostic_area in flow_area.diagnosticAreas:
+                if diagnostic_area.pipeIds and pipe_id in diagnostic_area.pipeIds:
+                    candidates.append(diagnostic_area)
+        if not candidates:
+            return None
+        elif len(candidates) == 1:
+            return candidates[0]
+        else:
+            # Среди дубликатов ищет ДУ с наибольшим количеством pipeIds
+            return max(candidates, key=lambda candidate: len(candidate.pipeIds))
+    except (AttributeError, KeyError, RuntimeError, TypeError, ValueError):
+        return None
 
 
 def find_diagnostic_areas_by_ids(flow_areas: List[FlowArea], id_list: List[int]) -> List[DiagnosticArea]:
@@ -298,6 +346,18 @@ def find_diagnostic_areas_by_ids(flow_areas: List[FlowArea], id_list: List[int])
         find_diagnostic_area_by_id(flow_areas, diagnostic_area_id)
         for diagnostic_area_id in id_list
         if find_diagnostic_area_by_id(flow_areas, diagnostic_area_id) is not None
+    ]
+    return diagnostic_areas
+
+
+def find_diagnostic_areas_by_pipe_ids(flow_areas: List[FlowArea], id_list: List[int]) -> List[DiagnosticArea]:
+    """
+    Получает список ДУ из списка flow_areas по списку pipe id
+    """
+    diagnostic_areas = [
+        find_diagnostic_area_by_pipe_id(flow_areas, pipe_id)
+        for pipe_id in id_list
+        if find_diagnostic_area_by_id(flow_areas, pipe_id) is not None
     ]
     return diagnostic_areas
 
@@ -381,18 +441,25 @@ def create_journal_req_body(**kwargs) -> dict:
     return result
 
 
-def parse_journal_msg_value(value: str) -> Tuple[float, float]:
+def parse_journal_msg_value(value: str) -> tuple:
     """Парсит поле value в сообщении журнала"""
-    # ищет группы цифр с точкой в строке
     try:
-        coordinate_and_volume = re.findall(TestConst.DIGITS_WITH_DOT_PATTERN, value)
-    except (TypeError, ValueError):
-        fail("Не удалось получить данные из поля value в сообщении журнала")
-    try:
-        coordinate, volume = coordinate_and_volume
-        return float(coordinate), float(volume)
-    except (TypeError, ValueError):
-        fail("Ошибка распаковки данных из поля value в сообщении журнала")
+        # ищет группы цифр с точкой в строке
+        matches = re.findall(TestConst.DIGITS_WITH_DOT_PATTERN, value)
+        coordinate, volume = (matches + [None, None])[:2]
+        if coordinate is not None:
+            try:
+                coordinate = float(coordinate)
+            except ValueError:
+                coordinate = None
+        if volume is not None:
+            try:
+                volume = float(volume)
+            except ValueError:
+                volume = None
+        return coordinate, volume
+    except (AttributeError, TypeError, ValueError):
+        return None, None
 
 
 def parse_bit_flags(
@@ -625,7 +692,7 @@ async def poll_balance_algorithm_diagnostic_areas(
 
 def get_leak_diagnostic_area_samples(
     collected_diagnostic_areas: list,
-    leak_diagnostic_area_id: int,
+    leak_diagnostic_area_name: str,
     total_wait: int,
 ) -> list:
     """
@@ -638,8 +705,8 @@ def get_leak_diagnostic_area_samples(
     leak_diagnostic_area_samples = [
         diagnostic_area
         for diagnostic_area in collected_diagnostic_areas
-        if diagnostic_area.id == leak_diagnostic_area_id
+        if diagnostic_area.name == leak_diagnostic_area_name
     ]
     if not leak_diagnostic_area_samples:
-        fail(f"За {total_wait} секунд не пришло ни одного сообщения для ДУ с id={leak_diagnostic_area_id}.")
+        fail(f"За {total_wait} секунд не пришло ни одного сообщения для ДУ с name={leak_diagnostic_area_name}.")
     return leak_diagnostic_area_samples

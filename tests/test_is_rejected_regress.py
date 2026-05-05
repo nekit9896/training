@@ -2,10 +2,8 @@
 Тесты отбраковки сигналов с датчиков давления и расходомеров.
 
 Параметризация:
-- SUITE_PARAMS: генерирует (config, rejection_case, case_number) для каждого RejectionTestCase
-  из каждого IsRejectedConfig.
-- Все 4 теста (InputSignals, Journal, MainPage, SchemeSignalsState) запускаются с одинаковым offset
-  для каждого события отбраковки.
+SUITE_PARAMS генерирует (config, rejection_case, case_number) для каждого RejectionTestCase
+из каждого IsRejectedConfig.
 
 Запуск:
 pytest tests/test_is_rejected_regress.py --suites=is_rejected_regress
@@ -20,7 +18,7 @@ import pytest
 from clients.websocket_client import WebSocketClient
 from test_config.datasets import ALL_IS_REJECTED_CONFIGS
 from test_config.models_for_tests import CaseMarkers, IsRejectedConfig, RejectionTestCase
-from test_scenarios import scenarios
+from test_scenarios import rejected_scenarios as scenarios
 
 # ===== ГЕНЕРАЦИЯ ПАРАМЕТРОВ =====
 
@@ -154,7 +152,8 @@ class TestIsRejectedScenarios:
         """[MainPageSignalsInfo] Проверка счетчика отбраковки на состоянии МТ"""
         tag = "MainPageSignalsInfo"
         title = (
-            f"[{tag}] Проверка: {rejection_case.expected_event} - счетчик отбраковки на состоянии МТ показывает отбраковку"
+            f"[{tag}] Проверка: {rejection_case.expected_event} - "
+            f"счетчик отбраковки на состоянии МТ показывает отбраковку"
             f"({rejection_case.name}). ЭФ: Состояние МТ"
         )
         _apply_allure_markers(
