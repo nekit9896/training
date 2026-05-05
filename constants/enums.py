@@ -253,6 +253,33 @@ class RejectionCriteria(IntFlag):
     NEARBY = 1 << 8            # nearbyRejection
     DIAGNOSTIC_INFO = 1 << 9   # diagnInfoRejection
 
+    @property
+    def backend_name(self) -> str:
+        names = {
+            "QUALITY": "qualityRejection",
+            "RANGE": "rangeRejection",
+            "EMPTY": "emptyRejection",
+            "TIME": "timeRejection",
+            "CONSTANT_SIGNAL": "constantSignalRejection",
+            "DISCHARGE": "dischargeRejection",
+            "SIGMA3": "sigma3Rejection",
+            "VTOR": "VTORRejection",
+            "NEARBY": "nearbyRejection",
+            "DIAGNOSTIC_INFO": "diagnInfoRejection",
+        }
+        return names.get(self.name or "", str(int(self)))
+
+    def __str__(self) -> str:
+        raw_value = int(self)
+        if raw_value == 0:
+            return "0"
+
+        active_flags = [flag.backend_name for flag in type(self) if flag.value and flag & self == flag]
+        if active_flags:
+            return f"{'|'.join(active_flags)} ({raw_value})"
+
+        return str(raw_value)
+
 
 class RejectionSensorTag(Enum):
     """Теги датчиков для тестов отбраковки (id, description=tag)"""

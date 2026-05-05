@@ -134,6 +134,52 @@ def localize_as_moscow(input_datetime: datetime) -> None | datetime:
     return input_datetime.astimezone(moscow_tz)
 
 
+def get_rejection_time_window(
+    imitator_start_time: datetime, start_seconds: int | float, end_seconds: int | float, margin_seconds: int | float = 0
+) -> tuple[datetime, datetime]:
+    """
+    Возвращает временное окно для проверки сообщения об отбраковке.
+    """
+    if not imitator_start_time:
+        fail("Пришло пустое значение imitator_start_time")
+
+    imitator_msk = localize_as_moscow(imitator_start_time)
+    range_start = imitator_msk + timedelta(seconds=start_seconds - margin_seconds)
+    range_end = imitator_msk + timedelta(seconds=end_seconds + margin_seconds)
+    return range_start, range_end
+
+
+def find_rejection_journal_message(
+    messages_info: List[ObjectType],
+    tag: str,
+    range_start: datetime,
+    range_end: datetime,
+    technological_section: str,
+    expected_event: str,
+) -> tuple[list[ObjectType], ObjectType | None]:
+    """
+    Фильтрует сообщения журнала по tag и временному диапазону,
+    затем ищет целевое сообщение по technologicalSection и event.
+    """
+    if not messages_info:
+        fail("Список сообщений журнала пуст")
+
+    time_filtered = [
+        msg for msg in messages_info if msg.tag == tag and range_start <= ensure_moscow_timezone(msg.time) <= range_end
+    ]
+    time_filtered.sort(key=lambda msg: ensure_moscow_timezone(msg.time), reverse=True)
+
+    target_msg = next(
+        (
+            msg
+            for msg in time_filtered
+            if msg.technologicalSection == technological_section and msg.event.rstrip() == expected_event
+        ),
+        None,
+    )
+    return time_filtered, target_msg
+
+
 def get_random_item(item_list: List[RandomObjectType]) -> RandomObjectType:
     """
     Получает случайный объект из списка

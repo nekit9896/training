@@ -441,8 +441,11 @@ def pytest_runtest_setup(item):
         except Exception as error:
             pytest.exit(f"[SETUP] [ERROR] ошибка запуска СORE контейнеров: {error}")
 
-        # Сохраняем время старта имитатора для расчёта интервалов утечек в тестах
-        cfg["imitator_start_time"] = stand_manager.start_time
+        # Сохраняем актуальное время старта имитатора для расчёта интервалов утечек в тестах
+        try:
+            cfg["imitator_start_time"] = stand_manager.wait_for_imitator_start_time()
+        except RuntimeError as error:
+            pytest.exit(f"[SETUP] [ERROR] ошибка получения времени старта имитатора: {error}")
 
     yield  # pytest продолжит выполнение теста
 

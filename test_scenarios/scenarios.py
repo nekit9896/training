@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import allure
 import pytest
 
-from constants.enums import Direction, LdsStatus, MessageType, ReplyStatus, StationaryStatus, UserActions
+from constants.enums import Direction, LdsStatus, MessageType, RejectionCriteria, ReplyStatus, StationaryStatus, UserActions
 from constants.test_constants import BaseTN3Constants as TestConst
 from models.get_messages_model import Filtering, FilteringObjects, Pagination
 from test_config.models_for_tests import (
@@ -2124,11 +2124,12 @@ async def rejection_input_signals(ws_client, cfg: IsRejectedConfig, rejection_ca
         ).actual(target_signal.isRejected).expected(True).equal_to()
 
         if rejection_case.expected_criteria_names:
-            criteria = (
-                target_signal.rejection.criteriaNames
+            raw_criteria = (
+                target_signal.rejection.get('criteriaNames')
                 if isinstance(target_signal.rejection, dict)
                 else None
             )
+            criteria = RejectionCriteria(raw_criteria) if raw_criteria is not None else None
             StepCheck(
                 f"Проверка rejection.criteriaNames для {sensor.description} (id={sensor.id})",
                 "criteriaNames",
@@ -2136,53 +2137,53 @@ async def rejection_input_signals(ws_client, cfg: IsRejectedConfig, rejection_ca
             ).actual(criteria).expected(rejection_case.expected_criteria_names).equal_to()
 
 
-async def rejection_journal(
-    ws_client, cfg: IsRejectedConfig, rejection_case: RejectionTestCase, imitator_start_time
-):
+async def rejection_journal(ws_client, cfg: IsRejectedConfig, rejection_case: RejectionTestCase, imitator_start_time):
     """
     Проверка наличия записи об отбраковке в журнале по GetMessagesRequest.
     """
     sensor = rejection_case.sensor
-    with allure.step("Запрос сообщений журнала с фильтром messageTypes=REJECTION"):
+    with allure.step("Подготовка запроса и ожидаемого диапазона времени"):
         request_body = t_utils.create_journal_req_body(
-            pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
+            pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_REJECT_LIMIT, direction=Direction.FIRST.value),
             filtering=Filtering(
                 messageTypes=int(MessageType.REJECTION),
                 objects=FilteringObjects(tuId=cfg.tu_id),
             ),
         )
+        range_start, range_end = t_utils.get_rejection_time_window(
+            imitator_start_time=imitator_start_time,
+            start_seconds=rejection_case.time_range_start_s,
+            end_seconds=rejection_case.time_range_end_s,
+            margin_seconds=TestConst.SEC_PER_MIN,
+        )
+
+    with allure.step("Получение сообщений журнала с фильтром messageTypes=REJECTION"):
         payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
         parsed_payload = parser.parse_journal_msg(payload)
         messages_info = parsed_payload.replyContent.messagesInfo
 
+    with allure.step("Проверка наличия сообщений в журнале"):
         StepCheck("Проверка наличия сообщений в журнале", "messagesInfo").actual(messages_info).is_not_empty()
 
     with allure.step(
-        f"Фильтрация сообщений по диапазону слоя данных "
-        f"({rejection_case.time_range_start_s}-{rejection_case.time_range_end_s} с от старта имитатора)"
+        f"Подготовка сообщений к проверке по диапазону слоя данных "
+        f"({rejection_case.time_range_start_s - TestConst.SEC_PER_MIN}-"
+        f"{rejection_case.time_range_end_s + TestConst.SEC_PER_MIN} с от старта имитатора)"
     ):
-        imitator_msk = t_utils.localize_as_moscow(imitator_start_time)
-        range_start = imitator_msk + timedelta(seconds=rejection_case.time_range_start_s)
-        range_end = imitator_msk + timedelta(seconds=rejection_case.time_range_end_s)
-
-        time_filtered = [
-            msg
-            for msg in messages_info
-            if msg.tag == sensor.description
-            and range_start <= t_utils.ensure_moscow_timezone(msg.time) <= range_end
-        ]
-        time_filtered.sort(key=lambda msg: t_utils.ensure_moscow_timezone(msg.time), reverse=True)
-
-        target_msg = next(
-            (msg for msg in time_filtered if msg.technologicalSection == cfg.tu_name),
-            None,
+        time_filtered, target_msg = t_utils.find_rejection_journal_message(
+            messages_info=messages_info,
+            tag=sensor.description,
+            range_start=range_start,
+            range_end=range_end,
+            technological_section=cfg.tu_name,
+            expected_event=rejection_case.expected_event,
         )
 
         allure.attach(
             f"Всего получено сообщений: {len(messages_info)}\n"
             f"Диапазон фильтрации: {range_start} - {range_end}\n"
             f"После фильтрации по tag='{sensor.description}' и времени: {len(time_filtered)}\n"
-            f"Найдено ли сообщение с technologicalSection='{cfg.tu_name}': "
+            f"Найдено ли сообщение с technologicalSection='{cfg.tu_name}' и событием {rejection_case.expected_event}: "
             f"{'True' if target_msg else 'False'}",
             name="Результат фильтрации сообщений журнала",
             attachment_type=allure.attachment_type.TEXT,
@@ -2190,7 +2191,7 @@ async def rejection_journal(
 
     with allure.step(
         f"Проверка: найдено ли сообщение с tag='{sensor.description}' (id={sensor.id}) "
-        f"в диапазоне {rejection_case.time_range_start_s}-{rejection_case.time_range_end_s} с"
+        f"в диапазоне {range_start}-{range_end} с"
     ):
         if target_msg is None:
             pytest.fail(
@@ -2201,13 +2202,13 @@ async def rejection_journal(
             )
 
     with SoftAssertions() as soft_failures:
-        StepCheck("Проверка mainPipeline", "mainPipeline", soft_failures).actual(
-            target_msg.mainPipeline
-        ).expected(cfg.main_pipeline).equal_to()
+        StepCheck("Проверка mainPipeline", "mainPipeline", soft_failures).actual(target_msg.mainPipeline).expected(
+            cfg.main_pipeline
+        ).equal_to()
 
-        StepCheck("Проверка messageType", "messageType", soft_failures).actual(
-            target_msg.messageType
-        ).expected(TestConst.JOURNAL_MESSAGE_TYPE_REJECTION).equal_to()
+        StepCheck("Проверка messageType", "messageType", soft_failures).actual(target_msg.messageType).expected(
+            TestConst.JOURNAL_MESSAGE_TYPE_REJECTION
+        ).equal_to()
 
         StepCheck("Проверка technologicalSection не пустой", "technologicalSection", soft_failures).actual(
             target_msg.technologicalSection
@@ -2222,13 +2223,13 @@ async def rejection_journal(
         ).expected(sensor.description).equal_to()
 
         if rejection_case.expected_signal_name:
-            StepCheck("Проверка signalName", "signalName", soft_failures).actual(
-                target_msg.signalName
-            ).expected(rejection_case.expected_signal_name).equal_to()
+            StepCheck("Проверка signalName", "signalName", soft_failures).actual(target_msg.signalName).expected(
+                rejection_case.expected_signal_name
+            ).equal_to()
 
         if rejection_case.expected_event:
             StepCheck("Проверка event", "event", soft_failures).actual(
-                (target_msg.event or "").strip()
+                (target_msg.event.rstrip() or "").strip()
             ).expected(rejection_case.expected_event).equal_to()
 
 
@@ -2328,10 +2329,15 @@ async def rejection_scheme_signals_state(
         ).actual(target_signal.isImitated).expected(False).equal_to()
 
         if rejection_case.expected_criteria_names and target_signal.rejection is not None:
+            raw_criteria = (
+                target_signal.rejection.get('criteriaNames')
+                if isinstance(target_signal.rejection, dict)
+                else None
+            )
             StepCheck(
                 f"Проверка rejection.criteriaNames для {sensor.description} (id={sensor.id})",
                 "criteriaNames",
                 soft_failures,
             ).actual(
-                target_signal.rejection.criteriaNames if isinstance(target_signal.rejection, dict) else None
+                RejectionCriteria(raw_criteria) if raw_criteria is not None else None
             ).expected(rejection_case.expected_criteria_names).equal_to()
