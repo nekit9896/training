@@ -343,10 +343,11 @@ def find_diagnostic_areas_by_ids(flow_areas: List[FlowArea], id_list: List[int])
     Получает список ДУ из списка flow_areas по списку id
     """
     diagnostic_areas = [
-        find_diagnostic_area_by_id(flow_areas, diagnostic_area_id)
+        result
         for diagnostic_area_id in id_list
-        if find_diagnostic_area_by_id(flow_areas, diagnostic_area_id) is not None
+        if (result := find_diagnostic_area_by_id(flow_areas, diagnostic_area_id)) is not None
     ]
+
     return diagnostic_areas
 
 
@@ -355,10 +356,9 @@ def find_diagnostic_areas_by_pipe_ids(flow_areas: List[FlowArea], id_list: List[
     Получает список ДУ из списка flow_areas по списку pipe id
     """
     diagnostic_areas = [
-        find_diagnostic_area_by_pipe_id(flow_areas, pipe_id)
-        for pipe_id in id_list
-        if find_diagnostic_area_by_id(flow_areas, pipe_id) is not None
+        result for pipe_id in id_list if (result := find_diagnostic_area_by_pipe_id(flow_areas, pipe_id)) is not None
     ]
+
     return diagnostic_areas
 
 
@@ -367,13 +367,6 @@ def find_base_diagnostic_areas(flow_areas: List[FlowArea]) -> List[DiagnosticAre
     Получает список базовых ДУ из списка flow_areas
     """
     return find_diagnostic_areas_by_ids(flow_areas, TestConst.DIAGNOSTIC_AREA_BASE_IDS)
-
-
-def find_representative_diagnostic_areas(flow_areas: List[FlowArea]) -> List[DiagnosticArea]:
-    """
-    Получает список показательных ДУ из списка flow_areas, для проверки режимов СОУ
-    """
-    return find_diagnostic_areas_by_ids(flow_areas, TestConst.REPRESENTATIVE_DIAGNOSTIC_AREA_IDS)
 
 
 def find_leak_by_coordinate(
@@ -565,7 +558,7 @@ def parse_stationary_status_reasons(
     """
     Получение списка stationaryStatusReasons, соответствующего stationaryStatus
     """
-    enum_cls = get_reason_enum_by_lds_status(stationary_status, failures)
+    enum_cls = get_reason_enum_by_stationary_status(stationary_status, failures)
     flags = parse_bit_flags(stationary_status_reasons, enum_cls, failures)
     return flags
 

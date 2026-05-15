@@ -107,6 +107,8 @@ def pytest_runtest_makereport(item, call):
 SMOKE_SUITE_LEVEL_MAPPING = {
     'test_basic_info': 'basic_info_test',
     'test_journal_info': 'journal_info_test',
+    'test_imitate_flowmeter_signal': 'imitate_flowmeter_signal_test',
+    'test_imitate_pressure_sensor_signal': 'imitate_pressure_sensor_signal_test',
     'test_lds_status_initialization': 'lds_status_initialization_test',
     'test_lds_status_init_in_journal': 'lds_status_init_in_journal_test',
     'test_main_page_info': 'main_page_info_test',
@@ -119,22 +121,28 @@ SMOKE_SUITE_LEVEL_MAPPING = {
     'test_mask_du_on_mini_scheme': 'mask_du_on_mini_scheme_test',
     'test_unmask_du_on_mini_scheme': 'unmask_du_on_mini_scheme_test',
     'test_lds_status_after_confirming_leak': 'lds_status_after_confirming_leak_test',
+    'test_lds_status_completed_leak': 'lds_status_completed_leak_test',
 }
 
 # Regress-тесты режимов СОУ (маркеры из LDSStatusConfig)
 LDS_STATUS_SUITE_LEVEL_MAPPING = {
     'test_lds_status_basic_info': 'lds_status_basic_info_test',
+    'test_lds_status_init_accumulation_data': 'lds_status_init_accumulation_data_test',
     'test_lds_status_init_cold_start': 'lds_status_init_cold_start_test',
     'test_lds_status_init_exiting_faulty': 'lds_status_init_exiting_faulty_test',
+    'test_lds_status_init_switching_shut_off': 'lds_status_init_switching_shut_off_test',
     'test_lds_status_serviceable_after_cold_start': 'lds_status_serviceable_after_cold_start_test',
+    'test_lds_status_serviceable_after_switching_shut_off': 'lds_status_serviceable_after_switching_shut_off_test',
     'test_lds_status_serviceable_after_deg_absence_min_pressure_sensors': 'lds_status_serviceable_after_deg_absence_min_pressure_sensors_test',  # noqa: E501
-    'test_lds_status_serviceable_after_deg_starting_pumping_out_pump': 'lds_status_serviceable_after_deg_starting_pumping_out_pumps_test',  # noqa: E501
+    'test_lds_status_serviceable_after_deg_starting_pumping_out_pumps': 'lds_status_serviceable_after_deg_starting_pumping_out_pumps_test',  # noqa: E501
+    'test_lds_status_serviceable_after_deg_faulty_pressure_sensors_at_pump': 'lds_status_serviceable_after_deg_faulty_pressure_sensors_at_pump_test',  # noqa: E501
     'test_lds_status_serviceable_after_faulty': 'lds_status_serviceable_after_faulty_test',
     'test_lds_status_degradation_additive_injectors_operation': 'lds_status_deg_additive_injectors_operation_test',
     'test_lds_status_degradation_exceeding_distance_between_pressure_sensors': 'lds_status_deg_exceeding_distance_between_pressure_sensors_test',  # noqa: E501
-    'test_lds_status_degradation_not_enough_pressure_sensors': 'lds_status_deg_not_enough_pressure_sensors_test',
+    'test_lds_status_degradation_absence_min_pressure_sensors': 'lds_status_deg_absence_min_pressure_sensors_test',
     'test_lds_status_degradation_faulty_pressure_sensors_at_pump_station': 'lds_status_deg_faulty_pressure_sensors_at_pump_station_test',  # noqa: E501
     'test_lds_status_degradation_gravity_section_pumping': 'lds_status_deg_gravity_section_pumping_test',
+    'test_lds_status_degradation_gravity_section_pumping_in_stopping': 'lds_status_deg_gravity_section_pumping_in_stopping_test',  # noqa: E501
     'test_lds_status_degradation_pig_sensor_passage': 'lds_status_deg_pig_sensor_passage_test',
     'test_lds_status_degradation_starting_pumping_out_pumps': 'lds_status_deg_starting_pumping_out_pumps_test',
     'test_lds_status_degradation_exceeding_distance_between_flow_meters': 'lds_status_deg_exceeding_distance_between_flow_meters_test',  # noqa: E501
@@ -145,6 +153,7 @@ LDS_STATUS_SUITE_LEVEL_MAPPING = {
     'test_lds_status_degradation_rejection_density_and_viscosity_on_du_3': 'lds_status_deg_rejection_density_and_viscosity_on_du_3_test',  # noqa: E501
     'test_lds_status_degradation_rejection_density_and_viscosity_on_du_5': 'lds_status_deg_rejection_density_and_viscosity_on_du_5_test',  # noqa: E501
     'test_lds_status_faulty_absence_min_flow_meters': 'lds_status_faulty_absence_min_flow_meters_test',
+    'test_lds_status_faulty_absence_min_pressure_sensors': 'lds_status_faulty_absence_min_pressure_sensors_test',
 }
 
 # Тесты уровня утечки (маркеры из LeakTestConfig - параметр leak)
@@ -162,11 +171,12 @@ LEAK_LEVEL_TEST_MAPPING = {
     'test_balance_algorithm_leak_detected': 'balance_algorithm_leak_detected_test',
     'test_the_leak_is_complete_on_kg': 'the_leak_is_complete_on_kg_test',
     'test_leak_is_complete_in_output_signals': 'leak_is_complete_in_output_signals_test',
-    'test_message_about_complete_leak_in_journal': 'message_about_complete_leak_in_journal_test',
     'test_complete_tu_leaks_info_content': 'complete_tu_leaks_info_content_test',
     'test_all_leaks_is_empty': 'all_leaks_is_empty_test',
     'test_leak_is_confirm_on_main_page': 'leak_is_confirm_on_main_page_test',
     'test_leak_is_complete_on_main_page': 'leak_is_complete_on_main_page_test',
+    'test_balance_algorithm_leak_completed': 'balance_algorithm_leak_completed_test',
+    'test_completed_leak_info_in_journal': 'completed_leak_info_in_journal_test',
 }
 
 # Тесты уровня отбраковки (маркеры из RejectionTestCase - параметр rejection_case)
