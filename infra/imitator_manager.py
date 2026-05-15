@@ -19,11 +19,11 @@ class ImitatorManager:
     imitator_manager.run_imitator()
     imitator_manager.log_imitator_stdout()
     imitator_manager.wait_and_stop_imitator()
-    Для получения процесса с запущеным имитатором:
+    Для получения процесса с запущенным имитатором:
     imitator_process = imitator_manager.imitator_process
     Для остановки имитатора:
     imitator_manager.stop_imitator()
-    Для получения процесса с запущеным имитатором
+    Для получения процесса с запущенным имитатором
     """
 
     def __init__(self, client: SubprocessClient, imitator_run_cmd: str) -> None:
@@ -120,4 +120,3 @@ class ImitatorManager:
             raise
         finally:
             self.stop_imitator()
-            

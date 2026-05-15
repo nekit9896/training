@@ -316,26 +316,26 @@ class ClickHouseCmdGenerator(BaseCmdGenerator):
         path_to_remote_configuration = self._generate_path_to_remote_configuration()
         return f"{self._scp_cmd} {self._username}@{self._host}:{path_to_remote_configuration} ."
 
-    def generate_check_sensor_data_click_cmd(self, evo_id_pairs: List[tuple]) -> str:
+    def generate_check_sensor_data_click_cmd(self, evo_id_pairs: List[tuple], table_name: str) -> str:
         """
         Генерирует команду проверки данных в ClickHouse по паре значений objectId и parameterId
         """
         sql_evo_id_pairs = self._generate_sql_evo_id_pairs(evo_id_pairs)
         return (
-            f"echo \'SELECT count() FROM {CH_const.LAST_VALUE_TABLE_NAME} WHERE "
+            f"echo \'SELECT COUNT(*) FROM {table_name} WHERE "
             f"({CH_const.OBJECT_ID_KEY_NAME}, {CH_const.PARAMETER_ID_KEY_NAME}) IN ({sql_evo_id_pairs})\' "
-            "| docker exec -i clickhouse clickhouse-client"
+            f"| docker exec -i {CH_const.NAME_CONTAINER} clickhouse-client"
         )
 
-    def generate_delete_clickhouse_keys_cmd(self, evo_id_pairs: List[tuple]) -> str:
+    def generate_delete_clickhouse_keys_cmd(self, evo_id_pairs: List[tuple], table_name: str) -> str:
         """
         Генерирует команду удаления данных в ClickHouse по парам значений objectId и parameterId
         """
         sql_evo_id_pairs = self._generate_sql_evo_id_pairs(evo_id_pairs)
         return (
-            f"echo \'DELETE FROM {CH_const.LAST_VALUE_TABLE_NAME} WHERE "
+            f"echo \'DELETE FROM {table_name} WHERE "
             f"({CH_const.OBJECT_ID_KEY_NAME}, {CH_const.PARAMETER_ID_KEY_NAME}) IN ({sql_evo_id_pairs})\' "
-            "| docker exec -i clickhouse clickhouse-client"
+            f"| docker exec -i {CH_const.NAME_CONTAINER} clickhouse-client"
         )
 
     @staticmethod
@@ -350,4 +350,3 @@ class ClickHouseCmdGenerator(BaseCmdGenerator):
         Создает путь к файлу конфигурации конкретного стенда
         """
         return PurePosixPath(CH_const.CONFIG_PATH) / self._configuration_file_name
-        

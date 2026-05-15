@@ -1,0 +1,25 @@
+[
+    1,
+    {
+      
+    },
+    None,
+    'MainPageSignalsInfoContent',
+    [
+      {
+        'replyStatus': 200,
+        'replyErrors': None,
+        'replyContent': {
+          'tuId': 3,
+          'signalsInfo': {
+            'numberOfRejectedSignals': 8,
+            'numberOfMaskedSignals': 0,
+            'numberOfImitatedSignals': 0
+          }
+        }
+      }
+    ],
+    [
+      
+    ]
+  ]

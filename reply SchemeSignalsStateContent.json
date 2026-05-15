@@ -1,0 +1,176 @@
+{
+  "text": [
+    1,
+    {
+
+    },
+    None,
+    'SchemeSignalsStateContent',
+    [
+      {
+        'replyStatus': 200,
+        'replyErrors': None,
+        'replyContent': {
+          'tuId': 3,
+          'signalsStates': [
+            [
+              3,
+              {
+                'id': 32237,
+                'quality': None,
+                'isRejected': False,
+                'isMasked': False,
+                'isImitated': False,
+                'rejection': {
+                  'criteriaNames': 0
+                },
+                'generationTime': None,
+                'receivedTime': None,
+                'value': None,
+                'imitation': None
+              }
+            ],
+            [
+              3,
+              {
+                'id': 32239,
+                'quality': None,
+                'isRejected': False,
+                'isMasked': False,
+                'isImitated': False,
+                'rejection': {
+                  'criteriaNames': 0
+                },
+                'generationTime': None,
+                'receivedTime': None,
+                'value': None,
+                'imitation': None
+              }
+            ],
+            [
+              1,
+              {
+                'id': 32238,
+                'quality': None,
+                'isRejected': False,
+                'isMasked': False,
+                'isImitated': False,
+                'rejection': {
+                  'criteriaNames': 0
+                },
+                'generationTime': None,
+                'receivedTime': None,
+                'value': None,
+                'imitation': None
+              }
+            ],
+            [
+              3,
+              {
+                'id': 30166,
+                'quality': 1,
+                'isRejected': False,
+                'isMasked': False,
+                'isImitated': False,
+                'rejection': {
+                  'criteriaNames': 0
+                },
+                'generationTime': [
+                  Timestamp(seconds=1775052246,
+                  nanoseconds=0),
+                  0
+                ],
+                'receivedTime': [
+                  Timestamp(seconds=1775052299,
+                  nanoseconds=240000000),
+                  0
+                ],
+                'value': 849.42724609375,
+                'imitation': None
+              }
+            ],
+            [
+              3,
+              {
+                'id': 30167,
+                'quality': 1,
+                'isRejected': False,
+                'isMasked': False,
+                'isImitated': False,
+                'rejection': {
+                  'criteriaNames': 0
+                },
+                'generationTime': [
+                  Timestamp(seconds=1775052246,
+                  nanoseconds=0),
+                  0
+                ],
+                'receivedTime': [
+                  Timestamp(seconds=1775052299,
+                  nanoseconds=241000000),
+                  0
+                ],
+                'value': 849.530212402344,
+                'imitation': None
+              }
+            ],
+            [
+              3,
+              {
+                'id': 30168,
+                'quality': 1,
+                'isRejected': False,
+                'isMasked': False,
+                'isImitated': False,
+                'rejection': {
+                  'criteriaNames': 0
+                },
+                'generationTime': [
+                  Timestamp(seconds=1775052246,
+                  nanoseconds=0),
+                  0
+                ],
+                'receivedTime': [
+                  Timestamp(seconds=1775052299,
+                  nanoseconds=242000000),
+                  0
+                ],
+                'value': 849.369445800781,
+                'imitation': None
+              }
+            ],
+          ],
+          'toStates': [
+            {
+              'id': 401,
+              'isInWork': True
+            },
+            {
+              'id': 402,
+              'isInWork': True
+            },
+            {
+              'id': 403,
+              'isInWork': True
+            },
+            {
+              'id': 404,
+              'isInWork': False
+            },
+            {
+              'id': 405,
+              'isInWork': False
+            },
+            {
+              'id': 406,
+              'isInWork': False
+            }
+          ]
+        }
+      }
+    ],
+    [
+
+    ]
+  ]
+}

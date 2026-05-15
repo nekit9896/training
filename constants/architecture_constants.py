@@ -5,7 +5,7 @@ class ImitatorConstants:
     TEST_SETTINGS_KEY_NAME: str = "test_settings"
     IMITATOR_FLAGS_KEY_NAME: str = "imitator_flags"
     IMITATOR_TIME_FORMAT: str = "%Y%m%dT%H%M%S"
-    IMITATOR_START_DELAY_S: int = 50
+    IMITATOR_START_DELAY_S: int = 100
     IMITATOR_FINISH_DELAY_MINUTE: float = 2.0
     IMITATOR_CHECK_CMD: str = "pgrep -f Playground"
     IMITATOR_KILL_CMD: str = "pkill -f Playground"
@@ -33,7 +33,8 @@ class ImitatorConstants:
     CMD_STATUS_OK: str = "OK"
     CMD_STATUS_FAIL: str = "FAIL"
     REDIS_STAND_ADDRESS: str = "10.7.49.210"
-    CORE_START_DELAY_S: int = IMITATOR_START_DELAY_S + 20
+    CORE_START_DELAY_S: int = 5
+    ALL_MS_START_DELAY_S: int = IMITATOR_START_DELAY_S + CORE_START_DELAY_S
     ENCODING_UTF_8: str = "utf-8"
     ENCODING_UTF_8_SIG: str = "utf-8-sig"
     ENCODING_LATIN_1: str = "latin-1"

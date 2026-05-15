@@ -18,7 +18,7 @@ import pkgutil
 from pathlib import Path
 from typing import Dict, List, Type, TypeVar
 
-from test_config.models_for_tests import BaseSuiteConfig, LDSStatusConfig, SmokeSuiteConfig
+from test_config.models_for_tests import BaseSuiteConfig, IsRejectedConfig, LDSStatusConfig, SmokeSuiteConfig
 
 # Путь к директории datasets
 _DATASETS_PATH = Path(__file__).parent
@@ -73,6 +73,9 @@ ALL_SMOKE_CONFIGS = _discover_configs_by_type(SmokeSuiteConfig)
 # ===== Regress-тесты режимов СОУ =====
 ALL_LDS_STATUS_CONFIGS = _discover_configs_by_type(LDSStatusConfig)
 
+# ===== Regress-тесты отбраковки сигналов =====
+ALL_IS_REJECTED_CONFIGS = _discover_configs_by_type(IsRejectedConfig)
+
 
 def get_config_by_name(name: str) -> BaseSuiteConfig:
     """Получить конфиг по имени suite_name"""
@@ -99,6 +102,7 @@ def __dir__():
         "MULTI_LEAK_CONFIGS",
         "ALL_SMOKE_CONFIGS",
         "ALL_LDS_STATUS_CONFIGS",
+        "ALL_IS_REJECTED_CONFIGS",
         "get_config_by_name",
     ]
 
@@ -108,5 +112,6 @@ __all__ = [
     "MULTI_LEAK_CONFIGS",
     "ALL_SMOKE_CONFIGS",
     "ALL_LDS_STATUS_CONFIGS",
+    "ALL_IS_REJECTED_CONFIGS",
     "get_config_by_name",
 ] + list(_CONFIG_CACHE.keys())

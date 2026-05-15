@@ -10,13 +10,16 @@ from dacite import Config, DaciteError, from_dict
 from msgpack import Timestamp
 from pytest import fail
 
+import models.subscribe_scheme_signals_state_model as signals_state_model
 from constants.architecture_constants import WebSocketClientConstants
 from models.acknowledge_leak_model import AcknowledgeLeakReply
 from models.basic_info_model import BasicInfoReply
 from models.get_input_signals_model import GetInputSignalsReply
 from models.get_messages_model import GetMessagesReply
 from models.get_output_signals_model import GetOutputSignalsReply
+from models.imitate_signal_model import ImitateSignalReply
 from models.launch_pig_model import LaunchPigReply
+from models.mask_lds_command_model import MaskLdsReply
 from models.mask_signal_model import MaskSignalReply
 from models.subscribe_all_leaks_info_model import SubscribeAllLeaksInfoReply
 from models.subscribe_balance_algorithm_results_model import SubscribeBalanceAlgorithmResultsReply
@@ -27,10 +30,15 @@ from models.subscribe_main_page_info_model import SubscribeMainPageInfoReply
 from models.subscribe_main_page_signals_info_model import SubscribeMainPageSignalsInfoReply
 from models.subscribe_output_signals_model import SubscribeOutputSignalsReply
 from models.subscribe_tu_leaks_info_model import SubscribeTuLeaksInfoReply
+from models.unimitate_signal_model import UnimitateSignalReply
+from models.unmask_lds_command_model import UnmaskLdsReply
 from models.unmask_signal_model import UnmaskSignalReply
 
 MessageType = TypeVar("MessageType")  # создает типовую переменную для парсинга сообщений
 ContentType = TypeVar("ContentType")
+
+_SIGNAL_DATA_POSITION = 1
+_MIN_SIGNAL_TUPLE_LENGTH = 2
 
 
 class WsMessageParser:
@@ -100,6 +108,12 @@ class WsMessageParser:
         """
         return self._find_and_parse_message(data_class=SubscribeCommonSchemeReply, data=data)
 
+    def parse_imitate_signal_msg(self, data: list) -> ImitateSignalReply:
+        """
+        Парсит сообщение ImitateSignal
+        """
+        return self._find_and_parse_message(data_class=ImitateSignalReply, data=data)
+
     def parse_input_signals_info_msg(self, data: list) -> SubscribeInputSignalsReply:
         """
         Парсит сообщение InputSignalsInfo
@@ -112,11 +126,10 @@ class WsMessageParser:
             replyErrors=payload.get('replyErrors'),
             replyContent=SubscribeInputSignalsContent(
                 tuId=reply_content.get('tuId'),
-                # Получает второй элемент из списка и парсит его
                 inputSignals=[
-                    self._parse_message(InputSignal, item[1])
+                    self._parse_message(InputSignal, item[_SIGNAL_DATA_POSITION])
                     for item in input_signals_list
-                    if isinstance(item, list) and isinstance(item[1], dict)
+                    if self._is_valid_signal_tuple(item)
                 ],
             ),
         )
@@ -166,6 +179,18 @@ class WsMessageParser:
         """
         return self._find_and_parse_message(data_class=MaskSignalReply, data=data)
 
+    def parse_mask_lds_message(self, data: list) -> MaskLdsReply:
+        """
+        Парсит сообщение maskLDSRequest
+        """
+        return self._find_and_parse_message(data_class=MaskLdsReply, data=data)
+
+    def parse_unmask_lds_message(self, data: list) -> UnmaskLdsReply:
+        """
+        Парсит сообщение UnmaskLDSRequest
+        """
+        return self._find_and_parse_message(data_class=UnmaskLdsReply, data=data)
+
     def parse_output_signals_info_msg(self, data: list) -> SubscribeOutputSignalsReply:
         """
         Парсит OutputSignalsInfo сообщение
@@ -189,6 +214,26 @@ class WsMessageParser:
         Парсит tuLeaksInfo сообщение
         """
         return self._find_and_parse_message(data_class=SubscribeTuLeaksInfoReply, data=data)
+
+    def parse_scheme_signals_state_msg(self, data: list) -> signals_state_model.SchemeSignalsStateReply:
+        """
+        Парсит сообщение SchemeSignalsStateContent.
+        signalsStates приходят как [[signal_type, data_dict], ...] - конвертируем кортежи в словари.
+        """
+        payload = self._find_reply_status_in_ws_msg(data)
+        reply_content = payload.get('replyContent', {})
+        reply_content['signalsStates'] = [
+            item[_SIGNAL_DATA_POSITION]
+            for item in reply_content.get('signalsStates', [])
+            if self._is_valid_signal_tuple(item)
+        ]
+        return self._parse_message(data_class=signals_state_model.SchemeSignalsStateReply, data=payload)
+
+    def parse_unimitate_signal_msg(self, data: list) -> UnimitateSignalReply:
+        """
+        Парсит сообщение UnimitateSignal
+        """
+        return self._find_and_parse_message(data_class=UnimitateSignalReply, data=data)
 
     def parse_unmask_signal_msg(self, data: list) -> UnmaskSignalReply:
         """
@@ -239,6 +284,15 @@ class WsMessageParser:
             return message
         except DaciteError as error:
             fail(f"Ошибка парсинга сообщения типа: {data_class_name} текст ошибки: {error}")
+
+    @staticmethod
+    def _is_valid_signal_tuple(item: Any) -> bool:
+        """Проверяет, что элемент - кортеж/список [signal_type, signal_data_dict]."""
+        return (
+            isinstance(item, (list, tuple))
+            and len(item) >= _MIN_SIGNAL_TUPLE_LENGTH
+            and isinstance(item[_SIGNAL_DATA_POSITION], dict)
+        )
 
     @staticmethod
     def _find_reply_status_in_ws_msg(data: List[Any]) -> Optional[Dict[str, Any]]:
