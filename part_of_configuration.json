@@ -1,0 +1,352 @@
+{
+  "temperatureSensors": [
+    {
+      "type": 0,
+      "temperature": {
+        "id": 30160,
+        "address": "AK.CHTN.NPS_TIH_5.ToilOut",
+        "dataSourceId": 0,
+        "dataType": 2,
+        "defaultValue": "25",
+        "evoInfo": {
+          "evoObjectId": 91879,
+          "evoParameterId": 722
+        }
+      },
+      "position": [
+        {
+          "layerId": 0,
+          "textCoordinates": {
+            "x": 0,
+            "y": -60
+          },
+          "coordinates": {
+            "x": 0,
+            "y": 50
+          },
+          "connectionCoordinates": {
+            "x": -3173,
+            "y": 135
+          },
+          "rotationAngle": 0,
+          "neighborId": 999204051
+        },
+        {
+          "layerId": 1,
+          "textCoordinates": {
+            "x": 0,
+            "y": -60
+          },
+          "coordinates": {
+            "x": 0,
+            "y": 50
+          },
+          "connectionCoordinates": {
+            "x": -3173,
+            "y": 135
+          },
+          "rotationAngle": 0,
+          "neighborId": 999204051
+        }
+      ],
+      "sectionCoordinate": 0,
+      "realObjectId": 0,
+      "shortName": "",
+      "name": "Т-Н-3.НПС-5 «Тихорецкая». Температура вых",
+      "distance": 0,
+      "height": 87.42,
+      "id": 990162033
+    },
+    {
+      "type": 0,
+      "temperature": {
+        "id": 30161,
+        "address": "AK.CHTN.NPS_KRIM_2.ToilOut",
+        "dataSourceId": 0,
+        "dataType": 2,
+        "defaultValue": "25",
+        "evoInfo": {
+          "evoObjectId": 91880,
+          "evoParameterId": 722
+        }
+      },
+      "position": [
+        {
+          "layerId": 0,
+          "textCoordinates": {
+            "x": 0,
+            "y": 0
+          },
+          "coordinates": {
+            "x": 0,
+            "y": 50
+          },
+          "connectionCoordinates": {
+            "x": 11792,
+            "y": -173
+          },
+          "rotationAngle": 0,
+          "neighborId": 1474
+        },
+        {
+          "layerId": 1,
+          "textCoordinates": {
+            "x": 0,
+            "y": 0
+          },
+          "coordinates": {
+            "x": 0,
+            "y": 50
+          },
+          "connectionCoordinates": {
+            "x": 11792,
+            "y": -173
+          },
+          "rotationAngle": 0,
+          "neighborId": 1474
+        }
+      ],
+      "sectionCoordinate": 0,
+      "realObjectId": 0,
+      "shortName": "",
+      "name": "Т-Н-3.НПС-2 «Крымская». Температура вых",
+      "distance": 225700,
+      "height": 99.5,
+      "id": 990162034
+    }
+  ],
+  "flowMeters": [
+    {
+      "flow": {
+        "id": 30146,
+        "address": "AK.CHTN.NPS_TIH_5.UZR_1.Vmom",
+        "dataSourceId": 0,
+        "dataType": 2,
+        "defaultValue": "0",
+        "evoInfo": {
+          "evoObjectId": 75353,
+          "evoParameterId": 704
+        }
+      },
+      "vtorSignal": {
+        "id": 31728,
+        "address": "AK.CHTN.NPS_TIH_5.UZR_1.Remont.Status",
+        "dataSourceId": 0,
+        "dataType": 1,
+        "defaultValue": "0",
+        "evoInfo": {
+          "evoObjectId": 75353,
+          "evoParameterId": 705
+        }
+      },
+      "status": {
+        "id": 0,
+        "address": null,
+        "dataSourceId": 0,
+        "dataType": 1,
+        "defaultValue": "",
+        "evoInfo": {
+          "evoObjectId": 0,
+          "evoParameterId": 0
+        }
+      },
+      "typeId": 8000,
+      "diagnosticSignals": [
+        {
+          "diagnosticSignalId": 8001,
+          "signal": {
+            "id": 32849,
+            "address": "AK.CHTN.NPS_TIH_5.UZR_1.PowerSignal1",
+            "dataSourceId": 0,
+            "dataType": 2,
+            "defaultValue": "0",
+            "evoInfo": {
+              "evoObjectId": 75354,
+              "evoParameterId": 706
+            }
+          }
+        },
+        {
+          "diagnosticSignalId": 8001,
+          "signal": {
+            "id": 32850,
+            "address": "AK.CHTN.NPS_TIH_5.UZR_1.PowerSignal2",
+            "dataSourceId": 0,
+            "dataType": 2,
+            "defaultValue": "0",
+            "evoInfo": {
+              "evoObjectId": 75355,
+              "evoParameterId": 707
+            }
+          }
+        },
+        {
+          "diagnosticSignalId": 8001,
+          "signal": {
+            "id": 32851,
+            "address": "AK.CHTN.NPS_TIH_5.UZR_1.PowerSignalAvg",
+            "dataSourceId": 0,
+            "dataType": 2,
+            "defaultValue": "0",
+            "evoInfo": {
+              "evoObjectId": 75357,
+              "evoParameterId": 708
+            }
+          }
+        },
+        {
+          "diagnosticSignalId": 8002,
+          "signal": {
+            "id": 32852,
+            "address": "AK.CHTN.NPS_TIH_5.UZR_1.Air",
+            "dataSourceId": 0,
+            "dataType": 2,
+            "defaultValue": "0",
+            "evoInfo": {
+              "evoObjectId": 91601,
+              "evoParameterId": 709
+            }
+          }
+        },
+        {
+          "diagnosticSignalId": 8003,
+          "signal": {
+            "id": 32853,
+            "address": "AK.CHTN.NPS_TIH_5.UZR_1.EmptyPipe",
+            "dataSourceId": 0,
+            "dataType": 3,
+            "defaultValue": "False",
+            "evoInfo": {
+              "evoObjectId": 91602,
+              "evoParameterId": 710
+            }
+          }
+        },
+        {
+          "diagnosticSignalId": 8003,
+          "signal": {
+            "id": 32854,
+            "address": "AK.CHTN.NPS_TIH_5.UZR_1.EmptyPipe2",
+            "dataSourceId": 0,
+            "dataType": 3,
+            "defaultValue": "False",
+            "evoInfo": {
+              "evoObjectId": 91603,
+              "evoParameterId": 711
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "blockValves": [
+    {
+      "fullCapacity": 20000,
+      "status": {
+        "id": 30188,
+        "address": "AK.CHTN.LU_TIHVEL.KP_7.SW_6-3.Status",
+        "dataSourceId": 0,
+        "dataType": 1,
+        "defaultValue": "1.0",
+        "evoInfo": {
+          "evoObjectId": 91234,
+          "evoParameterId": 654
+        }
+      },
+      "imitationMode": {
+        "id": 30764,
+        "address": "AK.CHTN.LU_TIHVEL.KP_7.SW_6-3.Sim",
+        "dataSourceId": 0,
+        "dataType": 3,
+        "defaultValue": "False",
+        "evoInfo": {
+          "evoObjectId": 91234,
+          "evoParameterId": 656
+        }
+      },
+      "repairMode": null,
+      "vtorSignal": {
+        "id": 31741,
+        "address": "AK.CHTN.LU_TIHVEL.KP_7.SW_6-3.Remont.Status",
+        "dataSourceId": 0,
+        "dataType": 1,
+        "defaultValue": "0.0",
+        "evoInfo": {
+          "evoObjectId": 91234,
+          "evoParameterId": 655
+        }
+      },
+      "position": [
+        {
+          "layerId": 0,
+          "textCoordinates": {
+            "x": 0,
+            "y": -60
+          },
+          "coordinates": {
+            "x": -2670,
+            "y": -173
+          },
+          "rotationAngle": 0,
+          "inNeighborIds": [
+            1349
+          ],
+          "outNeighborIds": [
+            263
+          ]
+        },
+        {
+          "layerId": 1,
+          "textCoordinates": {
+            "x": 0,
+            "y": -60
+          },
+          "coordinates": {
+            "x": -2670,
+            "y": -173
+          },
+          "rotationAngle": 0,
+          "inNeighborIds": [
+            1349
+          ],
+          "outNeighborIds": [
+            263
+          ]
+        }
+      ],
+      "openPercentage": null,
+      "calcKvCapacity": false,
+      "realObjectId": 0,
+      "shortName": " 6-3",
+      "name": "Т-Н-3.КП-7.Задвижка 6-3",
+      "distance": 5427,
+      "height": 74,
+      "id": 261
+    },
+    {
+      "fullCapacity": 20000,
+      "status": {
+        "id": 30189,
+        "address": "AK.CHTN.LU_TIHVEL.KP_8.SW_8-3.Status",
+        "dataSourceId": 0,
+        "dataType": 1,
+        "defaultValue": "1.0",
+        "evoInfo": {
+          "evoObjectId": 91235,
+          "evoParameterId": 654
+        }
+      },
+      "imitationMode": {
+        "id": 30765,
+        "address": "AK.CHTN.LU_TIHVEL.KP_8.SW_8-3.Sim",
+        "dataSourceId": 0,
+        "dataType": 3,
+        "defaultValue": "False",
+        "evoInfo": {
+          "evoObjectId": 91235,
+          "evoParameterId": 656
+        }
+      }
+    }
+  ]
+}
