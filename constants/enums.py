@@ -1,4 +1,5 @@
 from enum import Enum, IntFlag
+from typing import Mapping
 
 
 class TU(Enum):
@@ -294,6 +295,22 @@ class RejectionSensorTag(Enum):
     def __init__(self, sensor_id: int, description: str) -> None:
         self.id = sensor_id
         self.description = description
+
+    @classmethod
+    def update_ids_from_config(cls, sensor_ids_by_address: Mapping[str, int]) -> None:
+        """
+        Обновляет sensor_id по tag из конфигурации стенда.
+        """
+        missing_tags = []
+        for sensor in cls:
+            sensor_id = sensor_ids_by_address.get(sensor.description)
+            if sensor_id is None:
+                missing_tags.append(sensor.description)
+                continue
+            sensor.id = sensor_id
+
+        if missing_tags:
+            raise ValueError(f"Не найдены sensor_id для tags: {', '.join(missing_tags)}")
 
     def __str__(self):
         return f"{self.id} - {self.description}"
