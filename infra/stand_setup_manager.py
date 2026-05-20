@@ -7,6 +7,7 @@ from constants.architecture_constants import EnvKeyConstants
 from constants.architecture_constants import ImitatorConstants as Im_const
 from constants.enums import TU
 from infra.clickhouse_manager import ClickHouseManager
+from infra.configuration_manager import ConfigurationManager
 from infra.cmd_generator import ImitatorCmdGenerator
 from infra.docker_manager import DockerContainerManager
 from infra.imitator_data_uploader import ImitatorDataUploader
@@ -92,6 +93,12 @@ class StandSetupManager:
         self._redis_cleaner.delete_keys_with_check()
         # Чистка ключей ClickHouse
         self._clickhouse_manager.delete_clickhouse_keys_with_check()
+
+    def get_sensor_ids_by_address(self) -> dict[str, int]:
+        """
+        Возвращает словарь address: id из конфигурации, скопированной на runner.
+        """
+        return self._configuration_manager.get_sensor_ids_by_address()
 
     def stop_all_containers(self):
         """
@@ -248,6 +255,7 @@ class StandSetupManager:
             self._clickhouse_manager = ClickHouseManager(
                 self._stand_client, self._infra_client, self._configuration_file_name
             )
+            self._configuration_manager = ConfigurationManager(self._configuration_file_name)
             self._docker_manager = DockerContainerManager(self._stand_client)
             self._redis_cleaner = RedisCleaner(self._infra_client, self._stand_name)
         except Exception as error:

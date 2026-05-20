@@ -14,6 +14,7 @@ from clients.websocket_client import WebSocketClient
 from constants.architecture_constants import EnvKeyConstants as EnvConst
 from constants.architecture_constants import ImitatorConstants as ImConst
 from constants.architecture_constants import WebSocketClientConstants as WSCliConst
+from constants.enums import RejectionSensorTag
 from infra.stand_setup_manager import StandSetupManager
 from test_config.datasets import ALL_SMOKE_CONFIGS
 
@@ -85,6 +86,21 @@ def pytest_configure(config):
         "stand_manager": None,
         "imitator_start_time": None,  # datetime объект времени старта имитатора для расчёта интервалов утечек
     }
+
+
+def _is_rejection_test(item) -> bool:
+    """
+    Проверяет, относится ли текущий pytest item к тестам отбраковки.
+    """
+    return "rejection_case" in getattr(item, "fixturenames", [])
+
+
+def _update_rejection_sensor_ids(stand_manager: StandSetupManager) -> None:
+    """
+    Для тестов отбраковки обновляет sensor_id по address из конфигурации стенда.
+    """
+    sensor_ids_by_address = stand_manager.get_sensor_ids_by_address()
+    RejectionSensorTag.update_ids_from_config(sensor_ids_by_address)
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -452,6 +468,12 @@ def pytest_runtest_setup(item):
             stand_manager.setup_stand_for_imitator_run()
         except Exception as error:
             pytest.exit(f"[SETUP] [ERROR] ошибка при подготовке стенда: {error}")
+
+        if _is_rejection_test(item):
+            try:
+                _update_rejection_sensor_ids(stand_manager)
+            except Exception as error:
+                pytest.exit(f"[SETUP] [ERROR] ошибка обновления id датчиков отбраковки из конфигурации: {error}")
 
         imitator_thread = threading.Thread(
             target=stand_manager.start_imitator, name=f"imitator->{current_test_suite}", daemon=True
