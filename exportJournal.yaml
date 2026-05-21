@@ -1,0 +1,337 @@
+journal/exportJournal.yaml
+
+asyncapi: 3.0.0
+info:
+  title: API Gateway Websockets API for export journal
+  version: '1.0.0'
+  description: WebSockets API for API-GW
+servers:
+  prod:
+    host: localhost
+    pathname: "/"
+    protocol: https
+    description: |
+      Public server available without authorization.
+      Once the socket is open you can subscribe to a public channel by sending
+      a subscribe request message.
+  develop:
+    host: "192.168.1.1"
+    pathname: "/"
+    protocol: wss
+    description: |
+      Public server available without authorization.
+      Once the socket is open you can subscribe to a public channel by sending
+      a subscribe request message.
+channels:
+  ldsMain:
+    address: "/hub"
+    messages:
+      exportJournalRequest:
+        $ref: '#/components/messages/exportJournalRequest'
+      readyForUploadingFiles:
+        $ref: '#/components/messages/readyForUploadingFiles'
+operations:
+  exportJournal:
+    title: exportJournal
+    description: >
+      Метод позволяет сформировать журнал для экспорта
+    action: send
+    channel:
+      $ref: '#/channels/ldsMain'
+    messages:
+      - $ref: '#/channels/ldsMain/messages/exportJournalRequest'
+    reply:
+      messages:
+        - $ref: '#/channels/ldsMain/messages/readyForUploadingFiles'
+components:
+  messages:
+    exportJournalRequest:
+      title: exportJournalRequest
+      summary: Метод позволяет сформировать журнал.
+      payload:
+        $ref: '#/components/schemas/exportJournalRequest'
+      x-response:
+        $ref: '#/components/schemas/readyForUploadingFiles'
+    readyForUploadingFiles:
+      title: readyForUploadingFiles
+      summary: Сообщение о том, что файл сформирован и готов к скачиванию.
+      payload:
+        $ref: '#/components/schemas/readyForUploadingFiles'
+  schemas:
+    exportJournalRequest:
+      title: exportJournalRequest
+      description: Метод позволяет сформировать журнал.
+      type: object
+      properties:
+        user:
+          title: user
+          description: Информация о пользователе, который хочет сформировать файл.
+          type: object
+          items:
+            $ref: '#/components/schemas/user'
+        periodTime:
+          title: periodTime
+          description: Период времени, за который надо отобразить сообщения. Для архивного журнала.
+          type: object
+          items:
+            $ref: '#/components/schemas/periodTime'
+        sorting:
+          title: sorting
+          description: Сортировка по столбцам.
+          type: object
+          items:
+            $ref: '#/components/schemas/sorting'
+        search:
+          title: search
+          description: Поиск сообщений
+          type: object
+          items:
+            $ref: '#/components/schemas/search'
+        filtering:
+          title: filtering
+          description: Фильтрация
+          type: object
+          items:
+            $ref: '#/components/schemas/filtering'
+        availableMessageIds:
+          title: availableMessageIds
+          description: Массив доступных сообщений для группы пользователей и их приоритет
+          type: array
+          items:
+            $ref: '#/components/schemas/availableMessageId'
+        columnsSelection:
+          title: columnSelection
+          description: Список столбцов, которые необходимо отобразить.
+          type: object
+          items:
+            $ref: '#/components/schemas/columnsSelection'
+      required: [ columnsSelection, availableMessageIds, pagination ]
+    readyForUploadingFiles:
+      title: readyForUploadingFiles
+      description: Сообщение о том, что файл сформирован и готов к скачиванию.
+      type: object
+      properties:
+        replyStatus:
+          $ref: '#/components/schemas/replyStatus'
+        replyErrors:
+          $ref: '#/components/schemas/replyErrors'
+        content:
+          $ref: '#/components/schemas/uploadingFilesInfoReply'
+      required: [replyStatus]
+    uploadingFilesInfoReply:
+      title: uploadingFilesInfoReply
+      description: Информация передеваемая по сформированным файлам
+      type: object
+      properties:
+        items:
+          $ref: '#/components/schemas/uploadingFilesInfo'
+    user:
+      title: user
+      description: Сортировка по выбранному столбцу.
+      type: object
+      properties:
+        id:
+          title: id
+          type: integer
+          description: Идентификатор пользователя
+        name:
+          title: name
+          type: string
+          description: ФИО пользователя
+          examples: [Иванов Иван Иванович]
+    sorting:
+      title: sorting
+      description: Сортировка по выбранному столбцу.
+      type: object
+      properties:
+        sortingParam:
+          title: sortingParam
+          type: string
+          description: Название столбца, по которому происходит сортировка
+          enum:
+            - dateTime
+        sortingType:
+          title: sortingType
+          type: string
+          enum:
+            - ascending
+            - descending
+          description: Тип сортировки (по возрастанию, по убыванию)
+          default: descending
+      required: [ sortingParam, sortingType ]
+    filtering:
+      title: filtering
+      description: Фильтрация по выбранному полю
+      type: object
+      properties:
+        fieldName:
+          title: fieldName
+          type: string
+          description: Название поля, по которому происходит фильтрация
+          enum:
+            - messageType
+            - objectType
+            - priority
+        filterCriteria:
+          title: fieldName
+          description: Критерии фильтрации.
+          type: array
+          items:
+            type: object
+            properties:
+              filterCriteriaValue:
+                title: filterCriteriaValue
+                description: Значение фильтра вводимое пользователем
+                type: array
+              filterCriteriaType:
+                title: filterCriteriaValue
+                description: >
+                  Тип фильтра (значение поля равно критерию, значение поля
+                  меньше критерия, значение поля больше критерия, один из)
+                type: string
+                enum:
+                  - equal
+                  - greaterThan
+                  - lessThan
+                  - oneOf
+            required: [ filterCriteriaType,filterCriteriaValue ]
+      required: [ fieldName, filterCriteria ]
+    search:
+      title: search
+      description: >
+        Поиск сообщений.
+      type: object
+      properties:
+        query:
+          type: string
+          title: query
+          description: Строка, которая ищется в сообщении.
+    availableMessageId:
+      title: availableMessageId
+      description: Доступное пользователю сообщение и его приоритет
+      type: object
+      properties:
+        eventId:
+          title: eventId
+          description: Идентификатор сообщения
+          type: integer
+          format: int64
+          examples: [ 89 ]
+        priority:
+          title: priority
+          description: Приоритет сообщения
+          type: integer
+          format: int32
+          examples: [ 1 ]
+      required: [ eventId, priority ]
+      examples:
+        - eventId: 89
+          priority: 1
+    columnsSelection:
+      title: columnSelection
+      description: Список столбцов, которые необходимо отобразить
+      type: array
+      format: string
+      enum:
+        - dateTime
+        - user
+        - mainPipeline
+        - technologicalSection
+        - technologicalObject
+        - controlPoint
+        - signal
+        - event
+        - value
+        - tag
+    periodTime:
+      title: periodTime
+      description: Период отображения архивного журнала.
+      type: object
+      properties:
+        start:
+          title: start
+          description: Время начала отображения сообщений.
+          type: number
+          format: dateTime
+          examples: [ 24.01.2018 14:23:56 ]
+        end:
+          title: start
+          description: Время конца отображения сообщений.
+          type: number
+          format: dateTime
+          examples: [ 24.01.2018 14:23:56 ]
+    uploadingFilesInfo:
+      title: uploadingFilesInfo
+      description: Информация о сформированном файле.
+      type: object
+      properties:
+        filesName:
+          title: filesName
+          description: Наименование файла
+          type: string
+        time:
+          title: time
+          description: Время формирования файла.
+          type: number
+          format: dateTime
+          examples: [24.03.2019 14:19:20]
+    replyStatus:
+      title: replyStatus
+      type: integer
+      format: int32
+      enum:
+        - 200
+        - 400
+        - 401
+        - 403
+        - 404
+        - 408
+        - 409
+        - 412
+        - 416
+        - 429
+        - 500
+        - 501
+        - 503
+        - 504
+        - 520
+      x-enumNames:
+        "200": OK
+        "400": Bad request
+        "401": Unauthorized
+        "403": Permission denied
+        "404": Not found
+        "408": Request timeout
+        "409": Conflict
+        "412": Precondition failed
+        "416": Range not satisfiable
+        "429": Too many requests
+        "500": Internal server error
+        "501": Not implemented
+        "503": Service unavailable
+        "504": Gateway timeout
+        "520": Unknown error
+    replyErrors:
+      title: replyErrors
+      type: array
+      items:
+        description: Информация об ошибке
+        type: object
+      properties:
+        errorType:
+          title: errorType
+          description: Тип ошибки
+          type: string
+          examples: [ INVALID_ARGUMENT ]
+        reason:
+          title: reason
+          description: Причина ошибки
+          type: string
+          examples: [ Значение должно лежать в пределах от 0 до 200 ]
+        location:
+          title: location
+          description: Место возникновения ошибки
+          type: string
+          examples: [ maxVolume ]
+      required: [ reason ]
+      

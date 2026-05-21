@@ -1,0 +1,173 @@
+asyncapi: 3.0.0
+info:
+  title: API Gateway Websockets API for view exported files list
+  version: '1.0.0'
+  description: WebSockets API for API-GW
+servers:
+  prod:
+    host: localhost
+    pathname: "/"
+    protocol: https
+    description: |
+      Public server available without authorization.
+      Once the socket is open you can get to a public channel by sending
+      a get request message.
+  develop:
+    host: "192.168.1.1"
+    pathname: "/"
+    protocol: wss
+    description: |
+      Public server available without authorization.
+      Once the socket is open you can get to a public channel by sending
+      a get request message.
+channels:
+  ldsMain:
+    address: "/hub"
+    messages:
+      getExportedFilesListRequest:
+        $ref: '#/components/messages/getExportedFilesListRequest'
+      getExportedFilesListReply:
+        $ref: '#/components/messages/getExportedFilesListReply'
+operations:
+  getExportedFilesList:
+    title: getExportedFilesList
+    description: >
+      Метод позволяет просмотреть список сформированных файлов для экспорта
+    action: send
+    channel:
+      $ref: '#/channels/ldsMain'
+    messages:
+      - $ref: '#/channels/ldsMain/messages/getExportedFilesListRequest'
+    reply:
+      messages:
+        - $ref: '#/channels/ldsMain/messages/getExportedFilesListReply'
+components:
+  messages:
+    getExportedFilesListRequest:
+      title: getExportedFilesListRequest
+      summary: Запрос для просмотра списка сформированных файлов для экспорта
+      payload:
+        $ref: '#/components/schemas/getExportedFilesListRequest'
+      x-response:
+        $ref: '#/components/schemas/getExportedFilesListReply'
+    getExportedFilesListReply:
+      title: getExportedFilesListReply
+      summary: Ответ на запрос getExportedFilesListRequest
+      payload:
+        $ref: '#/components/schemas/getExportedFilesListReply'
+  schemas:
+    getExportedFilesListRequest:
+      title: getExportedFilesListRequest
+      description: Запрос для получения списка сформированных файлов для экспорта
+      type: object
+      properties:
+        OSTid:
+          title: OSTid
+          description: Идентификатор ОСТ
+          type: object
+          items:
+            $ref: '#/components/schemas/OSTid'
+      required: [OSTid]
+    getExportedFilesListReply:
+      title: getExportedFilesListReply
+      description: Ответ на запрос getExportedFilesListRequest
+      type: object
+      properties:
+        replyStatus:
+          $ref: '#/components/schemas/replyStatus'
+        replyErrors:
+          $ref: '#/components/schemas/replyErrors'
+        content:
+          $ref: '#/components/schemas/exportedFilesInfoReply'
+      required: [replyStatus]
+    OSTid:
+      title: OSTid
+      description: Идентификатор ОСТ
+      type: number
+      format: integer
+    exportedFilesInfoReply:
+      title: exportedFilesInfoReply
+      description: Информация сформированных файлах
+      type: object
+      properties:
+        items:
+          $ref: '#/components/schemas/exportedFilesInfo'
+    exportedFilesInfo:
+      title: exportedFilesInfo
+      description: Информация о сформированных файлах.
+      type: object
+      properties:
+        id:
+          title: id
+          description: Идентификатор сформированного файла
+          type: string
+        exportedFilesName:
+          title: exportedFilesName
+          description: Наименование сформированного файла
+          type: string
+        time:
+          title: time
+          description: Дата и время формирования файла
+          type: number
+          format: dateTime
+          examples: [24.01.2018 14:23:56]
+      required: [time, exportedFilesName]
+    replyStatus:
+      title: replyStatus
+      type: integer
+      format: int32
+      enum:
+        - 200
+        - 400
+        - 401
+        - 403
+        - 404
+        - 408
+        - 409
+        - 412
+        - 416
+        - 429
+        - 500
+        - 501
+        - 503
+        - 504
+        - 520
+      x-enumNames:
+        "200": OK
+        "400": Bad request
+        "401": Unauthorized
+        "403": Permission denied
+        "404": Not found
+        "408": Request timeout
+        "409": Conflict
+        "412": Precondition failed
+        "416": Range not satisfiable
+        "429": Too many requests
+        "500": Internal server error
+        "501": Not implemented
+        "503": Service unavailable
+        "504": Gateway timeout
+        "520": Unknown error
+    replyErrors:
+      title: replyErrors
+      type: array
+      items:
+        description: Информация об ошибке
+        type: object
+      properties:
+        errorType:
+          title: errorType
+          description: Тип ошибки
+          type: string
+          examples: [ INVALID_ARGUMENT ]
+        reason:
+          title: reason
+          description: Причина ошибки
+          type: string
+          examples: [ Значение должно лежать в пределах от 0 до 200 ]
+        location:
+          title: location
+          description: Место возникновения ошибки
+          type: string
+          examples: [ maxVolume ]
+      required: [reason]

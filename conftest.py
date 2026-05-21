@@ -88,13 +88,6 @@ def pytest_configure(config):
     }
 
 
-def _is_rejection_test(item) -> bool:
-    """
-    Проверяет, относится ли текущий pytest item к тестам отбраковки.
-    """
-    return "rejection_case" in getattr(item, "fixturenames", [])
-
-
 def _update_rejection_sensor_ids(stand_manager: StandSetupManager) -> None:
     """
     Для тестов отбраковки обновляет sensor_id по address из конфигурации стенда.
@@ -469,11 +462,10 @@ def pytest_runtest_setup(item):
         except Exception as error:
             pytest.exit(f"[SETUP] [ERROR] ошибка при подготовке стенда: {error}")
 
-        if _is_rejection_test(item):
-            try:
-                _update_rejection_sensor_ids(stand_manager)
-            except Exception as error:
-                pytest.exit(f"[SETUP] [ERROR] ошибка обновления id датчиков отбраковки из конфигурации: {error}")
+        try:
+            _update_rejection_sensor_ids(stand_manager)
+        except Exception as error:
+            pytest.exit(f"[SETUP] [ERROR] ошибка обновления id датчиков отбраковки из конфигурации: {error}")
 
         imitator_thread = threading.Thread(
             target=stand_manager.start_imitator, name=f"imitator->{current_test_suite}", daemon=True
