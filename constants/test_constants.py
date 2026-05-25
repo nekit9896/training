@@ -2,6 +2,8 @@
 Общие константы для тестов.
 """
 
+from constants.enums import StationaryStatus
+
 
 class BaseTN3Constants:
     # ===== Константы для запросов журнала =====
@@ -96,3 +98,74 @@ class BaseTN3Constants:
     DIAGNOSTIC_AREA_BASE_IDS = [2, 3, 4, 5, 6, 7, 8]  # Список ДУ с isBase = true из конфигурации Тн-3
     REPRESENTATIVE_DIAGNOSTIC_AREA_IDS = [2, 3]  # Список показательных ДУ для определения режима СОУ
     ZONE_INFO: str = "Europe/Moscow"
+
+
+class ExportReportConstants:
+    """Константы для теста формирования отчёта об утечках"""
+
+    # ===== Параметры запроса =====
+    # Смещение часового пояса (часы) от UTC для отображения времени в отчёте (Москва = UTC+3)
+    MOSCOW_TIME_OFFSET_HOURS: int = 3
+
+    # ===== Таймауты и интервалы поллинга =====
+    # Максимальное ожидание нотификации о готовности отчёта
+    NOTIFICATION_TIMEOUT_SECONDS: float = 60.0
+    # Максимальное время ожидания появления отчёта в списке после нотификации
+    LIST_POLL_TOTAL_WAIT_SECONDS: float = 10.0
+    # Интервал между запросами getExportedFilesListRequest
+    LIST_POLL_INTERVAL_SECONDS: float = 10.0
+    # Таймаут получения ответа на скачивание
+    DOWNLOAD_TIMEOUT_SECONDS: float = 60.0
+
+    # ===== Имя файла отчёта =====
+    LEAKS_REPORT_NAME_PART: str = "Отчет об утечках"  # подстрока в имени файла/отчёта
+    XLSX_EXTENSION: str = ".xlsx"
+    # Сигнатура zip-архива, используется для проверки формата файла по содержимому
+    ZIP_SIGNATURE: bytes = b'PK\x03\x04'
+
+    # ===== Формат даты/времени в отчёте =====
+    REPORT_DATETIME_FORMAT: str = "%d.%m.%Y %H:%M:%S"
+    # Регулярное выражение для извлечения двух дат из заголовка
+    # "Отчет об утечках с 20.05.2026 11:00:00 по 20.05.2026 12:52:02"
+    REPORT_HEADER_PERIOD_PATTERN: str = (
+        r'Отчет об утечках с (?P<period_start>\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2})'
+        r' по (?P<period_end>\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2})'
+    )
+
+    # ===== Шапка таблицы отчёта об утечках =====
+    # Двойная шапка: первая строка - название отчёта с периодом, вторая - названия колонок
+    REPORT_TITLE_ROW: int = 1
+    REPORT_COLUMN_HEADERS_ROW: int = 2
+    REPORT_DATA_FIRST_ROW: int = 3
+
+    # ===== Названия колонок =====
+    COL_DATETIME: str = "Дата и время"
+    COL_OBJECT: str = "Объект"
+    COL_LDS_STATUS: str = "Режим работы СОУ"
+    COL_MASK_INFO: str = "Информация о маскировании"
+    COL_COORDINATE: str = "Координата"
+    COL_LEAK_VOLUME: str = "Объемный расход утечки"
+    COL_MT_MODE: str = "Режим работы МТ"
+
+    EXPECTED_COLUMN_HEADERS: list = [
+        COL_DATETIME,
+        COL_OBJECT,
+        COL_LDS_STATUS,
+        COL_MASK_INFO,
+        COL_COORDINATE,
+        COL_LEAK_VOLUME,
+        COL_MT_MODE,
+    ]
+
+    LDS_STATUS_OK_TEXT: str = "СОУ исправна"
+    MASKING_NOT_MASKED_TEXT: str = "СОУ не замаскирована"
+
+    # ===== Маппинг StationaryStatus <-> текст в колонке "Режим работы МТ" =====
+    STATIONARY_STATUS_TO_REPORT_TEXT: dict = {
+        StationaryStatus.UNSTATIONARY.value: "Нестационарный режим работы МТ",
+        StationaryStatus.STATIONARY.value: "Стационарный режим работы МТ",
+        StationaryStatus.STOPPED.value: "Режим остановленной перекачки МТ",
+    }
+
+    # ===== Прочее =====
+    DEFAULT_SHEET_INDEX: int = 0

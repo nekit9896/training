@@ -3,54 +3,35 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from constants.enums import ReplyStatus
-
-
-@dataclass
-class File:
-    """Информация о файле"""
-
-    # Идентификатор файла
-    id: Optional[int] = None
-    # Наименование файла
-    name: Optional[str] = None
+DOWNLOAD_EXPORTED_DATA_REQUEST = "DownloadExportedDataRequest"
 
 
 @dataclass
 class ReplyErrors:
-    # Причина ошибки
     reason: str
-    # Тип ошибки
     errorType: Optional[str] = None
-    # Место возникновения ошибки
     location: Optional[str] = None
 
 
 @dataclass
-class UploadExportedFileReply:
-    """Ответ на запрос uploadExportedFileRequest"""
+class DownloadExportedDataRequest:
+    """Запрос на скачивание сформированного файла"""
+    exportedDataId: int
+    exportedDataType: str
+    timeOffset: int
+    additionalProperties: Optional[Dict[str, Any]] = None
 
-    replyStatus: ReplyStatus
+
+@dataclass
+class DownloadExportedDataContent:
+    """Контент ответа на запрос скачивания"""
+    fileChunk: bytes
+
+
+@dataclass
+class DownloadExportedDataReply:
+    """Ответ со скачанным контентом сформированного файла"""
+
+    replyStatus: int
+    replyContent: Optional[DownloadExportedDataContent] = None
     replyErrors: Optional[ReplyErrors] = None
-
-
-@dataclass
-class UploadExportedFileRequest:
-    """Метод позволяет скачать (выгрузить) сформированный файл."""
-
-    # Информация о файле
-    file: Dict[str, Any]
-
-
-@dataclass
-class UploadExportedFileReplyMessage:
-    """Ответ на запрос uploadExportedFileRequest"""
-
-    payload: UploadExportedFileReply
-
-
-@dataclass
-class UploadExportedFileRequestMessage:
-    """Запрос позволяет скачать (выгрузить) сформированный файл."""
-
-    payload: UploadExportedFileRequest

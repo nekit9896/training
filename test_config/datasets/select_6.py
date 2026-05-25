@@ -111,5 +111,7 @@ SELECT_6_CONFIG = SmokeSuiteConfig(
         acknowledge_leak_test=CaseMarkers(test_case_id="6", offset=60),
         # ----- Тест OutputSignals -----
         output_signals_test=CaseMarkers(test_case_id="33", offset=61),
+        # ----- Тест ExportReports -----
+        export_leaks_report_test=CaseMarkers(test_case_id="", offset=62),
     ),
 )

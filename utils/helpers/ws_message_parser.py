@@ -14,6 +14,10 @@ import models.subscribe_scheme_signals_state_model as signals_state_model
 from constants.architecture_constants import WebSocketClientConstants
 from models.acknowledge_leak_model import AcknowledgeLeakReply
 from models.basic_info_model import BasicInfoReply
+from constants.enums import ExportStatus, ExportedDataType
+from models.export_reports_model import ReportDataExportedNotification
+from models.get_exported_files_list_model import GetExportedFilesListReply
+from models.upload_exported_file_model import DownloadExportedDataReply
 from models.get_input_signals_model import GetInputSignalsReply
 from models.get_messages_model import GetMessagesReply
 from models.get_output_signals_model import GetOutputSignalsReply
@@ -241,6 +245,24 @@ class WsMessageParser:
         """
         return self._find_and_parse_message(data_class=UnmaskSignalReply, data=data)
 
+    def parse_report_data_exported_notification_msg(self, data: list) -> ReportDataExportedNotification:
+        """
+        Парсит пуш-нотификацию ReportDataExportedNotification о готовности отчёта.
+        """
+        return self._find_and_parse_message(data_class=ReportDataExportedNotification, data=data)
+
+    def parse_exported_files_list_msg(self, data: list) -> GetExportedFilesListReply:
+        """
+        Парсит ответ getExportedFilesListReply со списком сформированных файлов.
+        """
+        return self._find_and_parse_message(data_class=GetExportedFilesListReply, data=data)
+
+    def parse_download_exported_data_msg(self, data: list) -> DownloadExportedDataReply:
+        """
+        Парсит ответ DownloadExportedDataReply со скачиваемым контентом файла (fileChunk).
+        """
+        return self._find_and_parse_message(data_class=DownloadExportedDataReply, data=data)
+
     def _find_and_parse_message(
         self,
         data_class: Type[ContentType],
@@ -319,7 +341,20 @@ class WsMessageParser:
         Получает конфиг с правилами обработки полей
         """
         # TODO добавить strict=True, после выполнения задачи LDS-8792
-        return Config(type_hooks={UUID: self.convert_to_uuid, datetime: self.timestamp_to_datetime})
+        def _to_export_status(value: Any) -> ExportStatus:
+            return value if isinstance(value, ExportStatus) else ExportStatus(value)
+
+        def _to_exported_data_type(value: Any) -> ExportedDataType:
+            return value if isinstance(value, ExportedDataType) else ExportedDataType(value)
+
+        return Config(
+            type_hooks={
+                UUID: self.convert_to_uuid,
+                datetime: self.timestamp_to_datetime,
+                ExportStatus: _to_export_status,
+                ExportedDataType: _to_exported_data_type,
+            }
+        )
 
 
 # Создает экземпляр класса для удобства импорта

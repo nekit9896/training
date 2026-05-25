@@ -434,6 +434,24 @@ def create_journal_req_body(**kwargs) -> dict:
     return result
 
 
+def extract_first_number(value: object) -> Optional[float]:
+    """
+    Извлекает первое число из ячейки (int/float/str вида '55.89 км', '111.46 м³/ч').
+    """
+    if value is None:
+        return None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    if isinstance(value, str):
+        matches = re.findall(TestConst.DIGITS_WITH_DOT_PATTERN, value)
+        if matches:
+            try:
+                return float(matches[0].replace(",", "."))
+            except ValueError:
+                return None
+    return None
+
+
 def parse_journal_msg_value(value: str) -> tuple:
     """Парсит поле value в сообщении журнала"""
     try:
@@ -703,3 +721,143 @@ def get_leak_diagnostic_area_samples(
     if not leak_diagnostic_area_samples:
         fail(f"За {total_wait} секунд не пришло ни одного сообщения для ДУ с name={leak_diagnostic_area_name}.")
     return leak_diagnostic_area_samples
+
+
+async def poll_for_report_export_notification(
+    ws_client: WebSocketClient,
+    parser,
+    total_wait_seconds: float,
+    poll_interval_seconds: float,
+) -> Optional[Any]:
+    """
+    Лонг-поллит очередь ws до появления ReportDataExportedNotification с успешным exportStatus.
+    """
+    from constants.enums import ExportStatus, ReplyStatus
+    from models.export_reports_model import REPORT_DATA_EXPORTED_NOTIFICATION
+
+    deadline = asyncio.get_event_loop().time() + total_wait_seconds
+
+    while asyncio.get_event_loop().time() < deadline:
+        remaining = deadline - asyncio.get_event_loop().time()
+        try:
+            payload = await ws_client.receive_by_type(
+                REPORT_DATA_EXPORTED_NOTIFICATION,
+                timeout=min(poll_interval_seconds * 5, remaining),
+            )
+            notification = parser.parse_report_data_exported_notification_msg(payload)
+            if (
+                notification.replyStatus == ReplyStatus.OK.value
+                and notification.replyContent is not None
+                and notification.replyContent.exportStatus == ExportStatus.DONE
+            ):
+                return notification
+        except (asyncio.TimeoutError, TimeoutError, OSError):
+            pass
+
+        await asyncio.sleep(poll_interval_seconds)
+
+    return None
+
+
+async def poll_for_exported_file(
+    ws_client: WebSocketClient,
+    parser,
+    tu_id: int,
+    expected_data_type: Any,
+    name_substring: str,
+    period_start: datetime,
+    period_end: datetime,
+    total_wait_seconds: float,
+    poll_interval_seconds: float,
+) -> Optional[Any]:
+    """
+    Лонг-поллит getExportedFilesListRequest пока в списке не появится наш отчёт.
+    """
+    from models.get_exported_files_list_model import GET_EXPORTED_FILES_LIST_REQUEST
+
+    deadline = asyncio.get_event_loop().time() + total_wait_seconds
+    last_items_count = -1
+
+    while asyncio.get_event_loop().time() < deadline:
+        await connect(
+            ws_client,
+            GET_EXPORTED_FILES_LIST_REQUEST,
+            {"tuId": tu_id, "additionalProperties": None},
+        )
+        invocation_id = ws_client.invocation_id
+        try:
+            payload = await ws_client.receive_by_invocation_id(
+                invocation_id, timeout=poll_interval_seconds * 5
+            )
+        except (asyncio.TimeoutError, TimeoutError, OSError):
+            await asyncio.sleep(poll_interval_seconds)
+            continue
+
+        parsed_payload = parser.parse_exported_files_list_msg(payload)
+        items = []
+        if parsed_payload.replyContent is not None:
+            items = parsed_payload.replyContent.exportedData or []
+
+        if len(items) != last_items_count:
+            allure.attach(
+                "\n".join(
+                    f"id={item.id}, name={item.name}, type={item.exportedDataType}, "
+                    f"start={item.start}, end={item.end}"
+                    for item in items
+                ),
+                name=f"Список сформированных файлов (попытка, всего: {len(items)})",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+            last_items_count = len(items)
+
+        match = find_matching_exported_item(
+            items=items,
+            expected_data_type=expected_data_type,
+            name_substring=name_substring,
+            period_start=period_start,
+            period_end=period_end,
+        )
+        if match is not None:
+            return match
+
+        await asyncio.sleep(poll_interval_seconds)
+
+    return None
+
+
+def _normalize_report_period_datetime(value: datetime) -> datetime:
+    """Приводит datetime периода отчёта к московскому времени без микросекунд."""
+    return localize_as_moscow(value).replace(microsecond=0)
+
+
+def find_matching_exported_item(
+    items: List[Any],
+    expected_data_type: Any,
+    name_substring: str,
+    period_start: datetime,
+    period_end: datetime,
+) -> Optional[Any]:
+    """
+    Ищет элемент списка по типу, подстроке имени и точному совпадению периода start/end.
+    """
+    name_substring_lower = name_substring.lower()
+    period_start_expected = _normalize_report_period_datetime(period_start)
+    period_end_expected = _normalize_report_period_datetime(period_end)
+
+    matched_items = []
+    for item in items:
+        if item.exportedDataType != expected_data_type:
+            continue
+        if name_substring_lower not in (item.name or "").lower():
+            continue
+        if item.start is None or item.end is None:
+            continue
+        item_start = _normalize_report_period_datetime(item.start)
+        item_end = _normalize_report_period_datetime(item.end)
+        if item_start != period_start_expected or item_end != period_end_expected:
+            continue
+        matched_items.append(item)
+
+    if not matched_items:
+        return None
+    return max(matched_items, key=lambda exported_item: exported_item.id)

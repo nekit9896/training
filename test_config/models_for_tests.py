@@ -10,7 +10,9 @@
 """
 
 from dataclasses import asdict, dataclass, field
-from typing import Any, Dict, Optional
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from constants.enums import (
     TU,
@@ -22,7 +24,11 @@ from constants.enums import (
     StationaryStatus,
 )
 from constants.test_constants import BaseTN3Constants
+from models.export_reports_model import ReportDataExportedNotification
+from models.get_exported_files_list_model import ExportedDataItem
+from models.upload_exported_file_model import DownloadExportedDataReply
 from models.subscribe_main_page_signals_info_model import SignalsInfo
+from utils.helpers.report_xlsx_utils import LeakReportRow
 
 
 @dataclass
@@ -170,6 +176,7 @@ class LeakTestConfig:
     complete_tu_leaks_info_content_test: Optional[CaseMarkers] = None
     completed_leak_info_in_journal_test: Optional[CaseMarkers] = None
     balance_algorithm_leak_completed_test: Optional[CaseMarkers] = None
+    export_leaks_report_test: Optional[CaseMarkers] = None
 
     @property
     def leak_diagnostic_area_id(self) -> Optional[int]:
@@ -381,3 +388,30 @@ class IsRejectedConfig(BaseSuiteConfig):
 
     main_pipeline: str = ""
     rejection_cases: list[RejectionTestCase] = field(default_factory=list)
+
+
+@dataclass
+class ExportLeaksReportState:
+    """
+    Состояние сценария формирования xlsx-отчёта об утечках между allure-шагами.
+    Заполняется по ходу export_leaks_report в smoke_scenarios.
+    """
+
+    report_test: Optional[CaseMarkers] = None
+    period_start: Optional[datetime] = None
+    period_end: Optional[datetime] = None
+    period_start_naive: Optional[datetime] = None
+    period_end_naive: Optional[datetime] = None
+    expected_mt_mode: Optional[str] = None
+    tu_description_lower: str = ""
+    notification: Optional[ReportDataExportedNotification] = None
+    report_item: Optional[ExportedDataItem] = None
+    report_file_name: str = ""
+    download_invocation_id: Optional[str] = None
+    download_payload: Optional[list] = None
+    download_reply: Optional[DownloadExportedDataReply] = None
+    file_bytes: Optional[bytes] = None
+    temp_file_path: Optional[Path] = None
+    worksheet: Any = None
+    data_rows: List[LeakReportRow] = field(default_factory=list)
+    target_row: Optional[LeakReportRow] = None

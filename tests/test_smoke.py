@@ -682,3 +682,40 @@ class TestLeakScenarios:
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.balance_algorithm_leak_detected(ws_client, config, leak)
+
+    @pytest.mark.asyncio
+    async def test_export_leaks_report(
+        self,
+        ws_client: WebSocketClient,
+        config: SmokeSuiteConfig,
+        leak: LeakTestConfig,
+        leak_number: int,
+        imitator_start_time: datetime,
+    ) -> None:
+        """[ExportReports] Проверка формирования и содержимого xlsx отчёта об утечках"""
+        tag = "ExportReports"
+        title = f"[{tag}] Проверка формирования отчёта об утечках. ЭФ: Выпадашка отчётов"
+        _apply_allure_markers(
+            leak.export_leaks_report_test,
+            tag,
+            title,
+            (
+                f"Проверка формирования и содержимого xlsx отчёта об утечках на наборе данных "
+                f"{config.suite_name},\n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Время проведения проверки: {leak.export_leaks_report_test.offset} мин.\n"
+                "Этапы сценария:\n"
+                "1) Отправка ExportReportsCommandRequest с фильтром по времени "
+                "(start = старт имитатора, end = старт + offset теста)\n"
+                "2) Ожидание пуш-нотификации ReportDataExportedNotification\n"
+                "3) Лонг-поллинг getExportedFilesListRequest до появления отчёта в списке\n"
+                "4) Отправка DownloadExportedDataRequest и приём fileChunk\n"
+                "5) Проверка имени файла (.xlsx, 'Отчет об утечках', описание ТУ)\n"
+                "6) Проверка двойной шапки xlsx (название + период, названия колонок)\n"
+                "7) Проверка содержимого строки утечки: дата, объект, режим СОУ, маскирование, "
+                "координата, объём, режим работы МТ"
+            ),
+        )
+        if config.has_multiple_leaks:
+            allure.dynamic.title(f"{title} (утечка #{leak_number})")
+        await scenarios.export_leaks_report(ws_client, config, leak, imitator_start_time)

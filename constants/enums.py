@@ -1,4 +1,4 @@
-from enum import Enum, IntFlag
+from enum import Enum, IntEnum, IntFlag
 from typing import Mapping
 
 
@@ -41,6 +41,36 @@ class ReplyStatus(Enum):
     SERVICE_UNAVAILABLE = 503
     GATEWAY_TIMEOUT = 504
     UNKNOWN_ERROR = 520
+
+
+class ExportedDataType(IntEnum):
+    """
+    Тип экспортируемых данных
+    """
+
+    JOURNAL = 1
+    LDS_MODES = 2
+    LEAKS_REPORT = 4
+    REJECTED_INPUT_DATA = 7
+
+    def to_download_name(self) -> str:
+        """Строковый тип для DownloadExportedDataRequest.exportedDataType"""
+        return _EXPORTED_DATA_TYPE_DOWNLOAD_NAMES[self]
+
+
+_EXPORTED_DATA_TYPE_DOWNLOAD_NAMES = {
+    ExportedDataType.JOURNAL: "JournalReport",
+    ExportedDataType.LDS_MODES: "LdsModesReport",
+    ExportedDataType.LEAKS_REPORT: "LeaksReport",
+    ExportedDataType.REJECTED_INPUT_DATA: "RejectedInputDataReport",
+}
+
+
+class ExportStatus(IntEnum):
+    """Статус формирования отчёта в ReportDataExportedNotification.replyContent.exportStatus."""
+
+    NOT_READY = 0
+    DONE = 1
 
 
 class StationaryStatus(Enum):

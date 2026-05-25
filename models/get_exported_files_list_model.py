@@ -1,73 +1,46 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from constants.enums import ReplyStatus
+from constants.enums import ExportedDataType
 
-
-@dataclass
-class ExportedFilesInfo:
-    """Информация о сформированных файлах."""
-
-    # Наименование сформированного файла
-    exportedFilesName: str
-    # Дата и время формирования файла
-    time: float
-    # Идентификатор сформированного файла
-    id: Optional[str] = None
-
-
-@dataclass
-class ExportedFilesInfoReply:
-    """Информация сформированных файлах"""
-
-    items: Optional[ExportedFilesInfo] = None
-
-
-@dataclass
-class GetExportedFilesListReply:
-    """Ответ на запрос getExportedFilesListRequest"""
-
-    replyStatus: ReplyStatus
-    content: Optional[ExportedFilesInfoReply] = None
-    replyErrors: Optional[ReplyErrors] = None
-
-
-@dataclass
-class GetExportedFilesListRequest:
-    """Запрос для получения списка сформированных файлов для экспорта"""
-
-    # Идентификатор ОСТ
-    OSTid: Dict[str, Any]
-
-
-@dataclass
-class OSTid:
-    """Идентификатор ОСТ"""
-
-    OSTid: int
+GET_EXPORTED_FILES_LIST_REQUEST = "getExportedFilesListRequest"
 
 
 @dataclass
 class ReplyErrors:
-    # Причина ошибки
     reason: str
-    # Тип ошибки
     errorType: Optional[str] = None
-    # Место возникновения ошибки
     location: Optional[str] = None
 
 
 @dataclass
-class GetExportedFilesListReplyMessage:
-    """Ответ на запрос getExportedFilesListRequest"""
-
-    payload: GetExportedFilesListReply
+class ExportedDataItem:
+    id: int
+    name: str
+    exportedDataType: ExportedDataType
+    start: Optional[datetime] = None
+    end: Optional[datetime] = None
 
 
 @dataclass
-class GetExportedFilesListRequestMessage:
-    """Запрос для просмотра списка сформированных файлов для экспорта"""
+class ExportedFilesListContent:
+    """Контент ответа со списком сформированных файлов"""
 
-    payload: GetExportedFilesListRequest
+    exportedData: List[ExportedDataItem]
+
+
+@dataclass
+class GetExportedFilesListRequest:
+    tuId: int
+    additionalProperties: Optional[Dict[str, Any]] = None
+
+
+@dataclass
+class GetExportedFilesListReply:
+    """Ответ со списком сформированных файлов"""
+    replyStatus: int
+    replyContent: Optional[ExportedFilesListContent] = None
+    replyErrors: Optional[ReplyErrors] = None
