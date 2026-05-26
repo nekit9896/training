@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import pprint
 import random
 import re
 from dataclasses import asdict, is_dataclass
@@ -16,24 +17,31 @@ from pytest import fail
 from clients.websocket_client import WebSocketClient
 from constants.enums import (
     ConfirmationStatus,
+    ExportStatus,
     LdsStatus,
     LdsStatusDegradation,
     LdsStatusFaulty,
     LdsStatusInitialization,
     LeakStatus,
+    ReplyStatus,
     StationaryReason,
     StationaryStatus,
     StoppedPumpingReason,
     UnStationaryReason,
 )
+from models.export_reports_model import (
+    ReportDataExportedContent,
+    ReportDataExportedNotification,
+)
 from constants.test_constants import BaseTN3Constants as TestConst
+from constants.test_constants import ExportReportConstants as ReportConst
 from models.get_messages_model import GetMessagesRequest
 from models.subscribe_all_leaks_info_model import SubscribeAllLeaksInfoReply
 from models.subscribe_common_scheme_model import DiagnosticArea, FlowArea
 from models.subscribe_leaks_model import Leak
 from models.subscribe_main_page_info_model import MainPageLeakInfo
 from utils.helpers.ws_message_parser import ws_message_parser
-from utils.msgpack_utils.message_filters import is_desired_type
+from utils.msgpack_utils.message_filters import is_desired_invocation_id, is_desired_type
 
 ObjectType = TypeVar("ObjectType")  # создает типовую переменную для поиска объектов в списке
 RandomObjectType = TypeVar("RandomObjectType")
@@ -723,6 +731,66 @@ def get_leak_diagnostic_area_samples(
     return leak_diagnostic_area_samples
 
 
+def _attach_ws_poll_failure(
+    collected_messages: List[Any],
+    total_wait_seconds: float,
+    expected_message_type: str,
+) -> None:
+    """Краткая сводка и pprint каждого WS-сообщения при таймауте поллинга."""
+    allure.attach(
+        "\n".join(
+            [
+                f"Таймаут ожидания: {total_wait_seconds} с",
+                f"Ожидаемый тип сообщения: {expected_message_type}",
+                f"Всего сообщений за период поллинга: {len(collected_messages)}",
+            ]
+        ),
+        name="WS poll timeout",
+        attachment_type=allure.attachment_type.TEXT,
+    )
+    for msg in collected_messages:
+        allure.attach(
+            pprint.pformat(msg, width=120, sort_dicts=False),
+            name="received ws message",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+
+def _drain_recv_queue(ws_client: WebSocketClient) -> List[Any]:
+    """Забирает все сообщения из очереди ws без блокирующего receive_by_* (ping не теряются)."""
+    messages: List[Any] = []
+    while not ws_client.recv_queue.empty():
+        try:
+            messages.append(ws_client.recv_queue.get_nowait())
+        except asyncio.QueueEmpty:
+            break
+    return messages
+
+
+def _find_valid_report_export_notification(
+    messages: List[Any],
+    parser,
+    notification_type: str,
+) -> Optional[ReportDataExportedNotification]:
+    """Ищет среди уже полученных сообщений успешную ReportDataExportedNotification."""
+    for msg in messages:
+        if not isinstance(msg, list) or not is_desired_type(msg, notification_type):
+            continue
+        try:
+            notification = parser.parse_report_data_exported_notification_msg(msg)
+        except (ValueError, TypeError, KeyError):
+            continue
+        if notification.replyStatus != ReplyStatus.OK.value:
+            continue
+        content: Optional[ReportDataExportedContent] = notification.replyContent
+        if content is None:
+            continue
+        if content.exportStatus != ExportStatus.DONE:
+            continue
+        return notification
+    return None
+
+
 async def poll_for_report_export_notification(
     ws_client: WebSocketClient,
     parser,
@@ -730,32 +798,34 @@ async def poll_for_report_export_notification(
     poll_interval_seconds: float,
 ) -> Optional[Any]:
     """
-    Лонг-поллит очередь ws до появления ReportDataExportedNotification с успешным exportStatus.
+    Собирает сообщения из очереди ws и ищет ReportDataExportedNotification с успешным exportStatus.
+    При таймауте прикрепляет к Allure все полученные за период сообщения.
     """
-    from constants.enums import ExportStatus, ReplyStatus
-    from models.export_reports_model import REPORT_DATA_EXPORTED_NOTIFICATION
 
     deadline = asyncio.get_event_loop().time() + total_wait_seconds
-
-    while asyncio.get_event_loop().time() < deadline:
-        remaining = deadline - asyncio.get_event_loop().time()
-        try:
-            payload = await ws_client.receive_by_type(
-                REPORT_DATA_EXPORTED_NOTIFICATION,
-                timeout=min(poll_interval_seconds * 5, remaining),
+    collected_messages: List[Any] = []
+    ws_client.suppress_recv_logging = True
+    parser.suppress_recv_logging = True
+    try:
+        while asyncio.get_event_loop().time() < deadline:
+            await asyncio.sleep(poll_interval_seconds)
+            batch = _drain_recv_queue(ws_client)
+            collected_messages.extend(batch)
+            notification = _find_valid_report_export_notification(
+                batch, parser, ReportConst.REPORT_DATA_EXPORTED_NOTIFICATION
             )
-            notification = parser.parse_report_data_exported_notification_msg(payload)
-            if (
-                notification.replyStatus == ReplyStatus.OK.value
-                and notification.replyContent is not None
-                and notification.replyContent.exportStatus == ExportStatus.DONE
-            ):
+            if notification is not None:
                 return notification
-        except (asyncio.TimeoutError, TimeoutError, OSError):
-            pass
+    finally:
+        collected_messages.extend(_drain_recv_queue(ws_client))
+        ws_client.suppress_recv_logging = False
+        parser.suppress_recv_logging = False
 
-        await asyncio.sleep(poll_interval_seconds)
-
+    _attach_ws_poll_failure(
+        collected_messages,
+        total_wait_seconds,
+        ReportConst.REPORT_DATA_EXPORTED_NOTIFICATION,
+    )
     return None
 
 
@@ -771,57 +841,74 @@ async def poll_for_exported_file(
     poll_interval_seconds: float,
 ) -> Optional[Any]:
     """
-    Лонг-поллит getExportedFilesListRequest пока в списке не появится наш отчёт.
+    Периодически шлёт getExportedFilesListRequest, забирает ответы из очереди
+    по invocation_id среди всех накопленных сообщений.
+    При таймауте прикрепляет к Allure все полученные за период сообщения.
     """
-    from models.get_exported_files_list_model import GET_EXPORTED_FILES_LIST_REQUEST
 
     deadline = asyncio.get_event_loop().time() + total_wait_seconds
     last_items_count = -1
-
-    while asyncio.get_event_loop().time() < deadline:
-        await connect(
-            ws_client,
-            GET_EXPORTED_FILES_LIST_REQUEST,
-            {"tuId": tu_id, "additionalProperties": None},
-        )
-        invocation_id = ws_client.invocation_id
-        try:
-            payload = await ws_client.receive_by_invocation_id(
-                invocation_id, timeout=poll_interval_seconds * 5
+    collected_messages: List[Any] = []
+    ws_client.suppress_recv_logging = True
+    parser.suppress_recv_logging = True
+    try:
+        while asyncio.get_event_loop().time() < deadline:
+            drained_before_request = _drain_recv_queue(ws_client)
+            collected_messages.extend(drained_before_request)
+            await connect(
+                ws_client,
+                ReportConst.GET_EXPORTED_FILES_LIST_REQUEST,
+                {"tuId": tu_id, "additionalProperties": None},
             )
-        except (asyncio.TimeoutError, TimeoutError, OSError):
+            invocation_id = ws_client.invocation_id
             await asyncio.sleep(poll_interval_seconds)
-            continue
 
-        parsed_payload = parser.parse_exported_files_list_msg(payload)
-        items = []
-        if parsed_payload.replyContent is not None:
-            items = parsed_payload.replyContent.exportedData or []
+            list_reply_payload = None
+            for msg in _drain_recv_queue(ws_client):
+                collected_messages.append(msg)
+                if isinstance(msg, list) and is_desired_invocation_id(msg, invocation_id):
+                    list_reply_payload = msg
+                    break
 
-        if len(items) != last_items_count:
-            allure.attach(
-                "\n".join(
-                    f"id={item.id}, name={item.name}, type={item.exportedDataType}, "
-                    f"start={item.start}, end={item.end}"
-                    for item in items
-                ),
-                name=f"Список сформированных файлов (попытка, всего: {len(items)})",
-                attachment_type=allure.attachment_type.TEXT,
+            if list_reply_payload is None:
+                continue
+
+            parsed_payload = parser.parse_exported_files_list_msg(list_reply_payload)
+            items = []
+            if parsed_payload.replyContent is not None:
+                items = parsed_payload.replyContent.exportedData or []
+
+            if len(items) != last_items_count:
+                allure.attach(
+                    "\n".join(
+                        f"id={item.id}, name={item.name}, type={item.exportedDataType}, "
+                        f"start={item.start}, end={item.end}"
+                        for item in items
+                    ),
+                    name=f"Список сформированных файлов (попытка, всего: {len(items)})",
+                    attachment_type=allure.attachment_type.TEXT,
+                )
+                last_items_count = len(items)
+
+            match = find_matching_exported_item(
+                items=items,
+                expected_data_type=expected_data_type,
+                name_substring=name_substring,
+                period_start=period_start,
+                period_end=period_end,
             )
-            last_items_count = len(items)
+            if match is not None:
+                return match
+    finally:
+        collected_messages.extend(_drain_recv_queue(ws_client))
+        ws_client.suppress_recv_logging = False
+        parser.suppress_recv_logging = False
 
-        match = find_matching_exported_item(
-            items=items,
-            expected_data_type=expected_data_type,
-            name_substring=name_substring,
-            period_start=period_start,
-            period_end=period_end,
-        )
-        if match is not None:
-            return match
-
-        await asyncio.sleep(poll_interval_seconds)
-
+    _attach_ws_poll_failure(
+        collected_messages,
+        total_wait_seconds,
+        ReportConst.GET_EXPORTED_FILES_LIST_REQUEST,
+    )
     return None
 
 

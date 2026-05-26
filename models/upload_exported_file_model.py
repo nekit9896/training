@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-DOWNLOAD_EXPORTED_DATA_REQUEST = "DownloadExportedDataRequest"
-
 
 @dataclass
 class ReplyErrors:

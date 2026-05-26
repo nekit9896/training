@@ -1,8 +1,9 @@
 """
-Модели websocket-сообщений формирования отчётов (фактический протокол с бэка).
+Модели websocket-сообщений формирования отчётов
 
-ExportReportsCommandRequest  — запрос на формирование
-ReportDataExportedNotification — пуш о готовности (заменяет readyForUploadingFiles из старых контрактов)
+SubscribeReportsDataExportedRequest - подписка на пуш о готовности отчёта
+ExportReportsCommandRequest  - запрос на формирование
+ReportDataExportedNotification - пуш о готовности
 """
 
 from __future__ import annotations
@@ -12,10 +13,6 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from constants.enums import ExportStatus, ExportedDataType
-
-EXPORT_REPORTS_COMMAND_REQUEST = "ExportReportsCommandRequest"
-REPORT_DATA_EXPORTED_NOTIFICATION = "ReportDataExportedNotification"
-
 
 @dataclass
 class ReplyErrors:
@@ -32,6 +29,11 @@ class ExportReportsCommandRequest:
     exportedDataTypes: List[ExportedDataType]
     timeOffset: int
     period: Dict[str, Any]
+
+
+@dataclass
+class SubscribeReportsDataExportedRequest:
+    """Подписка на пуш ReportDataExportedNotification. Параметров нет (invoke с args=[[]])."""
 
 
 @dataclass

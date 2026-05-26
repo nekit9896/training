@@ -6,8 +6,6 @@ from typing import Any, Dict, List, Optional
 
 from constants.enums import ExportedDataType
 
-GET_EXPORTED_FILES_LIST_REQUEST = "getExportedFilesListRequest"
-
 
 @dataclass
 class ReplyErrors:

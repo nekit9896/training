@@ -28,7 +28,7 @@ from models.export_reports_model import ReportDataExportedNotification
 from models.get_exported_files_list_model import ExportedDataItem
 from models.upload_exported_file_model import DownloadExportedDataReply
 from models.subscribe_main_page_signals_info_model import SignalsInfo
-from utils.helpers.report_xlsx_utils import LeakReportRow
+from utils.helpers.report_xlsx_utils import LeakReportRow, ReportTitleInfo
 
 
 @dataclass
@@ -413,5 +413,6 @@ class ExportLeaksReportState:
     file_bytes: Optional[bytes] = None
     temp_file_path: Optional[Path] = None
     worksheet: Any = None
+    title_info: Optional[ReportTitleInfo] = None
     data_rows: List[LeakReportRow] = field(default_factory=list)
     target_row: Optional[LeakReportRow] = None

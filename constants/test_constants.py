@@ -103,6 +103,13 @@ class BaseTN3Constants:
 class ExportReportConstants:
     """Константы для теста формирования отчёта об утечках"""
 
+    # ===== Имена WS-сообщений (для шагов allure и connect) =====
+    SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST: str = "SubscribeReportsDataExportedRequest"
+    EXPORT_REPORTS_COMMAND_REQUEST: str = "ExportReportsCommandRequest"
+    REPORT_DATA_EXPORTED_NOTIFICATION: str = "ReportDataExportedNotification"
+    GET_EXPORTED_FILES_LIST_REQUEST: str = "getExportedFilesListRequest"
+    DOWNLOAD_EXPORTED_DATA_REQUEST: str = "DownloadExportedDataRequest"
+
     # ===== Параметры запроса =====
     # Смещение часового пояса (часы) от UTC для отображения времени в отчёте (Москва = UTC+3)
     MOSCOW_TIME_OFFSET_HOURS: int = 3
