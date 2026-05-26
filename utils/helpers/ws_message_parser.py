@@ -16,7 +16,7 @@ from models.acknowledge_leak_model import AcknowledgeLeakReply
 from models.basic_info_model import BasicInfoReply
 from constants.enums import ExportStatus, ExportedDataType
 from models.export_reports_model import ReportDataExportedNotification
-from models.get_exported_files_list_model import GetExportedFilesListReply
+from models.get_exported_files_list_model import GetExportedDataListReply
 from models.upload_exported_file_model import DownloadExportedDataReply
 from models.get_input_signals_model import GetInputSignalsReply
 from models.get_messages_model import GetMessagesReply
@@ -251,11 +251,11 @@ class WsMessageParser:
         """
         return self._find_and_parse_message(data_class=ReportDataExportedNotification, data=data)
 
-    def parse_exported_files_list_msg(self, data: list) -> GetExportedFilesListReply:
+    def parse_exported_data_list_msg(self, data: list) -> GetExportedDataListReply:
         """
-        Парсит ответ getExportedFilesListReply со списком сформированных файлов.
+        Парсит ответ GetExportedDataListReply со списком сформированных файлов.
         """
-        return self._find_and_parse_message(data_class=GetExportedFilesListReply, data=data)
+        return self._find_and_parse_message(data_class=GetExportedDataListReply, data=data)
 
     def parse_download_exported_data_msg(self, data: list) -> DownloadExportedDataReply:
         """

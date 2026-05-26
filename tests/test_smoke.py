@@ -708,7 +708,7 @@ class TestLeakScenarios:
                 "1) Отправка ExportReportsCommandRequest с фильтром по времени "
                 "(start = старт имитатора, end = старт + offset теста)\n"
                 "2) Ожидание пуш-нотификации ReportDataExportedNotification\n"
-                "3) Лонг-поллинг getExportedFilesListRequest до появления отчёта в списке\n"
+                "3) Лонг-поллинг GetExportedDataListRequest до появления отчёта в списке\n"
                 "4) Отправка DownloadExportedDataRequest и приём fileChunk\n"
                 "5) Проверка имени файла (.xlsx, 'Отчет об утечках', описание ТУ)\n"
                 "6) Проверка двойной шапки xlsx (название + период, названия колонок)\n"

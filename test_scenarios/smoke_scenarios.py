@@ -2622,7 +2622,7 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
     2. Отправка ExportReportsCommandRequest с фильтром по времени
        (start = старт имитатора, end = старт имитатора + offset теста).
     3. Ожидание пуш-нотификации ReportDataExportedNotification о готовности отчёта.
-    4. Лонг-поллинг getExportedFilesListRequest до появления нашего отчёта в списке.
+    4. Лонг-поллинг GetExportedDataListRequest до появления нашего отчёта в списке.
     5. Отправка DownloadExportedDataRequest по id отчёта.
     6. Получение fileChunk по ответу на скачивание.
     7-10. Проверки: формат файла, имя, шапка xlsx, строка утечки.
@@ -2711,12 +2711,12 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
         ).expected("").equal_to()
 
     with allure.step(
-        f"Этап 4. Лонг-поллинг {ReportConst.GET_EXPORTED_FILES_LIST_REQUEST} до появления отчёта в списке"
+        f"Этап 4. Лонг-поллинг {ReportConst.GET_EXPORTED_DATA_LIST_REQUEST} до появления отчёта в списке"
     ):
         report_state.report_item = await t_utils.poll_for_exported_file(
             ws_client=ws_client,
             parser=parser,
-            tu_id=cfg.tu_id,
+            list_limit=ReportConst.EXPORTED_DATA_LIST_LIMIT,
             expected_data_type=ExportedDataType.LEAKS_REPORT,
             name_substring=ReportConst.LEAKS_REPORT_NAME_PART,
             period_start=report_state.period_start,

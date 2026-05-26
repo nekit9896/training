@@ -731,6 +731,19 @@ def get_leak_diagnostic_area_samples(
     return leak_diagnostic_area_samples
 
 
+def _find_ws_reply_by_invocation_id(messages: List[Any], invocation_id: str, parser) -> Optional[list]:
+    """
+    Ищет последний ответ с заданным invocation_id и телом replyStatus.
+    """
+    reply_payload = None
+    for msg in messages:
+        if not isinstance(msg, list) or not is_desired_invocation_id(msg, invocation_id):
+            continue
+        if parser._find_reply_status_in_ws_msg(msg):
+            reply_payload = msg
+    return reply_payload
+
+
 def _attach_ws_poll_failure(
     collected_messages: List[Any],
     total_wait_seconds: float,
@@ -751,6 +764,32 @@ def _attach_ws_poll_failure(
     for msg in collected_messages:
         allure.attach(
             pprint.pformat(msg, width=120, sort_dicts=False),
+            name="received ws message",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+
+def _attach_ws_reply_parse_failure(
+    reply_payload: Optional[Any],
+    invocation_id: str,
+    request_name: str,
+    error: BaseException,
+) -> None:
+    """Прикрепляет к Allure ответ бэка при ошибке парсинга."""
+    allure.attach(
+        "\n".join(
+            [
+                f"Запрос: {request_name}",
+                f"invocation_id: {invocation_id}",
+                f"Ошибка: {error}",
+            ]
+        ),
+        name="WS parse failure",
+        attachment_type=allure.attachment_type.TEXT,
+    )
+    if reply_payload is not None:
+        allure.attach(
+            pprint.pformat(reply_payload, width=120, sort_dicts=False),
             name="received ws message",
             attachment_type=allure.attachment_type.TEXT,
         )
@@ -832,7 +871,7 @@ async def poll_for_report_export_notification(
 async def poll_for_exported_file(
     ws_client: WebSocketClient,
     parser,
-    tu_id: int,
+    list_limit: int,
     expected_data_type: Any,
     name_substring: str,
     period_start: datetime,
@@ -841,14 +880,15 @@ async def poll_for_exported_file(
     poll_interval_seconds: float,
 ) -> Optional[Any]:
     """
-    Периодически шлёт getExportedFilesListRequest, забирает ответы из очереди
+    Периодически шлёт GetExportedDataListRequest, забирает ответы из очереди
     по invocation_id среди всех накопленных сообщений.
-    При таймауте прикрепляет к Allure все полученные за период сообщения.
+    При таймауте или ошибке парсинга прикрепляет к Allure полученные ответы.
     """
 
     deadline = asyncio.get_event_loop().time() + total_wait_seconds
     last_items_count = -1
     collected_messages: List[Any] = []
+    request_name = ReportConst.GET_EXPORTED_DATA_LIST_REQUEST
     ws_client.suppress_recv_logging = True
     parser.suppress_recv_logging = True
     try:
@@ -857,23 +897,31 @@ async def poll_for_exported_file(
             collected_messages.extend(drained_before_request)
             await connect(
                 ws_client,
-                ReportConst.GET_EXPORTED_FILES_LIST_REQUEST,
-                {"tuId": tu_id, "additionalProperties": None},
+                request_name,
+                {"limit": list_limit},
             )
             invocation_id = ws_client.invocation_id
             await asyncio.sleep(poll_interval_seconds)
 
-            list_reply_payload = None
-            for msg in _drain_recv_queue(ws_client):
-                collected_messages.append(msg)
-                if isinstance(msg, list) and is_desired_invocation_id(msg, invocation_id):
-                    list_reply_payload = msg
-                    break
+            batch = _drain_recv_queue(ws_client)
+            collected_messages.extend(batch)
+            list_reply_payload = _find_ws_reply_by_invocation_id(batch, invocation_id, parser)
 
             if list_reply_payload is None:
                 continue
 
-            parsed_payload = parser.parse_exported_files_list_msg(list_reply_payload)
+            try:
+                parsed_payload = parser.parse_exported_data_list_msg(list_reply_payload)
+            except Exception as error:
+                _attach_ws_reply_parse_failure(list_reply_payload, invocation_id, request_name, error)
+                for msg in collected_messages:
+                    allure.attach(
+                        pprint.pformat(msg, width=120, sort_dicts=False),
+                        name="received ws message",
+                        attachment_type=allure.attachment_type.TEXT,
+                    )
+                fail(f"Не удалось разобрать ответ на {request_name}: {error}")
+
             items = []
             if parsed_payload.replyContent is not None:
                 items = parsed_payload.replyContent.exportedData or []
@@ -907,7 +955,7 @@ async def poll_for_exported_file(
     _attach_ws_poll_failure(
         collected_messages,
         total_wait_seconds,
-        ReportConst.GET_EXPORTED_FILES_LIST_REQUEST,
+        request_name,
     )
     return None
 

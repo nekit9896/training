@@ -107,7 +107,8 @@ class ExportReportConstants:
     SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST: str = "SubscribeReportsDataExportedRequest"
     EXPORT_REPORTS_COMMAND_REQUEST: str = "ExportReportsCommandRequest"
     REPORT_DATA_EXPORTED_NOTIFICATION: str = "ReportDataExportedNotification"
-    GET_EXPORTED_FILES_LIST_REQUEST: str = "getExportedFilesListRequest"
+    GET_EXPORTED_DATA_LIST_REQUEST: str = "GetExportedDataListRequest"
+    EXPORTED_DATA_LIST_LIMIT: int = 10
     DOWNLOAD_EXPORTED_DATA_REQUEST: str = "DownloadExportedDataRequest"
 
     # ===== Параметры запроса =====
@@ -119,7 +120,7 @@ class ExportReportConstants:
     NOTIFICATION_TIMEOUT_SECONDS: float = 60.0
     # Максимальное время ожидания появления отчёта в списке после нотификации
     LIST_POLL_TOTAL_WAIT_SECONDS: float = 10.0
-    # Интервал между запросами getExportedFilesListRequest
+    # Интервал между запросами GetExportedDataListRequest
     LIST_POLL_INTERVAL_SECONDS: float = 10.0
     # Таймаут получения ответа на скачивание
     DOWNLOAD_TIMEOUT_SECONDS: float = 60.0
