@@ -127,7 +127,12 @@ class WebSocketClientConstants:
     PING_INTERVAL: int = 3
     PING_TIMEOUT: int = 5
     CLOSE_TIMEOUT: int = 30
-    DEFAULT_SIGNALR_MESSAGE_TYPE: int = 1  # invocation type
+    DEFAULT_SIGNALR_MESSAGE_TYPE: int = 1  # invocation
+    STREAM_INVOCATION_MESSAGE_TYPE: int = 4  # StreamInvocation
+    STREAM_ITEM_MESSAGE_TYPE: int = 2  # StreamItem
+    COMPLETION_MESSAGE_TYPE: int = 3  # Completion
+    # Текст ошибки в кадре Completion при неуспешном streaming (SignalR CompletionWithDetail)
+    COMPLETION_ERROR_MESSAGE_INDEX: int = 4
     DEFAULT_SIGNALR_MAP_HEADERS: dict = {}
     EVENT_TYPE_INDEX = 3
     INVOCATION_ID_INDEX = 2

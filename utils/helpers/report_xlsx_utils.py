@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -16,7 +16,7 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 from constants.test_constants import BaseTN3Constants as TestConst
 from constants.test_constants import ExportReportConstants as ReportConst
-from utils.helpers.ws_test_utils import extract_first_number
+from utils.helpers.ws_test_utils import extract_first_number, localize_as_moscow
 
 
 @dataclass
@@ -99,6 +99,59 @@ def _stringify_cell(value: object) -> str:
     if isinstance(value, datetime):
         return value.strftime(ReportConst.REPORT_DATETIME_FORMAT)
     return str(value)
+
+
+def normalize_report_period_naive(value: datetime) -> datetime:
+    """Московское время без tzinfo и микросекунд - для сравнения периодов в отчёте."""
+    return localize_as_moscow(value).replace(microsecond=0, tzinfo=None)
+
+
+def report_period_comparison_bounds(
+    period_start: datetime,
+    period_end: datetime,
+    tolerance_minutes: int = ReportConst.REPORT_PERIOD_TOLERANCE_MINUTES,
+) -> tuple[datetime, datetime, datetime, datetime]:
+    """
+    Границы периода с допуском +-tolerance_minutes для start и end отдельно.
+    Возвращает (start_lower, start_upper, end_lower, end_upper).
+    """
+    start = normalize_report_period_naive(period_start)
+    end = normalize_report_period_naive(period_end)
+    delta = timedelta(minutes=tolerance_minutes)
+    return start - delta, start + delta, end - delta, end + delta
+
+
+def build_export_report_file_name(
+    tu_description: str,
+    period_start: datetime,
+    period_end: datetime,
+) -> str:
+    """
+    Имя xlsx при скачивании: «Отчет об утечках Тихорецк-Новороссийск-3 DD.MM.YYYY HH_MM_SS - DD.MM.YYYY HH_MM_SS.xlsx».
+    """
+    start_text = normalize_report_period_naive(period_start).strftime(ReportConst.REPORT_FILE_NAME_DATETIME_FORMAT)
+    end_text = normalize_report_period_naive(period_end).strftime(ReportConst.REPORT_FILE_NAME_DATETIME_FORMAT)
+    return (
+        f"{ReportConst.LEAKS_REPORT_NAME_PART} {tu_description} {start_text} - {end_text}"
+        f"{ReportConst.XLSX_EXTENSION}"
+    )
+
+
+def parse_period_from_export_file_name(file_name: str) -> tuple[Optional[datetime], Optional[datetime]]:
+    """Извлекает границы периода из имени скачанного xlsx-файла."""
+    match = re.search(ReportConst.REPORT_FILE_NAME_PERIOD_PATTERN, file_name.strip(), re.IGNORECASE)
+    if match is None:
+        return None, None
+
+    parse_format = ReportConst.REPORT_FILE_NAME_DATETIME_FORMAT.replace("_", ":")
+
+    def _parse_part(value: str) -> Optional[datetime]:
+        try:
+            return datetime.strptime(value.replace("_", ":"), parse_format)
+        except ValueError:
+            return None
+
+    return _parse_part(match.group("period_start")), _parse_part(match.group("period_end"))
 
 
 def parse_report_title(title_raw: object) -> ReportTitleInfo:

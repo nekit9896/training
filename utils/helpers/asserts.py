@@ -161,11 +161,17 @@ class StepMessageBuilder:
         ]
         return self._build_message(message_parts)
 
-    def contains(self, objects_list: List[ObjectType], expected_object: ObjectType) -> str:
-        message_parts = [
-            f"Ожидаемый результат: Список элементов: {objects_list}",
-            f"Содержит элемент: {expected_object}",
-        ]
+    def contains(self, container: Any, expected_item: Any) -> str:
+        if isinstance(container, str):
+            message_parts = [
+                f"Ожидаемый результат: '{container}' содержит подстроку '{expected_item}'",
+                f"Фактический результат: {self.field_name} = {self._format_val(container)}",
+            ]
+        else:
+            message_parts = [
+                f"Ожидаемый результат: список {self._format_val(container)} содержит элемент {expected_item}",
+                f"Фактический результат: {self.field_name} = {self._format_val(container)}",
+            ]
         return self._build_message(message_parts)
 
 
@@ -362,15 +368,12 @@ class StepCheck:
         except AssertionError as exc:
             self._handle_assertion(exc)
 
-    def contains(self, objects_list: List[ObjectType], expected_object: ObjectType) -> None:
-        """
-        Выполняет проверку does_not_contain.
-        """
-
-        msg = self._msg_builder.contains(objects_list, expected_object)
+    def contains(self, container: Any, expected_item: Any) -> None:
+        """Проверка, что container (список или строка) содержит expected_item."""
+        msg = self._msg_builder.contains(container, expected_item)
 
         try:
             with allure.step(msg):
-                assert_that(objects_list).described_as(msg).contains(expected_object)
+                assert_that(container).described_as(msg).contains(expected_item)
         except AssertionError as exc:
             self._handle_assertion(exc)

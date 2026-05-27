@@ -403,6 +403,7 @@ class ExportLeaksReportState:
     period_start_naive: Optional[datetime] = None
     period_end_naive: Optional[datetime] = None
     expected_mt_mode: Optional[str] = None
+    time_offset_hours: Optional[int] = None
     tu_description_lower: str = ""
     notification: Optional[ReportDataExportedNotification] = None
     report_item: Optional[ExportedDataItem] = None

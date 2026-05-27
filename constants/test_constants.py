@@ -98,6 +98,7 @@ class BaseTN3Constants:
     DIAGNOSTIC_AREA_BASE_IDS = [2, 3, 4, 5, 6, 7, 8]  # Список ДУ с isBase = true из конфигурации Тн-3
     REPRESENTATIVE_DIAGNOSTIC_AREA_IDS = [2, 3]  # Список показательных ДУ для определения режима СОУ
     ZONE_INFO: str = "Europe/Moscow"
+    SECONDS_PER_HOUR: int = 3600
 
 
 class ExportReportConstants:
@@ -111,9 +112,10 @@ class ExportReportConstants:
     EXPORTED_DATA_LIST_LIMIT: int = 10
     DOWNLOAD_EXPORTED_DATA_REQUEST: str = "DownloadExportedDataRequest"
 
-    # ===== Параметры запроса =====
-    # Смещение часового пояса (часы) от UTC для отображения времени в отчёте (Москва = UTC+3)
-    MOSCOW_TIME_OFFSET_HOURS: int = 3
+    # Допустимая погрешность при сравнении границ периода отчёта
+    REPORT_PERIOD_TOLERANCE_MINUTES: int = 1
+    # Формат даты/времени в имени скачиваемого xlsx-файла
+    REPORT_FILE_NAME_DATETIME_FORMAT: str = "%d.%m.%Y %H_%M_%S"
 
     # ===== Таймауты и интервалы поллинга =====
     # Максимальное ожидание нотификации о готовности отчёта
@@ -138,6 +140,13 @@ class ExportReportConstants:
     REPORT_HEADER_PERIOD_PATTERN: str = (
         r'Отчет об утечках с (?P<period_start>\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2})'
         r' по (?P<period_end>\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2})'
+    )
+    REPORT_FILE_NAME_PERIOD_PATTERN: str = (
+        r'^Отчет об утечках (?P<tu>.+?) '
+        r'(?P<period_start>\d{2}\.\d{2}\.\d{4} \d{2}_\d{2}_\d{2})'
+        r' - '
+        r'(?P<period_end>\d{2}\.\d{2}\.\d{4} \d{2}_\d{2}_\d{2})'
+        r'\.xlsx$'
     )
 
     # ===== Шапка таблицы отчёта об утечках =====

@@ -122,7 +122,7 @@ class WsMessageParser:
         """
         Парсит сообщение InputSignalsInfo
         """
-        payload = self._find_reply_status_in_ws_msg(data)
+        payload = self.find_reply_status_in_ws_msg(data)
         reply_content = payload.get('replyContent')
         input_signals_list = reply_content.get('inputSignals')
         parsed_payload = SubscribeInputSignalsReply(
@@ -224,7 +224,7 @@ class WsMessageParser:
         Парсит сообщение SchemeSignalsStateContent.
         signalsStates приходят как [[signal_type, data_dict], ...] - конвертируем кортежи в словари.
         """
-        payload = self._find_reply_status_in_ws_msg(data)
+        payload = self.find_reply_status_in_ws_msg(data)
         reply_content = payload.get('replyContent', {})
         reply_content['signalsStates'] = [
             item[_SIGNAL_DATA_POSITION]
@@ -272,7 +272,7 @@ class WsMessageParser:
         """
         Ищет объект с replyStatus в ws сообщении и парсит его
         """
-        payload = self._find_reply_status_in_ws_msg(data)
+        payload = self.find_reply_status_in_ws_msg(data)
         parsed_payload = self._parse_message(data_class=data_class, data=payload, config=config)
 
         return parsed_payload
@@ -317,7 +317,7 @@ class WsMessageParser:
         )
 
     @staticmethod
-    def _find_reply_status_in_ws_msg(data: List[Any]) -> Optional[Dict[str, Any]]:
+    def find_reply_status_in_ws_msg(data: List[Any]) -> Optional[Dict[str, Any]]:
         """
         Ищет объект с replyStatus в ws сообщении
         """

@@ -15,6 +15,7 @@ from msgpack import Timestamp as MsgpackTimestamp
 from pytest import fail
 
 from clients.websocket_client import WebSocketClient
+from constants.architecture_constants import WebSocketClientConstants as WS_Const
 from constants.enums import (
     ConfirmationStatus,
     ExportStatus,
@@ -131,6 +132,17 @@ def ensure_moscow_timezone(input_datetime: datetime) -> None | datetime:
 
     # Конвертируем в московское время
     return input_datetime.astimezone(ZoneInfo(TestConst.ZONE_INFO))
+
+
+def report_time_offset_hours(tz_name: str = TestConst.ZONE_INFO) -> Optional[int]:
+    """
+    Смещение часового пояса (часы от UTC) для поля timeOffset в запросах отчётов.
+    """
+    now = datetime.now(ZoneInfo(tz_name))
+    utc_offset = now.utcoffset()
+    if utc_offset is None:
+        return None
+    return int(utc_offset.total_seconds() // TestConst.SECONDS_PER_HOUR)
 
 
 def localize_as_moscow(input_datetime: datetime) -> None | datetime:
@@ -600,6 +612,101 @@ async def connect(ws_client: WebSocketClient, ws_invoke_type: str, ws_invoke_par
         fail(f"Не удалось отправить сообщение типа: {ws_invoke_type} c параметрами {ws_invoke_params}. Ошибка: {error}")
 
 
+async def connect_stream(
+    ws_client: WebSocketClient,
+    ws_invoke_type: str,
+    ws_invoke_params: Any = None,
+    purpose: str = "streaming-вызов WS",
+) -> None:
+    """
+    Streaming-вызов (StreamInvocation)
+    """
+    try:
+        with allure.step(f"Streaming-вызов {ws_invoke_type} c параметрами {ws_invoke_params}"):
+            await ws_client.invoke_stream(ws_invoke_type, ws_invoke_params)
+    except (asyncio.TimeoutError, ConnectionError, ConnectionResetError, OSError) as error:
+        fail(
+            f"Не удалось выполнить {purpose} ({ws_invoke_type}, StreamInvocation). "
+            f"Параметры запроса: {ws_invoke_params}. Ошибка соединения: {error}"
+        )
+
+
+def _stream_completion_error(msg: Any, invocation_id: str) -> Optional[str]:
+    """Текст ошибки из ответа SignalR Completion для данного invocation_id, если есть."""
+    if not isinstance(msg, list):
+        return None
+    if msg[0] != WS_Const.COMPLETION_MESSAGE_TYPE:
+        return None
+    if not is_desired_invocation_id(msg, invocation_id):
+        return None
+    if len(msg) <= WS_Const.COMPLETION_ERROR_MESSAGE_INDEX:
+        return None
+    error_text = msg[WS_Const.COMPLETION_ERROR_MESSAGE_INDEX]
+    if isinstance(error_text, str):
+        return error_text
+    return None
+
+
+async def receive_download_exported_data_reply(
+    ws_client: WebSocketClient,
+    parser,
+    invocation_id: str,
+    request_name: str,
+    total_wait_seconds: float,
+    poll_interval_seconds: float = 0.5,
+    purpose: str = "скачивании xlsx-отчёта после выбора файла в списке сформированных отчётов",
+) -> Any:
+    """
+    Ожидает StreamItem с fileChunk после streaming DownloadExportedDataRequest.
+    """
+    deadline = asyncio.get_event_loop().time() + total_wait_seconds
+    collected_messages: List[Any] = []
+    ws_client.suppress_recv_logging = True
+    parser.suppress_recv_logging = True
+    try:
+        while asyncio.get_event_loop().time() < deadline:
+            await asyncio.sleep(poll_interval_seconds)
+            batch = _drain_recv_queue(ws_client)
+            collected_messages.extend(batch)
+
+            for msg in batch:
+                stream_error = _stream_completion_error(msg, invocation_id)
+                if stream_error:
+                    _attach_ws_reply_parse_failure(msg, invocation_id, request_name, RuntimeError(stream_error))
+                    fail(
+                        f"При {purpose} бэк вернул Completion с ошибкой "
+                        f"({request_name}, invocation_id={invocation_id}): {stream_error}"
+                    )
+
+            for msg in batch:
+                if (
+                    not isinstance(msg, list)
+                    or msg[0] != WS_Const.STREAM_ITEM_MESSAGE_TYPE
+                    or not is_desired_invocation_id(msg, invocation_id)
+                ):
+                    continue
+                if parser.find_reply_status_in_ws_msg(msg) is None:
+                    continue
+                try:
+                    return parser.parse_download_exported_data_msg(msg)
+                except Exception as error:
+                    _attach_ws_reply_parse_failure(msg, invocation_id, request_name, error)
+                    fail(
+                        f"При {purpose} получен StreamItem ({request_name}, invocation_id={invocation_id}), "
+                        f"но не удалось разобрать ответ с fileChunk: {error}"
+                    )
+    finally:
+        collected_messages.extend(_drain_recv_queue(ws_client))
+        ws_client.suppress_recv_logging = False
+        parser.suppress_recv_logging = False
+
+    _attach_ws_poll_failure(collected_messages, total_wait_seconds, f"{request_name} (StreamItem)")
+    fail(
+        f"При {purpose} за {total_wait_seconds} с не получен StreamItem с fileChunk "
+        f"({request_name}, invocation_id={invocation_id}). Смотреть вложения received ws message"
+    )
+
+
 async def connect_and_get_parsed_msg_by_tu_id(
     tu_id: int,
     ws_client: WebSocketClient,
@@ -739,7 +846,7 @@ def _find_ws_reply_by_invocation_id(messages: List[Any], invocation_id: str, par
     for msg in messages:
         if not isinstance(msg, list) or not is_desired_invocation_id(msg, invocation_id):
             continue
-        if parser._find_reply_status_in_ws_msg(msg):
+        if parser.find_reply_status_in_ws_msg(msg):
             reply_payload = msg
     return reply_payload
 
@@ -874,10 +981,12 @@ async def poll_for_exported_file(
     list_limit: int,
     expected_data_type: Any,
     name_substring: str,
+    tu_name_substring: str,
     period_start: datetime,
     period_end: datetime,
     total_wait_seconds: float,
     poll_interval_seconds: float,
+    period_tolerance_minutes: int = ReportConst.REPORT_PERIOD_TOLERANCE_MINUTES,
 ) -> Optional[Any]:
     """
     Периодически шлёт GetExportedDataListRequest, забирает ответы из очереди
@@ -942,8 +1051,10 @@ async def poll_for_exported_file(
                 items=items,
                 expected_data_type=expected_data_type,
                 name_substring=name_substring,
+                tu_name_substring=tu_name_substring,
                 period_start=period_start,
                 period_end=period_end,
+                period_tolerance_minutes=period_tolerance_minutes,
             )
             if match is not None:
                 return match
@@ -965,31 +1076,54 @@ def _normalize_report_period_datetime(value: datetime) -> datetime:
     return localize_as_moscow(value).replace(microsecond=0)
 
 
+def _exported_item_period_matches(
+    item_start: datetime,
+    item_end: datetime,
+    period_start: datetime,
+    period_end: datetime,
+    tolerance_minutes: int,
+) -> bool:
+    """Проверяет start/end элемента списка в пределах периода запроса +- tolerance_minutes."""
+    item_start_norm = _normalize_report_period_datetime(item_start)
+    item_end_norm = _normalize_report_period_datetime(item_end)
+    period_start_norm = _normalize_report_period_datetime(period_start)
+    period_end_norm = _normalize_report_period_datetime(period_end)
+    delta = timedelta(minutes=tolerance_minutes)
+    return (
+        (period_start_norm - delta) <= item_start_norm <= (period_start_norm + delta)
+        and (period_end_norm - delta) <= item_end_norm <= (period_end_norm + delta)
+    )
+
+
 def find_matching_exported_item(
     items: List[Any],
     expected_data_type: Any,
     name_substring: str,
+    tu_name_substring: str,
     period_start: datetime,
     period_end: datetime,
+    period_tolerance_minutes: int = ReportConst.REPORT_PERIOD_TOLERANCE_MINUTES,
 ) -> Optional[Any]:
     """
-    Ищет элемент списка по типу, подстроке имени и точному совпадению периода start/end.
+    Ищет элемент списка по типу, подстрокам в имени (отчёт + ТУ) и периоду start/end с допуском.
     """
     name_substring_lower = name_substring.lower()
-    period_start_expected = _normalize_report_period_datetime(period_start)
-    period_end_expected = _normalize_report_period_datetime(period_end)
+    tu_name_lower = tu_name_substring.lower()
 
     matched_items = []
     for item in items:
         if item.exportedDataType != expected_data_type:
             continue
-        if name_substring_lower not in (item.name or "").lower():
+        item_name_lower = (item.name or "").lower()
+        if name_substring_lower not in item_name_lower:
+            continue
+        if tu_name_lower not in item_name_lower:
             continue
         if item.start is None or item.end is None:
             continue
-        item_start = _normalize_report_period_datetime(item.start)
-        item_end = _normalize_report_period_datetime(item.end)
-        if item_start != period_start_expected or item_end != period_end_expected:
+        if not _exported_item_period_matches(
+            item.start, item.end, period_start, period_end, period_tolerance_minutes
+        ):
             continue
         matched_items.append(item)
 
