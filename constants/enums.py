@@ -141,10 +141,29 @@ class Direction(Enum):
 
 
 class LdsStatus(Enum):
-    FAULTY = 1  # Неисправность
-    INITIALIZATION = 2  # Инициализация
-    DEGRADATION = 3  # Ухудшенные характеристики
-    SERVICEABLE = 4  # Исправность
+    """
+    Режим работы СОУ. 
+    report_text - значение колонки 'Режим работы СОУ' в xlsx-отчёте об утечках.
+    """
+
+    FAULTY = (1, "СОУ неисправна")
+    INITIALIZATION = (2, "СОУ в инициализации")
+    DEGRADATION = (3, "СОУ в ухудшенных характеристиках")
+    SERVICEABLE = (4, "СОУ исправна")
+
+    def __new__(cls, value: int, report_text: str) -> "LdsStatus":
+        member = object.__new__(cls)
+        member._value_ = value
+        member.report_text = report_text
+        return member
+
+    @classmethod
+    def report_text_by_value(cls, status_value: int) -> str | None:
+        """Текст режима СОУ для отчёта по числовому значению статуса"""
+        try:
+            return cls(status_value).report_text
+        except ValueError:
+            return None
 
 
 class ConfirmationStatus(Enum):

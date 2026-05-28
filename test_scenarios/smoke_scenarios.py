@@ -2679,6 +2679,9 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
         actual_report_state.expected_mt_mode = ReportConst.STATIONARY_STATUS_TO_REPORT_TEXT.get(
             leak.expected_stationary_status
         )
+        actual_report_state.expected_lds_status_text = LdsStatus.report_text_by_value(
+            leak.expected_lds_status_in_leaks_report
+        )
         actual_report_state.tu_description_lower = cfg.technological_unit.description.lower()
         time_offset_hours = t_utils.report_time_offset_hours()
         StepCheck(
@@ -2895,6 +2898,7 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
             leak_volume_value = target_row.leak_volume if target_row else None
             mt_mode_lower = target_row.mt_mode.lower() if target_row else ""
             expected_mt_mode_lower = actual_report_state.expected_mt_mode.lower()
+            expected_lds_status_lower = actual_report_state.expected_lds_status_text.lower()
             masking_not_masked_lower = ReportConst.MASKING_NOT_MASKED_TEXT.lower()
             period_start_lo, period_start_hi, period_end_lo, period_end_hi = (
                 report_utils.report_period_comparison_bounds(
@@ -2926,12 +2930,11 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
                 ).contains(object_value_lower, actual_report_state.tu_description_lower)
 
                 StepCheck(
-                    f"Колонка '{ReportConst.COL_LDS_STATUS}'",
+                    f"Колонка '{ReportConst.COL_LDS_STATUS}' содержит "
+                    f"'{actual_report_state.expected_lds_status_text}'",
                     ReportConst.COL_LDS_STATUS,
                     soft_failures,
-                ).actual(
-                    lds_status_value
-                ).expected(ReportConst.LDS_STATUS_OK_TEXT).equal_to()
+                ).contains(lds_status_value.lower(), expected_lds_status_lower)
 
                 StepCheck(
                     f"Колонка '{ReportConst.COL_MASK_INFO}' содержит '{ReportConst.MASKING_NOT_MASKED_TEXT}'",

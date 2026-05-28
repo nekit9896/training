@@ -148,6 +148,8 @@ class LeakTestConfig:
 
     # ===== Ожидаемые статусы =====
     expected_lds_status: int = LdsStatus.SERVICEABLE.value
+    # Режим СОУ в xlsx export_leaks_report (колонка 'Режим работы СОУ')
+    expected_lds_status_in_leaks_report: Optional[int] = None
     expected_stationary_status: int = StationaryStatus.UNSTATIONARY.value
     expected_algorithm_type: int = ReservedType.UNSTATIONARY_FLOW.value
     expected_leak_status: int = ConfirmationStatus.CONFIRMED.value
@@ -403,6 +405,7 @@ class ExportLeaksReportState:
     period_start_naive: Optional[datetime] = None
     period_end_naive: Optional[datetime] = None
     expected_mt_mode: Optional[str] = None
+    expected_lds_status_text: Optional[str] = None
     time_offset_hours: Optional[int] = None
     tu_description_lower: str = ""
     notification: Optional[ReportDataExportedNotification] = None

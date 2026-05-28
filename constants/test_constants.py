@@ -174,7 +174,6 @@ class ExportReportConstants:
         COL_MT_MODE,
     ]
 
-    LDS_STATUS_OK_TEXT: str = "СОУ исправна"
     MASKING_NOT_MASKED_TEXT: str = "СОУ не замаскирована"
 
     # ===== Маппинг StationaryStatus <-> текст в колонке "Режим работы МТ" =====
