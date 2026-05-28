@@ -172,6 +172,26 @@ class WebSocketClient:
         logger.debug(f"Отправляем сообщение: {packet}")
         await self._ws.send(packet)
 
+    async def invoke_stream(self, target: str, args: list) -> None:
+        """
+        Отправляет streaming-вызов (StreamInvocation) по протоколу SignalR.
+        """
+        if not self._ws:
+            raise websockets.WebSocketException("Не установлено подключение по wss")
+        self._invocation_id = str(self._next_id)
+        self._next_id += 1
+        invocation = [
+            WS_Const.STREAM_INVOCATION_MESSAGE_TYPE,
+            WS_Const.DEFAULT_SIGNALR_MAP_HEADERS,
+            self._invocation_id,
+            target,
+            [args],
+        ]
+        logger.info(f"Streaming-сообщение подготовлено к отправке: {invocation}")
+        payload = msgpack.packb(invocation, use_bin_type=True)
+        packet = encode_with_varint_prefix(payload)
+        await self._ws.send(packet)
+
     async def receive_by_type(self, message_type: str, timeout: WS_Const.FILTERING_TIMEOUT) -> List[Any]:
         """
         Фильтрует сообщения по message_type

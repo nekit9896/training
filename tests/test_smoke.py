@@ -682,3 +682,44 @@ class TestLeakScenarios:
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.balance_algorithm_leak_detected(ws_client, config, leak)
+
+    @pytest.mark.asyncio
+    async def test_export_leaks_report(
+        self,
+        ws_client: WebSocketClient,
+        config: SmokeSuiteConfig,
+        leak: LeakTestConfig,
+        leak_number: int,
+        imitator_start_time: datetime,
+    ) -> None:
+        tag = "ExportReports"
+        title = f"[{tag}] Проверка формирования отчёта об утечках. ЭФ: Выпадашка отчётов"
+        _apply_allure_markers(
+            leak.export_leaks_report_test,
+            tag,
+            title,
+            (
+                f"Проверка формирования и содержимого xlsx-отчёта об утечках на наборе данных "
+                f"{config.suite_name},\n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Период отчёта: от старта имитатора до старта + сдвиг теста"
+                f"{leak.export_leaks_report_test.offset} мин. (часовой пояс Europe/Moscow, timeOffset в запросах)\n"
+                "Этапы сценария:\n"
+                "1) SubscribeReportsDataExportedRequest - подписка на пуш-нотификации\n"
+                "2) ExportReportsCommandRequest - запрос формирования отчёта (тип LeaksReport, фильтр по периоду)\n"
+                "3) Ожидание ReportDataExportedNotification - пуш-нотификация о формировании отчёта\n"
+                "4) Лонг-поллинг GetExportedDataListRequest - поиск отчёта в списке "
+                "(имя, ТУ, период start/end с погрешностью +-1 мин)\n"
+                "5) DownloadExportedDataRequest (StreamInvocation) - скачивание по exportedDataId\n"
+                "6) Приём fileChunk, проверка формата xlsx (zip-сигнатура, контент существует)\n"
+                "7) Проверка имени файла: .xlsx, 'Отчет об утечках', название ТУ, "
+                "диапазон дат в имени (+-1 мин)\n"
+                "8) Проверка шапки xlsx: заголовок с периодом (+-1 мин), названия колонок\n"
+                "9) Проверка строки утечки: дата в периоде, объект, режим СОУ, маскирование, "
+                "координата, объём, режим работы МТ\n"
+                "Во вложениях Allure xlsx прикладывается только при падении теста"
+            ),
+        )
+        if config.has_multiple_leaks:
+            allure.dynamic.title(f"{title} (утечка #{leak_number})")
+        await scenarios.export_leaks_report(ws_client, config, leak, imitator_start_time)

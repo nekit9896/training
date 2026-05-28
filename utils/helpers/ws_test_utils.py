@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import pprint
 import random
 import re
 from dataclasses import asdict, is_dataclass
@@ -14,26 +15,31 @@ from msgpack import Timestamp as MsgpackTimestamp
 from pytest import fail
 
 from clients.websocket_client import WebSocketClient
+from constants.architecture_constants import WebSocketClientConstants as WS_Const
 from constants.enums import (
     ConfirmationStatus,
+    ExportStatus,
     LdsStatus,
     LdsStatusDegradation,
     LdsStatusFaulty,
     LdsStatusInitialization,
     LeakStatus,
+    ReplyStatus,
     StationaryReason,
     StationaryStatus,
     StoppedPumpingReason,
     UnStationaryReason,
 )
 from constants.test_constants import BaseTN3Constants as TestConst
+from constants.test_constants import ExportReportConstants as ReportConst
+from models.export_reports_model import ReportDataExportedContent, ReportDataExportedNotification
 from models.get_messages_model import GetMessagesRequest
 from models.subscribe_all_leaks_info_model import SubscribeAllLeaksInfoReply
 from models.subscribe_common_scheme_model import DiagnosticArea, FlowArea
 from models.subscribe_leaks_model import Leak
 from models.subscribe_main_page_info_model import MainPageLeakInfo
 from utils.helpers.ws_message_parser import ws_message_parser
-from utils.msgpack_utils.message_filters import is_desired_type
+from utils.msgpack_utils.message_filters import is_desired_invocation_id, is_desired_type
 
 ObjectType = TypeVar("ObjectType")  # создает типовую переменную для поиска объектов в списке
 RandomObjectType = TypeVar("RandomObjectType")
@@ -125,6 +131,17 @@ def ensure_moscow_timezone(input_datetime: datetime) -> None | datetime:
     return input_datetime.astimezone(ZoneInfo(TestConst.ZONE_INFO))
 
 
+def report_time_offset_hours(tz_name: str = TestConst.ZONE_INFO) -> Optional[int]:
+    """
+    Смещение часового пояса (часы от UTC) для поля timeOffset в запросах отчётов.
+    """
+    now = datetime.now(ZoneInfo(tz_name))
+    utc_offset = now.utcoffset()
+    if utc_offset is None:
+        return None
+    return int(utc_offset.total_seconds() // TestConst.SECONDS_PER_HOUR)
+
+
 def localize_as_moscow(input_datetime: datetime) -> None | datetime:
     """
     Присваивает datetime московский часовой пояс без сдвига времени.
@@ -137,6 +154,13 @@ def localize_as_moscow(input_datetime: datetime) -> None | datetime:
     if input_datetime.tzinfo is None:
         return input_datetime.replace(tzinfo=moscow_tz)
     return input_datetime.astimezone(moscow_tz)
+
+
+def format_datetime_moscow(value: Optional[datetime]) -> str:
+    """Строковое представление datetime в Europe/Moscow для вложений Allure."""
+    if value is None:
+        return "None"
+    return str(localize_as_moscow(value))
 
 
 def get_rejection_time_window(
@@ -266,6 +290,28 @@ def find_object_by_field(item_list: List[ObjectType], field_name: str, value: An
         return next((item for item in item_list if getattr(item, field_name) == value))
     except Exception:
         fail(f"Не найдено значение: {value} для поля: {field_name}, в списке: {item_list}.")
+
+
+def find_object_by_a_few_fields(item_list: List[ObjectType], fields_dict: dict) -> ObjectType:
+    """
+    Ищет объект в списке объектов по значениям нескольких полей
+    """
+    if not item_list:
+        return None
+
+    return next(
+        (item for item in item_list if all(getattr(item, field) == value for field, value in fields_dict.items())), None
+    )
+
+
+def get_signal(site_message, signal_type):
+    if not site_message:
+        return None
+    return next((s for s in site_message.signals if s.signalType == signal_type.value), None)
+
+
+def get_value(obj):
+    return getattr(obj, "value", None)
 
 
 def find_confirmed_leaks(item_list: List[Leak]) -> List[Leak]:
@@ -434,6 +480,315 @@ def create_journal_req_body(**kwargs) -> dict:
     return result
 
 
+def extract_first_number(value: object) -> Optional[float]:
+    """
+    Извлекает первое число из ячейки (int/float/str вида '55.55 км', '111.11 м3/ч').
+    """
+    if value is None:
+        return None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    if isinstance(value, str):
+        matches = re.findall(TestConst.DIGITS_WITH_DOT_PATTERN, value)
+        if matches:
+            try:
+                return float(matches[0].replace(",", "."))
+            except ValueError:
+                return None
+    return None
+
+
+def _attach_ws_poll_failure(
+    collected_messages: List[Any],
+    total_wait_seconds: float,
+    expected_message_type: str,
+) -> None:
+    """Краткая сводка и pprint каждого WS-сообщения при таймауте поллинга."""
+    allure.attach(
+        "\n".join(
+            [
+                f"Таймаут ожидания: {total_wait_seconds} с",
+                f"Ожидаемый тип сообщения: {expected_message_type}",
+                f"Всего сообщений за период поллинга: {len(collected_messages)}",
+            ]
+        ),
+        name="WS poll timeout",
+        attachment_type=allure.attachment_type.TEXT,
+    )
+    for msg in collected_messages:
+        allure.attach(
+            pprint.pformat(msg, width=120, sort_dicts=False),
+            name="received ws message",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+
+def _attach_ws_reply_parse_failure(
+    reply_payload: Optional[Any],
+    invocation_id: str,
+    request_name: str,
+    error: BaseException,
+) -> None:
+    """Прикрепляет к Allure ответ бэка при ошибке парсинга."""
+    allure.attach(
+        "\n".join(
+            [
+                f"Запрос: {request_name}",
+                f"invocation_id: {invocation_id}",
+                f"Ошибка: {error}",
+            ]
+        ),
+        name="WS parse failure",
+        attachment_type=allure.attachment_type.TEXT,
+    )
+    if reply_payload is not None:
+        allure.attach(
+            pprint.pformat(reply_payload, width=120, sort_dicts=False),
+            name="received ws message",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+
+def _drain_recv_queue(ws_client: WebSocketClient) -> List[Any]:
+    """Забирает все сообщения из очереди ws без блокирующего receive_by_..."""
+    messages: List[Any] = []
+    while not ws_client.recv_queue.empty():
+        try:
+            messages.append(ws_client.recv_queue.get_nowait())
+        except asyncio.QueueEmpty:
+            break
+    return messages
+
+
+def _find_valid_report_export_notification(
+    messages: List[Any],
+    parser,
+    notification_type: str,
+) -> Optional[ReportDataExportedNotification]:
+    """Ищет среди уже полученных сообщений успешную ReportDataExportedNotification."""
+    for msg in messages:
+        if not isinstance(msg, list) or not is_desired_type(msg, notification_type):
+            continue
+        try:
+            notification = parser.parse_report_data_exported_notification_msg(msg)
+        except (ValueError, TypeError, KeyError):
+            continue
+        if notification.replyStatus != ReplyStatus.OK.value:
+            continue
+        content: Optional[ReportDataExportedContent] = notification.replyContent
+        if content is None:
+            continue
+        if content.exportStatus != ExportStatus.DONE:
+            continue
+        return notification
+    return None
+
+
+async def poll_for_report_export_notification(
+    ws_client: WebSocketClient,
+    parser,
+    total_wait_seconds: float,
+    poll_interval_seconds: float,
+) -> Optional[Any]:
+    """
+    Собирает сообщения из очереди ws и ищет ReportDataExportedNotification с успешным exportStatus.
+    При таймауте прикрепляет к Allure все полученные за период сообщения.
+    """
+
+    deadline = asyncio.get_event_loop().time() + total_wait_seconds
+    collected_messages: List[Any] = []
+    ws_client.suppress_recv_logging = True
+    parser.suppress_recv_logging = True
+    try:
+        while asyncio.get_event_loop().time() < deadline:
+            await asyncio.sleep(poll_interval_seconds)
+            batch = _drain_recv_queue(ws_client)
+            collected_messages.extend(batch)
+            notification = _find_valid_report_export_notification(
+                batch, parser, ReportConst.REPORT_DATA_EXPORTED_NOTIFICATION
+            )
+            if notification is not None:
+                return notification
+    finally:
+        collected_messages.extend(_drain_recv_queue(ws_client))
+        ws_client.suppress_recv_logging = False
+        parser.suppress_recv_logging = False
+
+    _attach_ws_poll_failure(
+        collected_messages,
+        total_wait_seconds,
+        ReportConst.REPORT_DATA_EXPORTED_NOTIFICATION,
+    )
+    return None
+
+
+def _find_ws_reply_by_invocation_id(messages: List[Any], invocation_id: str, parser) -> Optional[list]:
+    """
+    Ищет последний ответ с заданным invocation_id и телом replyStatus.
+    """
+    reply_payload = None
+    for msg in messages:
+        if not isinstance(msg, list) or not is_desired_invocation_id(msg, invocation_id):
+            continue
+        if parser.find_reply_status_in_ws_msg(msg):
+            reply_payload = msg
+    return reply_payload
+
+
+async def poll_for_exported_file(
+    ws_client: WebSocketClient,
+    parser,
+    list_limit: int,
+    expected_data_type: Any,
+    name_substring: str,
+    tu_name_substring: str,
+    period_start: datetime,
+    period_end: datetime,
+    total_wait_seconds: float,
+    poll_interval_seconds: float,
+    period_tolerance_minutes: int = ReportConst.REPORT_PERIOD_TOLERANCE_MINUTES,
+) -> Optional[Any]:
+    """
+    Периодически шлёт GetExportedDataListRequest, забирает ответы из очереди
+    по invocation_id среди всех накопленных сообщений.
+    При таймауте или ошибке парсинга прикрепляет к Allure полученные ответы.
+    """
+
+    deadline = asyncio.get_event_loop().time() + total_wait_seconds
+    last_items_count = -1
+    collected_messages: List[Any] = []
+    request_name = ReportConst.GET_EXPORTED_DATA_LIST_REQUEST
+    ws_client.suppress_recv_logging = True
+    parser.suppress_recv_logging = True
+    try:
+        while asyncio.get_event_loop().time() < deadline:
+            drained_before_request = _drain_recv_queue(ws_client)
+            collected_messages.extend(drained_before_request)
+            await connect(
+                ws_client,
+                request_name,
+                {"limit": list_limit},
+            )
+            invocation_id = ws_client.invocation_id
+            await asyncio.sleep(poll_interval_seconds)
+
+            batch = _drain_recv_queue(ws_client)
+            collected_messages.extend(batch)
+            list_reply_payload = _find_ws_reply_by_invocation_id(batch, invocation_id, parser)
+
+            if list_reply_payload is None:
+                continue
+
+            try:
+                parsed_payload = parser.parse_exported_data_list_msg(list_reply_payload)
+            except Exception as error:
+                _attach_ws_reply_parse_failure(list_reply_payload, invocation_id, request_name, error)
+                for msg in collected_messages:
+                    allure.attach(
+                        pprint.pformat(msg, width=120, sort_dicts=False),
+                        name="received ws message",
+                        attachment_type=allure.attachment_type.TEXT,
+                    )
+                fail(f"Не удалось разобрать ответ на {request_name}: {error}")
+
+            items = []
+            if parsed_payload.replyContent is not None:
+                items = parsed_payload.replyContent.exportedData or []
+
+            if len(items) != last_items_count:
+                allure.attach(
+                    "\n".join(
+                        f"id={item.id}, name={item.name}, type={item.exportedDataType}, "
+                        f"start={format_datetime_moscow(item.start)}, end={format_datetime_moscow(item.end)}"
+                        for item in items
+                    ),
+                    name=f"Список сформированных файлов (всего: {len(items)})",
+                    attachment_type=allure.attachment_type.TEXT,
+                )
+                last_items_count = len(items)
+
+            match = find_matching_exported_item(
+                items=items,
+                expected_data_type=expected_data_type,
+                name_substring=name_substring,
+                tu_name_substring=tu_name_substring,
+                period_start=period_start,
+                period_end=period_end,
+                period_tolerance_minutes=period_tolerance_minutes,
+            )
+            if match is not None:
+                return match
+    finally:
+        collected_messages.extend(_drain_recv_queue(ws_client))
+        ws_client.suppress_recv_logging = False
+        parser.suppress_recv_logging = False
+
+    _attach_ws_poll_failure(
+        collected_messages,
+        total_wait_seconds,
+        request_name,
+    )
+    return None
+
+
+def _normalize_report_period_datetime(value: datetime) -> datetime:
+    """Приводит datetime периода отчёта к московскому времени без микросекунд."""
+    return localize_as_moscow(value).replace(microsecond=0)
+
+
+def _exported_item_period_matches(
+    item_start: datetime,
+    item_end: datetime,
+    period_start: datetime,
+    period_end: datetime,
+    tolerance_minutes: int,
+) -> bool:
+    """Проверяет start/end элемента списка в пределах периода запроса +- tolerance_minutes."""
+    item_start_norm = _normalize_report_period_datetime(item_start)
+    item_end_norm = _normalize_report_period_datetime(item_end)
+    period_start_norm = _normalize_report_period_datetime(period_start)
+    period_end_norm = _normalize_report_period_datetime(period_end)
+    delta = timedelta(minutes=tolerance_minutes)
+    return (period_start_norm - delta) <= item_start_norm <= (period_start_norm + delta) and (
+        period_end_norm - delta
+    ) <= item_end_norm <= (period_end_norm + delta)
+
+
+def find_matching_exported_item(
+    items: List[Any],
+    expected_data_type: Any,
+    name_substring: str,
+    tu_name_substring: str,
+    period_start: datetime,
+    period_end: datetime,
+    period_tolerance_minutes: int = ReportConst.REPORT_PERIOD_TOLERANCE_MINUTES,
+) -> Optional[Any]:
+    """
+    Ищет элемент списка по типу, подстрокам в имени (отчёт + ТУ) и периоду start/end с допуском.
+    """
+    name_substring_lower = name_substring.lower()
+    tu_name_lower = tu_name_substring.lower()
+
+    matched_items = []
+    for item in items:
+        if item.exportedDataType != expected_data_type:
+            continue
+        item_name_lower = (item.name or "").lower()
+        if name_substring_lower not in item_name_lower:
+            continue
+        if tu_name_lower not in item_name_lower:
+            continue
+        if item.start is None or item.end is None:
+            continue
+        if not _exported_item_period_matches(item.start, item.end, period_start, period_end, period_tolerance_minutes):
+            continue
+        matched_items.append(item)
+
+    if not matched_items:
+        return None
+    return max(matched_items, key=lambda exported_item: exported_item.id)
+
+
 def parse_journal_msg_value(value: str) -> tuple:
     """Парсит поле value в сообщении журнала"""
     try:
@@ -574,6 +929,101 @@ async def connect(ws_client: WebSocketClient, ws_invoke_type: str, ws_invoke_par
         fail(f"Не удалось отправить сообщение типа: {ws_invoke_type} c параметрами {ws_invoke_params}. Ошибка: {error}")
 
 
+async def connect_stream(
+    ws_client: WebSocketClient,
+    ws_invoke_type: str,
+    ws_invoke_params: Any = None,
+    purpose: str = "streaming-вызов WS",
+) -> None:
+    """
+    Streaming-вызов (StreamInvocation)
+    """
+    try:
+        with allure.step(f"Streaming-вызов {ws_invoke_type} c параметрами {ws_invoke_params}"):
+            await ws_client.invoke_stream(ws_invoke_type, ws_invoke_params)
+    except (asyncio.TimeoutError, ConnectionError, ConnectionResetError, OSError) as error:
+        fail(
+            f"Не удалось выполнить {purpose} ({ws_invoke_type}, StreamInvocation). "
+            f"Параметры запроса: {ws_invoke_params}. Ошибка соединения: {error}"
+        )
+
+
+def _stream_completion_error(msg: Any, invocation_id: str) -> Optional[str]:
+    """Текст ошибки из ответа SignalR Completion для данного invocation_id, если есть."""
+    if not isinstance(msg, list):
+        return None
+    if msg[0] != WS_Const.COMPLETION_MESSAGE_TYPE:
+        return None
+    if not is_desired_invocation_id(msg, invocation_id):
+        return None
+    if len(msg) <= WS_Const.COMPLETION_ERROR_MESSAGE_INDEX:
+        return None
+    error_text = msg[WS_Const.COMPLETION_ERROR_MESSAGE_INDEX]
+    if isinstance(error_text, str):
+        return error_text
+    return None
+
+
+async def receive_download_exported_data_reply(
+    ws_client: WebSocketClient,
+    parser,
+    invocation_id: str,
+    request_name: str,
+    total_wait_seconds: float,
+    poll_interval_seconds: float = 0.5,
+    purpose: str = "скачивании xlsx-отчёта после выбора файла в списке сформированных отчётов",
+) -> Any:
+    """
+    Ожидает StreamItem с fileChunk после streaming DownloadExportedDataRequest.
+    """
+    deadline = asyncio.get_event_loop().time() + total_wait_seconds
+    collected_messages: List[Any] = []
+    ws_client.suppress_recv_logging = True
+    parser.suppress_recv_logging = True
+    try:
+        while asyncio.get_event_loop().time() < deadline:
+            await asyncio.sleep(poll_interval_seconds)
+            batch = _drain_recv_queue(ws_client)
+            collected_messages.extend(batch)
+
+            for msg in batch:
+                stream_error = _stream_completion_error(msg, invocation_id)
+                if stream_error:
+                    _attach_ws_reply_parse_failure(msg, invocation_id, request_name, RuntimeError(stream_error))
+                    fail(
+                        f"При {purpose} бэк вернул Completion с ошибкой "
+                        f"({request_name}, invocation_id={invocation_id}): {stream_error}"
+                    )
+
+            for msg in batch:
+                if (
+                    not isinstance(msg, list)
+                    or msg[0] != WS_Const.STREAM_ITEM_MESSAGE_TYPE
+                    or not is_desired_invocation_id(msg, invocation_id)
+                ):
+                    continue
+                if parser.find_reply_status_in_ws_msg(msg) is None:
+                    continue
+                try:
+                    return parser.parse_download_exported_data_msg(msg)
+                except Exception as error:
+                    _attach_ws_reply_parse_failure(msg, invocation_id, request_name, error)
+                    fail(
+                        f"При {purpose} получен StreamItem ({request_name}, invocation_id={invocation_id}), "
+                        f"но не удалось разобрать ответ с fileChunk: {error}"
+                    )
+    finally:
+        collected_messages.extend(_drain_recv_queue(ws_client))
+        ws_client.suppress_recv_logging = False
+        parser.suppress_recv_logging = False
+
+    _attach_ws_poll_failure(collected_messages, total_wait_seconds, f"{request_name} (StreamItem)")
+    fail(
+        f"При {purpose} за {total_wait_seconds} с не получен StreamItem с fileChunk "
+        f"({request_name}, invocation_id={invocation_id}). Смотреть вложения received ws message"
+    )
+
+
 async def connect_and_get_parsed_msg_by_tu_id(
     tu_id: int,
     ws_client: WebSocketClient,
@@ -703,3 +1153,4 @@ def get_leak_diagnostic_area_samples(
     if not leak_diagnostic_area_samples:
         fail(f"За {total_wait} секунд не пришло ни одного сообщения для ДУ с name={leak_diagnostic_area_name}.")
     return leak_diagnostic_area_samples
+    

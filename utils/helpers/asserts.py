@@ -74,7 +74,7 @@ class StepMessageBuilder:
         """
         return len(val) if hasattr(val, "__len__") else 0
 
-    def equal_to(
+    def equal_to_msg(
         self,
         exp_value: Any,
         act_value: Any,
@@ -85,7 +85,7 @@ class StepMessageBuilder:
         ]
         return self._build_message(message_parts)
 
-    def is_not_equal_to(
+    def is_not_equal_to_msg(
         self,
         exp_value: Any,
         act_value: Any,
@@ -96,14 +96,14 @@ class StepMessageBuilder:
         ]
         return self._build_message(message_parts)
 
-    def is_not_none(self, act_value: Any) -> str:
+    def is_not_none_msg(self, act_value: Any) -> str:
         message_parts = [
             f"Ожидаемый результат: {self.field_name} не пустое",
             f"Фактический результат: {self.field_name} = {self._format_val(act_value)}",
         ]
         return self._build_message(message_parts)
 
-    def is_not_empty(self, act_value: Any) -> str:
+    def is_not_empty_msg(self, act_value: Any) -> str:
         item_count = self._item_count(act_value)
         message_parts = [
             f"Ожидаемый результат: {self.field_name} не пустое",
@@ -111,7 +111,7 @@ class StepMessageBuilder:
         ]
         return self._build_message(message_parts)
 
-    def is_empty(self, act_value: Any) -> str:
+    def is_empty_msg(self, act_value: Any) -> str:
         item_count = self._item_count(act_value)
         message_parts = [
             f"Ожидаемый результат: {self.field_name} пустое",
@@ -119,7 +119,7 @@ class StepMessageBuilder:
         ]
         return self._build_message(message_parts)
 
-    def is_close_to(self, exp_value: Any, act_value: Any, extra_info: Optional[Any] = None) -> str:
+    def is_close_to_msg(self, exp_value: Any, act_value: Any, extra_info: Optional[Any] = None) -> str:
         message_parts = [
             f"Ожидаемый результат: {self.field_name} = {self._format_val(exp_value)}",
             f"Фактический результат: {self.field_name} = {self._format_val(act_value)}",
@@ -128,7 +128,7 @@ class StepMessageBuilder:
             message_parts.append(f"Дополнительная информация: {self._format_val(extra_info)}")
         return self._build_message(message_parts)
 
-    def is_less_than(self, exp_value: Any, act_value: Any, extra_info: Optional[Any] = None) -> str:
+    def is_less_than_msg(self, exp_value: Any, act_value: Any, extra_info: Optional[Any] = None) -> str:
         message_parts = [
             f"Ожидаемый результат: Значение в поле {self.field_name} < {self._format_val(exp_value)}",
             f"Фактический результат: {self.field_name} = {self._format_val(act_value)}",
@@ -137,7 +137,7 @@ class StepMessageBuilder:
             message_parts.append(f"Дополнительная информация: {self._format_val(extra_info)}")
         return self._build_message(message_parts)
 
-    def is_greater_than(self, exp_value: Any, act_value: Any, extra_info: Optional[Any] = None) -> str:
+    def is_greater_than_msg(self, exp_value: Any, act_value: Any, extra_info: Optional[Any] = None) -> str:
         message_parts = [
             f"Ожидаемый результат: Значение в поле {self.field_name} > {self._format_val(exp_value)}",
             f"Фактический результат: {self.field_name} = {self._format_val(act_value)}",
@@ -146,7 +146,16 @@ class StepMessageBuilder:
             message_parts.append(f"Дополнительная информация: {self._format_val(extra_info)}")
         return self._build_message(message_parts)
 
-    def is_between(self, act_value: Any, lower_bound: Any, upper_bound: Any) -> str:
+    def is_greater_than_or_equal_to_msg(self, exp_value: Any, act_value: Any, extra_info: Optional[Any] = None) -> str:
+        message_parts = [
+            f"Ожидаемый результат: Значение в поле {self.field_name} >= {self._format_val(exp_value)}",
+            f"Фактический результат: {self.field_name} = {self._format_val(act_value)}",
+        ]
+        if extra_info:
+            message_parts.append(f"Дополнительная информация: {self._format_val(extra_info)}")
+        return self._build_message(message_parts)
+
+    def is_between_msg(self, act_value: Any, lower_bound: Any, upper_bound: Any) -> str:
         message_parts = [
             f"Ожидаемый результат: "
             f"Значение в поле {self.field_name} должно быть в диапазоне [{lower_bound}, {upper_bound}]",
@@ -154,18 +163,24 @@ class StepMessageBuilder:
         ]
         return self._build_message(message_parts)
 
-    def does_not_contain(self, objects_list: List[ObjectType], forbidden_object: ObjectType) -> str:
+    def does_not_contain_msg(self, objects_list: List[ObjectType], forbidden_object: ObjectType) -> str:
         message_parts = [
             f"Ожидаемый результат: Список элементов: {objects_list}",
             f"Не содержит элемента: {forbidden_object}",
         ]
         return self._build_message(message_parts)
 
-    def contains(self, objects_list: List[ObjectType], expected_object: ObjectType) -> str:
-        message_parts = [
-            f"Ожидаемый результат: Список элементов: {objects_list}",
-            f"Содержит элемент: {expected_object}",
-        ]
+    def contains_msg(self, container: Any, expected_item: Any) -> str:
+        if isinstance(container, str):
+            message_parts = [
+                f"Ожидаемый результат: '{container}' содержит подстроку '{expected_item}'",
+                f"Фактический результат: {self.field_name} = {self._format_val(container)}",
+            ]
+        else:
+            message_parts = [
+                f"Ожидаемый результат: список {self._format_val(container)} содержит элемент {expected_item}",
+                f"Фактический результат: {self.field_name} = {self._format_val(container)}",
+            ]
         return self._build_message(message_parts)
 
 
@@ -223,7 +238,7 @@ class StepCheck:
         if self._actual is None:
             raise ValueError("Фактический результат должен быть заполнен при вызове equal_to()")
 
-        msg = self._msg_builder.equal_to(self._expected, self._actual)
+        msg = self._msg_builder.equal_to_msg(self._expected, self._actual)
 
         try:
             with allure.step(msg):
@@ -245,7 +260,7 @@ class StepCheck:
         if self._actual is None:
             raise ValueError("Фактический результат должен быть заполнен при вызове is_not_equal_to()")
 
-        msg = self._msg_builder.is_not_equal_to(self._expected, self._actual)
+        msg = self._msg_builder.is_not_equal_to_msg(self._expected, self._actual)
 
         try:
             with allure.step(msg):
@@ -257,10 +272,7 @@ class StepCheck:
 
     def is_not_none(self) -> None:
         """Проверка на существование поля"""
-        if self._actual is None:
-            fail("Фактический результат должен быть заполнен при вызове is_not_none()")
-
-        msg = self._msg_builder.is_not_none(self._actual)
+        msg = self._msg_builder.is_not_none_msg(self._actual)
 
         try:
             with allure.step(msg):
@@ -274,7 +286,7 @@ class StepCheck:
         if self._actual is None:
             fail("Фактический результат должен быть заполнен при вызове is_not_empty()")
 
-        msg = self._msg_builder.is_not_empty(self._actual)
+        msg = self._msg_builder.is_not_empty_msg(self._actual)
 
         try:
             with allure.step(msg):
@@ -287,7 +299,7 @@ class StepCheck:
         if self._actual is None:
             fail("Фактический результат должен быть заполнен при вызове is_not_empty()")
 
-        msg = self._msg_builder.is_empty(self._actual)
+        msg = self._msg_builder.is_empty_msg(self._actual)
 
         try:
             with allure.step(msg):
@@ -303,7 +315,7 @@ class StepCheck:
             raise ValueError("Фактический результат должен быть заполнен при вызове is_close_to()")
         self._expected = expected
 
-        msg = self._msg_builder.is_close_to(expected, self._actual, extra_info)
+        msg = self._msg_builder.is_close_to_msg(expected, self._actual, extra_info)
 
         try:
             with allure.step(msg):
@@ -311,12 +323,12 @@ class StepCheck:
         except AssertionError as exc:
             self._handle_assertion(exc)
 
-    def is_less_than(self, threshold: Any, extra_info: Any) -> None:
+    def is_less_than(self, threshold: Any, extra_info: Any = None) -> None:
         """Проверка, что значение меньше порога"""
         if self._actual is None:
             raise ValueError("Фактический результат должен быть заполнен при вызове is_less_than()")
 
-        msg = self._msg_builder.is_less_than(self.check_step, self._actual, extra_info)
+        msg = self._msg_builder.is_less_than_msg(self.check_step, self._actual, extra_info)
 
         try:
             with allure.step(msg):
@@ -329,7 +341,7 @@ class StepCheck:
         if self._actual is None:
             raise ValueError("Фактический результат должен быть заполнен при вызове is_greater_than()")
 
-        msg = self._msg_builder.is_greater_than(threshold, self._actual, extra_info)
+        msg = self._msg_builder.is_greater_than_msg(threshold, self._actual, extra_info)
 
         try:
             with allure.step(msg):
@@ -340,12 +352,25 @@ class StepCheck:
     def is_between(self, lower_bound: Any, upper_bound: Any) -> None:
         """Проверка, что значение в пределах установленных границ"""
         if self._actual is None:
-            raise ValueError("Фактический результат должен быть заполнен при вызове is_less_than()")
-        msg = self._msg_builder.is_between(self._actual, lower_bound, upper_bound)
+            raise ValueError("Фактический результат должен быть заполнен при вызове is_between()")
+        msg = self._msg_builder.is_between_msg(self._actual, lower_bound, upper_bound)
 
         try:
             with allure.step(msg):
                 assert_that(self._actual).described_as(msg).is_between(lower_bound, upper_bound)
+        except AssertionError as exc:
+            self._handle_assertion(exc)
+
+    def is_greater_than_or_equal_to(self, threshold: Any, extra_info: Any = None) -> None:
+        """Проверка, что значение больше или равно порогу"""
+        if self._actual is None:
+            raise ValueError("Фактический результат должен быть заполнен при вызове is_greater_than_or_equal_to_msg()")
+
+        msg = self._msg_builder.is_greater_than_or_equal_to_msg(threshold, self._actual, extra_info)
+
+        try:
+            with allure.step(msg):
+                assert_that(self._actual).described_as(msg).is_greater_than_or_equal_to(threshold)
         except AssertionError as exc:
             self._handle_assertion(exc)
 
@@ -354,7 +379,7 @@ class StepCheck:
         Выполняет проверку does_not_contain.
         """
 
-        msg = self._msg_builder.does_not_contain(objects_list, forbidden_object)
+        msg = self._msg_builder.does_not_contain_msg(objects_list, forbidden_object)
 
         try:
             with allure.step(msg):
@@ -362,15 +387,12 @@ class StepCheck:
         except AssertionError as exc:
             self._handle_assertion(exc)
 
-    def contains(self, objects_list: List[ObjectType], expected_object: ObjectType) -> None:
-        """
-        Выполняет проверку does_not_contain.
-        """
-
-        msg = self._msg_builder.contains(objects_list, expected_object)
+    def contains(self, container: Any, expected_item: Any) -> None:
+        """Проверка, что container (список или строка) содержит expected_item."""
+        msg = self._msg_builder.contains_msg(container, expected_item)
 
         try:
             with allure.step(msg):
-                assert_that(objects_list).described_as(msg).contains(expected_object)
+                assert_that(container).described_as(msg).contains_msg(expected_item)
         except AssertionError as exc:
             self._handle_assertion(exc)

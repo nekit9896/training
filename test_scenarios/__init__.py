@@ -6,7 +6,7 @@
 Для добавления нового теста необходимо добавить в список __all__ название этого теста scenarios.your_new_test
 """
 
-import test_scenarios.scenarios as scenarios
+import test_scenarios.smoke_scenarios as scenarios
 
 __all__ = [
     scenarios.basic_info,
@@ -27,8 +27,5 @@ __all__ = [
     scenarios.acknowledge_leak_info,
     scenarios.acknowledge_leak_in_journal,
     scenarios.output_signals,
-    scenarios.rejection_input_signals,
-    scenarios.rejection_journal,
-    scenarios.rejection_main_page,
-    scenarios.rejection_scheme_signals_state,
+    scenarios.export_leaks_report,
 ]
