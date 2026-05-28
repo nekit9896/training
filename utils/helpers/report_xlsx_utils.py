@@ -68,7 +68,7 @@ class LeakReportRow:
 
 
 def is_xlsx_file_bytes(file_bytes: Optional[bytes]) -> bool:
-    """Проверяет zip-сигнатуру xlsx (PK\\x03\\x04)."""
+    """Проверяет zip-сигнатуру xlsx"""
     if not file_bytes:
         return False
     return file_bytes.startswith(ReportConst.ZIP_SIGNATURE)
@@ -156,7 +156,7 @@ def parse_period_from_export_file_name(file_name: str) -> tuple[Optional[datetim
 
 def parse_report_title(title_raw: object) -> ReportTitleInfo:
     """
-    Парсит шапку отчёта с именованными группами period_start / period_end.
+    Парсит шапку отчёта с именованными группами period_start/period_end.
     """
     title_str = _stringify_cell(title_raw)
     match = re.search(ReportConst.REPORT_HEADER_PERIOD_PATTERN, title_str)
@@ -239,7 +239,7 @@ def iter_report_data_rows(worksheet: Worksheet) -> List[LeakReportRow]:
 
 
 def find_row_with_object(rows: List[LeakReportRow], object_substring: str) -> Optional[LeakReportRow]:
-    """Ищет первую строку, где колонка «Объект» содержит подстроку без учёта регистра"""
+    """Ищет первую строку, где колонка 'Объект' содержит подстроку без учёта регистра"""
     substring_lower = object_substring.lower()
     for row in rows:
         if substring_lower in row.object_value.lower():

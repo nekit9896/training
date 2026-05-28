@@ -48,10 +48,10 @@ class ExportedDataType(IntEnum):
     Тип экспортируемых данных
     """
 
-    JOURNAL = 1
-    LDS_MODES = 2
+    STATIONARY_STATUS_REPORT = 6
+    LDS_STATUS_REPORT = 5
     LEAKS_REPORT = 4
-    REJECTED_INPUT_DATA = 7
+    REJECTED_REPORT = 7
 
     def to_download_name(self) -> str:
         """Строковый тип для DownloadExportedDataRequest.exportedDataType"""
@@ -59,10 +59,10 @@ class ExportedDataType(IntEnum):
 
 
 _EXPORTED_DATA_TYPE_DOWNLOAD_NAMES = {
-    ExportedDataType.JOURNAL: "JournalReport",
-    ExportedDataType.LDS_MODES: "LdsModesReport",
+    ExportedDataType.STATIONARY_STATUS_REPORT: "StationaryStatusReport",
+    ExportedDataType.LDS_STATUS_REPORT: "LdsStatusReport",
     ExportedDataType.LEAKS_REPORT: "LeaksReport",
-    ExportedDataType.REJECTED_INPUT_DATA: "RejectedInputDataReport",
+    ExportedDataType.REJECTED_REPORT: "RejectedReport",
 }
 
 
@@ -80,8 +80,8 @@ class StationaryStatus(Enum):
 
 
 class LeakStatus(Enum):
-    CONFIRMED = 1  # Подтверждена
-    WAITING = 2
+    CONFIRMED = 2
+    WAITING = 1
     POSSIBLE = 3
 
 
@@ -202,7 +202,7 @@ class LdsStatusDegradation(IntFlag):
 
 
 class LdsStatusFaulty(IntFlag):
-    NO_DATA_SOURCE_CONNECTION = 1 << 0  # Отсутствует связь серверного оборудования СОУ с источником «сырых» данны
+    NO_DATA_SOURCE_CONNECTION = 1 << 0  # Отсутствует связь серверного оборудования СОУ с источником «сырых» данных
     ABSENCE_MIN_PRESSURE_SENSORS_REQUIRED_NUMBER = 1 << 1  # Менее 4 КП с достоверными СИ давления
     ABSENCE_MIN_FLOW_METERS_REQUIRED_NUMBER = 1 << 2  # Недостоверность граничного СИ расхода
 
@@ -228,7 +228,7 @@ class StationaryReason(IntFlag):
 
 class UnStationaryReason(IntFlag):
     """
-    Причины режима работы МТ: Не стационар
+    Причины режима работы МТ: Нестационар
     """
 
     # Пуск/остановка трубопровода; включение/отключение магистрального насоса; включение/отключение НПС
@@ -273,16 +273,15 @@ class StoppedPumpingReason(IntFlag):
 class RejectionCriteria(IntFlag):
     """Критерии отбраковки сигналов criteriaNames"""
 
-    QUALITY = 1 << 0           # qualityRejection
-    RANGE = 1 << 1             # rangeRejection
-    EMPTY = 1 << 2             # emptyRejection
-    TIME = 1 << 3              # timeRejection
-    CONSTANT_SIGNAL = 1 << 4   # constantSignalRejection
-    DISCHARGE = 1 << 5         # dischargeRejection
-    SIGMA3 = 1 << 6            # sigma3Rejection
-    VTOR = 1 << 7              # VTORRejection
-    NEARBY = 1 << 8            # nearbyRejection
-    DIAGNOSTIC_INFO = 1 << 9   # diagnInfoRejection
+    QUALITY = 1 << 0  # qualityRejection
+    RANGE = 1 << 1  # rangeRejection
+    EMPTY = 1 << 2  # emptyRejection
+    TIME = 1 << 3  # timeRejection
+    CONSTANT_SIGNAL = 1 << 4  # constantSignalRejection
+    DISCHARGE = 1 << 5  # dischargeRejection
+    VTOR = 1 << 6  # VTORRejection
+    NEARBY = 1 << 7  # nearbyRejection
+    DIAGNOSTIC_INFO = 1 << 8  # diagnInfoRejection
 
     @property
     def backend_name(self) -> str:
@@ -313,14 +312,17 @@ class RejectionCriteria(IntFlag):
 
 
 class RejectionSensorTag(Enum):
-    """Теги датчиков для тестов отбраковки (id, description=tag)"""
+    """
+    Теги датчиков для тестов отбраковки (id, description=tag)
+    Айди тегов подставляется на ходу из текущей версии конфы с сервера
+    """
 
-    KP_8_Pin = (31439, "AK.CHTN.LU_TIHVEL.KP_8.SW_8-3.Pin")
-    NPS_TIH_5_Vmom = (30145, "AK.CHTN.NPS_TIH_5.UZR_1.Vmom")
-    KP_8_Pout = (31440, "AK.CHTN.LU_TIHVEL.KP_8.SW_8-3.Pout")
-    KP_209_1_Pin = (31488, "AK.CHTN.LU_VELKRIM.KP_209-1.SW_215-3-1.Pin")
-    KP_7_Pin = (31437, "AK.CHTN.LU_TIHVEL.KP_7.SW_6-3.Pin")
-    NPS_KRIM_P_Vmom = (30157, "AK.CHTN.NPS_KRIM_P.UZR_1.Vmom")
+    KP_8_Pin = (0, "AK.CHTN.LU_TIHVEL.KP_8.SW_8-3.Pin")  # nearby_pressure_pin range_upper_pressure range_lower_pres
+    NPS_TIH_5_Vmom = (0, "AK.CHTN.NPS_TIH_5.UZR_1.Vmom")  # diagnostic_info_flowrange_upper_flow range_lower_flow
+    KP_8_Pout = (0, "AK.CHTN.LU_TIHVEL.KP_8.SW_8-3.Pout")  # nearby_pressure_pout
+    KP_209_1_Pin = (0, "AK.CHTN.LU_VELKRIM.KP_209-1.SW_215-3-1.Pin")  # empty_pressure
+    KP_7_Pin = (0, "AK.CHTN.LU_TIHVEL.KP_7.SW_6-3.Pin")  # vtor_pressure
+    NPS_KRIM_P_Vmom = (0, "AK.CHTN.NPS_KRIM_P.UZR_1.Vmom")  # empty_flow quality_flow
 
     def __init__(self, sensor_id: int, description: str) -> None:
         self.id = sensor_id
@@ -359,3 +361,57 @@ class UserActions(IntFlag):
     LEAK_REMOVE = 1 << 9  # Исключение неактивных утечек
     LDS_ADMIN = 1 << 10  # Администрирование СОУ
     PIG_CONTROL = 1 << 11  # Управление СОД
+
+
+class SiteKpKp(Enum):
+    """controlledSiteId, segmentId"""
+
+    TIXORECZKAYA_NOVOVELICHKOVSKAYA = {'controlledSiteId': 6012, 'segmentId': 6013}
+    NOVOVELICHKOVSKAYA_KRYMSKAYA = {'controlledSiteId': 6074, 'segmentId': 6075}
+    KRYMSKAYA_GRUSHOVAYA = {'controlledSiteId': 6220, 'segmentId': 6221}
+    BACKUP_ROUTE_BEJSUG = {'controlledSiteId': 6242, 'segmentId': 6243}
+    BACKUP_ROUTE_PONURA = {'controlledSiteId': 6076, 'segmentId': 6077}
+    BACKUP_ROUTE_KUBAN = {'controlledSiteId': 6088, 'segmentId': 6089}
+    NPZ_AFIPSKIJ = {'controlledSiteId': 6244, 'segmentId': 6245}
+    NPZ_ILINSKIJ = {'controlledSiteId': 6120, 'segmentId': 6121}
+
+
+class SignalType(IntFlag):
+    """Типы сигналов: режим МТ - 8, режим СОУ - 256, самотеки -16"""
+
+    REGLU = 1 << 3
+    REGSOU = 1 << 8
+    GRAVITYPIPE = 1 << 4
+
+    @property
+    def backend_name(self) -> str:
+        names = {
+            "REGLU": "PumpingStatus",
+            "REGSOU": "LdsStatus",
+            "GRAVITYPIPE": "FreeFlow",
+        }
+        return names.get(self.name or "", str(int(self)))
+
+    def __str__(self) -> str:
+        raw_value = int(self)
+        if raw_value == 0:
+            return "0"
+
+        active_flags = [flag.backend_name for flag in type(self) if flag.value and flag & self == flag]
+        if active_flags:
+            return f"{'|'.join(active_flags)} ({raw_value})"
+
+        return str(raw_value)
+
+
+class GravityPipe(Enum):
+
+    expected_lds_status_gravity_true = (1, "Наличие самотека")
+    expected_lds_status_gravity_false = (0, "Отсутствие самотека")
+
+    def __init__(self, status_id: int, description: str) -> None:
+        self.id = status_id
+        self.description = description
+
+    def __str__(self):
+        return f"{self.id} - {self.description}"

@@ -36,19 +36,25 @@ class BaseTN3Constants:
     ADDRESS_SUFFIX_POINT_LEAK = "PointLeak"
     ADDRESS_SUFFIX_Q_LEAK = "QLeak"
     ADDRESS_SUFFIX_TIME_LEAK = "TimeLeak"
+    ADDRESS_SUFFIX_PUMPING_STATUS = "RegLU"
+    ADDRESS_SUFFIX_LDS_STATUS = "RegSOU"
 
     # ===== Ключи поиска =====
     LEAK_LINEAR_PART_ID_KEY = "id"
+    CONTROLLED_SITE_ID_AND_SEGMENT_ID = "controlledSiteId"
 
     # ===== Ожидаемые значения выходных сигналов =====
     OUTPUT_IS_ACK_LEAK = "1"
     OUTPUT_IS_LEAK = "1"
+    OUTPUT_IS_NOT_LEAK = "0"
     OUTPUT_IS_NOT_MASK = "0"
     OUTPUT_IS_MASK = "1"
 
     MASS_KG = 3600  # Коэффициент массы, нужно умножить, чтобы получить объем в м3/час
+    KGS_SM2 = 98066  # Коэффициент давления, нужно умножить, чтобы получить объем в кгс/см2
     ALLOWED_VOLUME_DIFF = 0.3  # Относительная погрешность по объему
     ALLOWED_DISTANCE_DIFF_METERS = 5000  # Погрешность координаты в метрах
+    KM_TO_METERS = 1000  # Перевод в метры
     LEAK_START_INTERVAL = 2100  # Интервал от старта имитатора до первого обнаружения утечки - 35 минут по умолчанию
     LEAK_LOCATION_STATUS = 1
 
@@ -60,6 +66,11 @@ class BaseTN3Constants:
     IS_MASKED_TRUE = True
     IS_MASKED_FALSE = False
 
+    # ===== Параметры имитации =====
+    PRESSURE_IMITATION_RANGE = (1, 40)
+    VOLUME_IMITATION_RANGE = (100, 2400)
+    GOOD_QUALITY_VAL = 1
+
     # ===== Константы журнала =====
     JOURNAL_EVENT_MASK = "Установка признака маскирования"
     JOURNAL_EVENT_UNMASK = "Снятие признака маскирования"
@@ -70,16 +81,20 @@ class BaseTN3Constants:
     JOURNAL_EXPECTED_MSG_COUNT_PER_SIGNAL = 2
     JOURNAL_MASK_PAGINATION_LIMIT = 10
     JOURNAL_EVENT_POSSIBLE_LEAK = "Возможна утечка"
+    JOURNAL_EVENT_DETECTED_LEAK = "Утечка."
     JOURNAL_MESSAGE_TYPE_LEAKS = "Утечки"
+    JOURNAL_EVENT_COMPLETED_LEAKS = "Утечка завершена"
     JOURNAL_EXPECTED_MASK_MSG_TOTAL = 4
     JOURNAL_MASK_EXPECTED_EVENTS = {"Установка признака маскирования", "Снятие признака маскирования"}
     JOURNAL_MASK_EXPECTED_SIGNALS = {"Значение давления", "Расход"}
     JOURNAL_PAGINATION_LIMIT = 10
+    JOURNAL_PAGINATION_REJECT_LIMIT = 20
     JOURNAL_EVENT_LEAK_ACKNOWLEDGED = "Сообщение об утечке квитировано"
     JOURNAL_EVENT_LDS_INIT_ACCUM_DATA = "СОУ в инициализации (Накопление данных)"
     JOURNAL_EVENT_LDS_INIT_COLD_START = "СОУ в инициализации (Одновременный «холодный» запуск нескольких серверов СОУ)"
     JOURNAL_MESSAGE_TYPE_LDS_STATUS = "Режим работы СОУ"
     JOURNAL_MESSAGE_TYPE_REJECTION = "Отбраковка"
+    SEC_PER_MIN = 60
 
     # ===== Параметры подтверждения =====
     IS_ACKNOWLEDGED_FALSE = False
@@ -93,36 +108,22 @@ class BaseTN3Constants:
     BASIC_MESSAGE_TIMEOUT = 10.0  # Таймаут ожидания сообщений в секундах
     MASK_MESSAGE_TIMEOUT = 180.0  # Таймаут ожидания сообщений в секундах
     PRECISION = 3  # Точность округления для координат
-    KM_TO_METERS = 1000  # Перевод в метры
     DIGITS_WITH_DOT_PATTERN = r'\d+(?:\.\d+)?'  # Регулярное выражение для поиска чисел с точкой
-    DIAGNOSTIC_AREA_BASE_IDS = [2, 3, 4, 5, 6, 7, 8]  # Список ДУ с isBase = true из конфигурации Тн-3
+    DIAGNOSTIC_AREA_BASE_IDS = [2, 3, 4, 5, 7, 8]  # Список ДУ с isBase = true из конфигурации Тн-3
     REPRESENTATIVE_DIAGNOSTIC_AREA_IDS = [2, 3]  # Список показательных ДУ для определения режима СОУ
     ZONE_INFO: str = "Europe/Moscow"
     SECONDS_PER_HOUR: int = 3600
+    CRITERIA_NAMES_FIELD: str = 'criteriaNames'
 
 
 class ExportReportConstants:
     """Константы для теста формирования отчёта об утечках"""
 
-    # ===== Имена WS-сообщений (для шагов allure и connect) =====
-    SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST: str = "SubscribeReportsDataExportedRequest"
-    EXPORT_REPORTS_COMMAND_REQUEST: str = "ExportReportsCommandRequest"
-    REPORT_DATA_EXPORTED_NOTIFICATION: str = "ReportDataExportedNotification"
-    GET_EXPORTED_DATA_LIST_REQUEST: str = "GetExportedDataListRequest"
-    EXPORTED_DATA_LIST_LIMIT: int = 10
-    DOWNLOAD_EXPORTED_DATA_REQUEST: str = "DownloadExportedDataRequest"
-
-    # Допустимая погрешность при сравнении границ периода отчёта
-    REPORT_PERIOD_TOLERANCE_MINUTES: int = 1
-    # Формат даты/времени в имени скачиваемого xlsx-файла
-    REPORT_FILE_NAME_DATETIME_FORMAT: str = "%d.%m.%Y %H_%M_%S"
-
-    # ===== Таймауты и интервалы поллинга =====
-    # Максимальное ожидание нотификации о готовности отчёта
+    # Максимальное ожидание уведомления о готовности отчёта
     NOTIFICATION_TIMEOUT_SECONDS: float = 60.0
-    # Максимальное время ожидания появления отчёта в списке после нотификации
+    # Максимальное время ожидания появления отчёта в списке после уведомления
     LIST_POLL_TOTAL_WAIT_SECONDS: float = 10.0
-    # Интервал между запросами GetExportedDataListRequest
+    # Интервал между запросами getExportedFilesListRequest
     LIST_POLL_INTERVAL_SECONDS: float = 10.0
     # Таймаут получения ответа на скачивание
     DOWNLOAD_TIMEOUT_SECONDS: float = 60.0
@@ -136,11 +137,11 @@ class ExportReportConstants:
     # ===== Формат даты/времени в отчёте =====
     REPORT_DATETIME_FORMAT: str = "%d.%m.%Y %H:%M:%S"
     # Регулярное выражение для извлечения двух дат из заголовка
-    # "Отчет об утечках с 20.05.2026 11:00:00 по 20.05.2026 12:52:02"
     REPORT_HEADER_PERIOD_PATTERN: str = (
         r'Отчет об утечках с (?P<period_start>\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2})'
         r' по (?P<period_end>\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2})'
     )
+    # Регулярное выражение для извлечения двух дат из названия файла
     REPORT_FILE_NAME_PERIOD_PATTERN: str = (
         r'^Отчет об утечках (?P<tu>.+?) '
         r'(?P<period_start>\d{2}\.\d{2}\.\d{4} \d{2}_\d{2}_\d{2})'
@@ -149,7 +150,6 @@ class ExportReportConstants:
         r'\.xlsx$'
     )
 
-    # ===== Шапка таблицы отчёта об утечках =====
     # Двойная шапка: первая строка - название отчёта с периодом, вторая - названия колонок
     REPORT_TITLE_ROW: int = 1
     REPORT_COLUMN_HEADERS_ROW: int = 2
@@ -186,3 +186,15 @@ class ExportReportConstants:
 
     # ===== Прочее =====
     DEFAULT_SHEET_INDEX: int = 0
+
+    SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST: str = "SubscribeReportsDataExportedRequest"
+    EXPORT_REPORTS_COMMAND_REQUEST: str = "ExportReportsCommandRequest"
+    REPORT_DATA_EXPORTED_NOTIFICATION: str = "ReportDataExportedNotification"
+    GET_EXPORTED_DATA_LIST_REQUEST: str = "GetExportedDataListRequest"
+    EXPORTED_DATA_LIST_LIMIT: int = 10
+    DOWNLOAD_EXPORTED_DATA_REQUEST: str = "DownloadExportedDataRequest"
+
+    # Допустимая погрешность при сравнении границ периода отчёта
+    REPORT_PERIOD_TOLERANCE_MINUTES: int = 1
+    # Формат даты/времени в имени скачиваемого xlsx-файла
+    REPORT_FILE_NAME_DATETIME_FORMAT: str = "%d.%m.%Y %H_%M_%S"

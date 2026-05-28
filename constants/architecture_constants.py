@@ -34,7 +34,6 @@ class ImitatorConstants:
     CMD_STATUS_FAIL: str = "FAIL"
     REDIS_STAND_ADDRESS: str = "10.7.49.210"
     CORE_START_DELAY_S: int = 5
-    ALL_MS_START_DELAY_S: int = IMITATOR_START_DELAY_S + CORE_START_DELAY_S
     ENCODING_UTF_8: str = "utf-8"
     ENCODING_UTF_8_SIG: str = "utf-8-sig"
     ENCODING_LATIN_1: str = "latin-1"
@@ -55,12 +54,13 @@ class ImitatorConstants:
 
 
 class ClickhouseConstants(ImitatorConstants):
-    LAST_VALUE_TABLE_NAME: str = "lds.records_lastvalue"
+    CH_TABLE_NAMES: list = ["lds.records", "lds.records_lastvalue"]
     EVO_OBJECT_ID_KEY_NAME: str = "evoObjectId"
     EVO_PARAMETER_ID_KEY_NAME: str = "evoParameterId"
     OBJECT_ID_KEY_NAME: str = "objectId"
     PARAMETER_ID_KEY_NAME: str = "parameterId"
     EVO_ID_PAIRS_CHUNK_SIZE: int = 450
+    NAME_CONTAINER: str = "clickhouse-2"
 
 
 class DockerConstants:
@@ -131,7 +131,7 @@ class WebSocketClientConstants:
     STREAM_INVOCATION_MESSAGE_TYPE: int = 4  # StreamInvocation
     STREAM_ITEM_MESSAGE_TYPE: int = 2  # StreamItem
     COMPLETION_MESSAGE_TYPE: int = 3  # Completion
-    # Текст ошибки в кадре Completion при неуспешном streaming (SignalR CompletionWithDetail)
+    # Текст ошибки Completion при неуспешном streaming (SignalR CompletionWithDetail)
     COMPLETION_ERROR_MESSAGE_INDEX: int = 4
     DEFAULT_SIGNALR_MAP_HEADERS: dict = {}
     EVENT_TYPE_INDEX = 3
