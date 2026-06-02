@@ -723,3 +723,40 @@ class TestLeakScenarios:
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.export_leaks_report(ws_client, config, leak, imitator_start_time)
+
+    @pytest.mark.asyncio
+    async def test_export_lds_status_report(
+        self,
+        ws_client: WebSocketClient,
+        config: SmokeSuiteConfig,
+        leak: LeakTestConfig,
+        leak_number: int,
+        imitator_start_time: datetime,
+    ) -> None:
+        tag = "ExportReports"
+        title = f"[{tag}] Проверка формирования отчёта о режиме работы СОУ. ЭФ: Выпадашка отчётов"
+        _apply_allure_markers(
+            leak.export_lds_status_report_test,
+            tag,
+            title,
+            (
+                f"Проверка формирования и содержимого xlsx-отчёта о режиме работы СОУ на наборе данных "
+                f"{config.suite_name},\n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Период отчёта: от старта имитатора до старта + сдвиг теста "
+                f"{leak.export_lds_status_report_test.offset} мин.\n"
+                "Этапы сценария:\n"
+                "1) SubscribeReportsDataExportedRequest - подписка на пуш-нотификации\n"
+                "2) ExportReportsCommandRequest - запрос формирования отчёта (тип LdsStatusReport, фильтр по периоду)\n"
+                "3) Ожидание ReportDataExportedNotification\n"
+                "4) Лонг-поллинг GetExportedDataListRequest - поиск отчёта в списке\n"
+                "5) DownloadExportedDataRequest (StreamInvocation) - скачивание по exportedDataId\n"
+                "6) Проверка xlsx: участки, длительности режимов СОУ, суммарное время работы\n"
+                "7) Проверка двойной шапки и названий колонок\n"
+                "8) Проверка имени файла (.xlsx, название отчёта, ТУ, период +-1 мин)\n"
+                "Во вложениях Allure xlsx прикладывается только при падении теста"
+            ),
+        )
+        if config.has_multiple_leaks:
+            allure.dynamic.title(f"{title} (утечка #{leak_number})")
+        await scenarios.export_lds_status_report(ws_client, config, leak, imitator_start_time)

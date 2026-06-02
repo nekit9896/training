@@ -119,5 +119,8 @@ IMITATIVE_17_CONFIG = SmokeSuiteConfig(
         acknowledge_leak_in_journal_test=CaseMarkers(test_case_id="212", offset=61),
         # ----- Тест OutputSignals -----
         output_signals_test=CaseMarkers(test_case_id="158", offset=62),
+        # ----- Тест ExportReports -----
+        export_leaks_report_test=CaseMarkers(test_case_id="234", offset=62),
+        export_lds_status_report_test=CaseMarkers(test_case_id="235", offset=63),
     ),
 )

@@ -197,3 +197,51 @@ class ExportReportConstants:
     REPORT_PERIOD_TOLERANCE_MINUTES: int = 1
     # Формат даты/времени в имени скачиваемого xlsx-файла
     REPORT_FILE_NAME_DATETIME_FORMAT: str = "%d.%m.%Y %H_%M_%S"
+
+
+class ExportLdsStatusReportConstants:
+    """Константы для теста формирования xlsx-отчёта о режиме работы СОУ"""
+
+    LDS_STATUS_REPORT_NAME_PART: str = "Отчет о режиме работы СОУ"
+    SECTION_NAMES: list[str] = [
+        "НПС-5 Тихорецкая - НПС-3 Нововеличковская",
+        "НПС-3 Нововеличковская - НПС-2 Крымская",
+        "НПС-2 Крымская - НПС Грушовая",
+    ]
+    TOTAL_WORK_DURATION_LABEL: str = "Суммарное время работы:"
+    ZERO_DURATION_TEXT: str = "0:00:00"
+    TOTAL_DURATION_TOLERANCE_SECONDS: int = 5
+    # Число частей времени при split(':') - часы:минуты:секунды (1:02:51) и минуты:секунды (02:51)
+    DURATION_PARTS_COUNT_H_MM_SS: int = 3
+    DURATION_PARTS_COUNT_MM_SS: int = 2
+
+    REPORT_TITLE_ROW: int = 1
+    REPORT_COLUMN_HEADERS_ROW: int = 2
+    REPORT_DATA_FIRST_ROW: int = 3
+
+    COL_SECTION: str = "Наименование участка"
+    COL_FAULTY: str = "Неисправность"
+    COL_DEGRADATION: str = "В ухудшенных характеристиках"
+    COL_INITIALIZATION: str = "Инициализация"
+    COL_SERVICEABLE: str = "Исправность"
+
+    MODE_DURATION_COLUMNS: list = [
+        COL_FAULTY,
+        COL_DEGRADATION,
+        COL_INITIALIZATION,
+        COL_SERVICEABLE,
+    ]
+
+    EXPECTED_COLUMN_HEADERS: list = [COL_SECTION, *MODE_DURATION_COLUMNS]
+
+    REPORT_HEADER_PERIOD_PATTERN: str = (
+        r'Отчет о режиме работы СОУ с (?P<period_start>\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2})'
+        r' по (?P<period_end>\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2})'
+    )
+    REPORT_FILE_NAME_PERIOD_PATTERN: str = (
+        r'^Отчет о режиме работы СОУ\. (?P<tu>.+?) '
+        r'(?P<period_start>\d{2}\.\d{2}\.\d{4} \d{2}_\d{2}_\d{2})'
+        r' - '
+        r'(?P<period_end>\d{2}\.\d{2}\.\d{4} \d{2}_\d{2}_\d{2})'
+        r'\.xlsx$'
+    )

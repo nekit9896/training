@@ -179,6 +179,7 @@ class LeakTestConfig:
     completed_leak_info_in_journal_test: Optional[CaseMarkers] = None
     balance_algorithm_leak_completed_test: Optional[CaseMarkers] = None
     export_leaks_report_test: Optional[CaseMarkers] = None
+    export_lds_status_report_test: Optional[CaseMarkers] = None
 
     @property
     def leak_diagnostic_area_id(self) -> Optional[int]:
@@ -263,6 +264,9 @@ class SmokeSuiteConfig(BaseSuiteConfig):
 
     # Для наборов с несколькими утечками (select_19_20)
     leaks: list[LeakTestConfig] = field(default_factory=list)
+
+    # Участки в xlsx-отчёте о режиме работы СОУ (export_lds_status_report)
+    lds_status_report_section_names: list[str] = field(default_factory=list)
 
     # ===== Дополнительные тесты для двух утечек =====
     main_page_info_unstationary_test: Optional[CaseMarkers] = None
@@ -420,3 +424,25 @@ class ExportLeaksReportState:
     title_info: Optional[ReportTitleInfo] = None
     data_rows: List[LeakReportRow] = field(default_factory=list)
     target_row: Optional[LeakReportRow] = None
+
+
+@dataclass
+class ExportLdsStatusReportState:
+    """Состояние сценария формирования xlsx-отчёта о режиме работы СОУ."""
+
+    report_test: Optional[CaseMarkers] = None
+    period_start: Optional[datetime] = None
+    period_end: Optional[datetime] = None
+    period_start_naive: Optional[datetime] = None
+    period_end_naive: Optional[datetime] = None
+    time_offset_hours: Optional[int] = None
+    tu_description_lower: str = ""
+    notification: Optional[ReportDataExportedNotification] = None
+    report_item: Optional[ExportedDataItem] = None
+    report_file_name: str = ""
+    download_invocation_id: Optional[str] = None
+    download_reply: Optional[DownloadExportedDataReply] = None
+    file_bytes: Optional[bytes] = None
+    temp_file_path: Optional[Path] = None
+    worksheet: Any = None
+    parsed_report: Any = None
