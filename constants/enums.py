@@ -60,7 +60,7 @@ class ExportedDataType(IntEnum):
 
 _EXPORTED_DATA_TYPE_DOWNLOAD_NAMES = {
     ExportedDataType.STATIONARY_STATUS_REPORT: "StationaryStatusReport",
-    ExportedDataType.LDS_STATUS_REPORT: "LdsStatusReport",
+    ExportedDataType.LDS_STATUS_REPORT: "LdsStateReport",
     ExportedDataType.LEAKS_REPORT: "LeaksReport",
     ExportedDataType.REJECTED_REPORT: "RejectedReport",
 }

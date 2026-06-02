@@ -747,7 +747,7 @@ class TestLeakScenarios:
                 f"{leak.export_lds_status_report_test.offset} мин.\n"
                 "Этапы сценария:\n"
                 "1) SubscribeReportsDataExportedRequest - подписка на пуш-нотификации\n"
-                "2) ExportReportsCommandRequest - запрос формирования отчёта (тип LdsStatusReport, фильтр по периоду)\n"
+                "2) ExportReportsCommandRequest - запрос формирования отчёта (тип LdsStateReport, фильтр по периоду)\n"
                 "3) Ожидание ReportDataExportedNotification\n"
                 "4) Лонг-поллинг GetExportedDataListRequest - поиск отчёта в списке\n"
                 "5) DownloadExportedDataRequest (StreamInvocation) - скачивание по exportedDataId\n"

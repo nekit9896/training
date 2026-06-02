@@ -3129,10 +3129,12 @@ async def export_lds_status_report(
                 name="Найденный отчёт в списке",
                 attachment_type=allure.attachment_type.TEXT,
             )
-        report_state.report_file_name = lds_report_utils.build_lds_status_report_file_name(
+        report_state.report_file_name = report_utils.build_export_report_file_name(
             cfg.technological_unit.description,
             report_state.period_start,
             report_state.period_end,
+            LdsReportConst.LDS_STATUS_REPORT_NAME_PART,
+            ". ",
         )
 
     with allure.step("Проверка: отчёт найден в списке сформированных файлов"):
@@ -3177,7 +3179,7 @@ async def export_lds_status_report(
         has_download_reply_content = download_reply.replyContent is not None
         report_state.file_bytes = download_reply.replyContent.fileChunk if has_download_reply_content else None
         is_xlsx_signature = (
-            lds_report_utils.is_xlsx_file_bytes(report_state.file_bytes) if report_state.file_bytes else False
+            report_utils.is_xlsx_file_bytes(report_state.file_bytes) if report_state.file_bytes else False
         )
 
     with allure.step("Проверка ответа на скачивание и формата xlsx"):
@@ -3195,23 +3197,25 @@ async def export_lds_status_report(
     with allure.step("Подготовка данных для проверки имени файла отчёта"):
         report_file_name = report_state.report_file_name
         report_file_name_lower = report_file_name.lower()
-        file_name_period_start, file_name_period_end = lds_report_utils.parse_period_from_lds_status_report_file_name(
-            report_file_name
+        file_name_period_start, file_name_period_end = report_utils.parse_period_from_export_file_name(
+            report_file_name,
+            LdsReportConst.REPORT_FILE_NAME_PERIOD_PATTERN,
         )
-        period_start_lo, period_start_hi, period_end_lo, period_end_hi = lds_report_utils.report_period_comparison_bounds(
+        period_start_lo, period_start_hi, period_end_lo, period_end_hi = report_utils.report_period_comparison_bounds(
             report_state.period_start_naive,
             report_state.period_end_naive,
         )
-        has_xlsx_extension = lds_report_utils.is_xlsx_extension(report_file_name)
+        has_xlsx_extension = report_utils.is_xlsx_extension(report_file_name)
         lds_report_name_part_lower = LdsReportConst.LDS_STATUS_REPORT_NAME_PART.lower()
 
     try:
         with allure.step("Этап 7. Сохранение и разбор xlsx-отчёта о режиме СОУ"):
-            report_state.temp_file_path = lds_report_utils.save_lds_status_report_bytes_to_temp_file(
-                report_state.file_bytes
+            report_state.temp_file_path = report_utils.save_report_bytes_to_temp_file(
+                report_state.file_bytes,
+                prefix="lds_status_report_",
             )
             StepCheck("Временный xlsx файл создан", "temp_file_path").actual(report_state.temp_file_path).is_not_none()
-            report_state.worksheet = lds_report_utils.load_lds_status_report_worksheet(report_state.temp_file_path)
+            report_state.worksheet = report_utils.load_report_worksheet(report_state.temp_file_path)
             report_state.parsed_report = lds_report_utils.parse_lds_status_report_worksheet(
                 report_state.worksheet,
                 LdsReportConst.SECTION_NAMES,
@@ -3293,7 +3297,7 @@ async def export_lds_status_report(
             report_title_lower = title_info.raw_title.lower()
             lds_report_name_part_lower = LdsReportConst.LDS_STATUS_REPORT_NAME_PART.lower()
             column_headers = parsed_report.column_headers
-            period_start_lo, period_start_hi, period_end_lo, period_end_hi = lds_report_utils.report_period_comparison_bounds(
+            period_start_lo, period_start_hi, period_end_lo, period_end_hi = report_utils.report_period_comparison_bounds(
                 report_state.period_start_naive,
                 report_state.period_end_naive,
             )
@@ -3323,39 +3327,39 @@ async def export_lds_status_report(
                     soft_failures,
                 ).actual(column_headers).expected(LdsReportConst.EXPECTED_COLUMN_HEADERS).equal_to()
 
+        with allure.step("Проверка имени файла отчёта о режиме СОУ"):
+            with SoftAssertions() as soft_failures:
+                StepCheck(f"Имя файла оканчивается на {ReportConst.XLSX_EXTENSION}", "file_name", soft_failures).actual(
+                    has_xlsx_extension
+                ).expected(True).equal_to()
+                StepCheck(
+                    f"Имя файла содержит '{LdsReportConst.LDS_STATUS_REPORT_NAME_PART}'",
+                    "file_name",
+                    soft_failures,
+                ).contains(report_file_name_lower, lds_report_name_part_lower)
+                StepCheck(
+                    f"Имя файла содержит описание ТУ '{cfg.technological_unit.description}'",
+                    "file_name",
+                    soft_failures,
+                ).contains(report_file_name_lower, report_state.tu_description_lower)
+                StepCheck(
+                    "Дата начала периода в имени файла совпадает с фильтром запроса (+-1 мин)",
+                    "period_start_in_file_name",
+                    soft_failures,
+                ).actual(file_name_period_start).is_between(period_start_lo, period_start_hi)
+                StepCheck(
+                    "Дата конца периода в имени файла совпадает с фильтром запроса (+-1 мин)",
+                    "period_end_in_file_name",
+                    soft_failures,
+                ).actual(file_name_period_end).is_between(period_end_lo, period_end_hi)
+
     except Exception:
         with allure.step("Прикрепление xlsx отчёта к Allure при падении теста"):
             if report_state.temp_file_path and report_state.report_file_name:
-                lds_report_utils.attach_report_file_to_allure(
+                report_utils.attach_report_file_to_allure(
                     report_state.temp_file_path, report_state.report_file_name
                 )
         raise
-
-    with allure.step("Проверка имени файла отчёта о режиме СОУ"):
-        with SoftAssertions() as soft_failures:
-            StepCheck(f"Имя файла оканчивается на {ReportConst.XLSX_EXTENSION}", "file_name", soft_failures).actual(
-                has_xlsx_extension
-            ).expected(True).equal_to()
-            StepCheck(
-                f"Имя файла содержит '{LdsReportConst.LDS_STATUS_REPORT_NAME_PART}'",
-                "file_name",
-                soft_failures,
-            ).contains(report_file_name_lower, lds_report_name_part_lower)
-            StepCheck(
-                f"Имя файла содержит описание ТУ '{cfg.technological_unit.description}'",
-                "file_name",
-                soft_failures,
-            ).contains(report_file_name_lower, report_state.tu_description_lower)
-            StepCheck(
-                "Дата начала периода в имени файла совпадает с фильтром запроса (+-1 мин)",
-                "period_start_in_file_name",
-                soft_failures,
-            ).actual(file_name_period_start).is_between(period_start_lo, period_start_hi)
-            StepCheck(
-                "Дата конца периода в имени файла совпадает с фильтром запроса (+-1 мин)",
-                "period_end_in_file_name",
-                soft_failures,
-            ).actual(file_name_period_end).is_between(period_end_lo, period_end_hi)
 
     with allure.step("Проверка пуш-нотификации о готовности отчёта"):
         notification = report_state.notification
