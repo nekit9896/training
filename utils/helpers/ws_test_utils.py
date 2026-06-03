@@ -903,7 +903,11 @@ def parse_lds_status_reasons(lds_status: int, lds_status_reasons: int, failures:
     Получение списка ldsStatusReasons, соответствующего ldsStatus
     """
     enum_cls = get_reason_enum_by_lds_status(lds_status, failures)
-    flags = parse_bit_flags(lds_status_reasons, enum_cls, failures)
+    flags = enum_cls(lds_status_reasons)
+    if flags == str(lds_status_reasons):
+        error_message = f"Не удалось распаковать флаги: {lds_status_reasons} для {enum_cls.__name__}"
+        if failures is not None:
+            failures.append(error_message)
     return flags
 
 
@@ -914,7 +918,11 @@ def parse_stationary_status_reasons(
     Получение списка stationaryStatusReasons, соответствующего stationaryStatus
     """
     enum_cls = get_reason_enum_by_stationary_status(stationary_status, failures)
-    flags = parse_bit_flags(stationary_status_reasons, enum_cls, failures)
+    flags = enum_cls(stationary_status_reasons)
+    if flags == str(stationary_status_reasons):
+        error_message = f"Не удалось распаковать флаги: {stationary_status_reasons} для {enum_cls.__name__}"
+        if failures is not None:
+            failures.append(error_message)
     return flags
 
 
@@ -1153,4 +1161,3 @@ def get_leak_diagnostic_area_samples(
     if not leak_diagnostic_area_samples:
         fail(f"За {total_wait} секунд не пришло ни одного сообщения для ДУ с name={leak_diagnostic_area_name}.")
     return leak_diagnostic_area_samples
-    

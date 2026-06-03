@@ -2,6 +2,24 @@ from enum import Enum, IntEnum, IntFlag
 from typing import Mapping
 
 
+class BaseStrEnum(Enum):
+    def __str__(self) -> str:
+        return f"{self.name} ({self.value})"
+
+
+class BaseStrIntflag(IntFlag):
+    def __str__(self) -> str:
+        raw_value = int(self)
+        if raw_value == 0:
+            return "0"
+
+        active_flags = [f"{flag.name} ({flag.value})" for flag in type(self) if flag.value and flag & self == flag]
+        if active_flags:
+            return f"{', '.join(active_flags)}"
+
+        return str(raw_value)
+
+
 class TU(Enum):
     YAROSLAVL_MOSCOW = (1, "Ярославль - Москва", "volga.json")
     TIKHORETSK_NOVOROSSIYSK_2 = (2, "Тихорецк-Новороссийск-2", "tn2.json")
@@ -73,19 +91,19 @@ class ExportStatus(IntEnum):
     DONE = 1
 
 
-class StationaryStatus(Enum):
+class StationaryStatus(BaseStrEnum):
     UNSTATIONARY = 1  # Нестационарный режим
     STATIONARY = 2  # Стационарный режим
     STOPPED = 3  # Режим остановленной перекачки
 
 
-class LeakStatus(Enum):
+class LeakStatus(BaseStrEnum):
     CONFIRMED = 2
     WAITING = 1
     POSSIBLE = 3
 
 
-class LeakLocationStatus(Enum):
+class LeakLocationStatus(BaseStrEnum):
     NODATA = 1  # нет данных
     LEFT_FROM_PUMP_STATION = 2  # Слева от МНС
     RIGHT_FROM_PUMP_STATION = 3  # Справа от МНС
@@ -140,9 +158,9 @@ class Direction(Enum):
     LAST = 4
 
 
-class LdsStatus(Enum):
+class LdsStatus(BaseStrEnum):
     """
-    Режим работы СОУ. 
+    Режим работы СОУ.
     report_text - значение колонки 'Режим работы СОУ' в xlsx-отчёте об утечках.
     """
 
@@ -166,7 +184,7 @@ class LdsStatus(Enum):
             return None
 
 
-class ConfirmationStatus(Enum):
+class ConfirmationStatus(BaseStrEnum):
     FAULTY = 0  # Неисправность
     AWAITING = 1  # Предварительная
     NOT_CONFIRMED = 2  # Не подтверждена
@@ -174,7 +192,9 @@ class ConfirmationStatus(Enum):
     CONFIRMED_AND_LEAK_CLOSED = 4  # Завершена
 
 
-class ReservedType(Enum):
+class ReservedType(BaseStrEnum):
+    """Алгоритмы СОУ"""
+
     FAULTY = 0  # Неисправность
     STOP = 1  # Дифференциальный
     STATIONARY_FLOW = 2  # Стационарный
@@ -184,7 +204,7 @@ class ReservedType(Enum):
     CREATED_IN_DECISION_MAKING = 6  # Создано в АПР
 
 
-class MessageType(IntFlag):
+class MessageType(BaseStrIntflag):
     AUTHENTICATION = 1  # Вход в систему
     REJECTION = 1 << 2  # Отбраковка сигналов
     LDS_STATUS = 1 << 3  # Режим работы СОУ
@@ -195,7 +215,7 @@ class MessageType(IntFlag):
     LEAKS = 1 << 10  # Утечка
 
 
-class MessagePriority(IntFlag):
+class MessagePriority(BaseStrIntflag):
     LOW = 1  # Прочее
     COMMON = 1 << 1  # Информационное
     MEDIUM = 1 << 2  # Значительное
@@ -203,7 +223,7 @@ class MessagePriority(IntFlag):
     VERY_HIGH = 1 << 4  # Особой важности
 
 
-class LdsStatusDegradation(IntFlag):
+class LdsStatusDegradation(BaseStrIntflag):
     LEAK_ON_ADJACENT_DIAGNOSTIC_AREAS = 1 << 0  # Возникновение утечки на соседнем диагностическом участке
     ADDITIVE_INJECTORS_OPERATION = 1 << 1  # Наличие ПТП
     PIG_SENSOR_PASSAGE = 1 << 2  # Наличие СОД
@@ -220,13 +240,13 @@ class LdsStatusDegradation(IntFlag):
     GRAVITY_SECTION_IN_STOPPED_PUMPING_MODE = 1 << 13  # Наличие самотечного участка в режиме остановленной перекачки
 
 
-class LdsStatusFaulty(IntFlag):
+class LdsStatusFaulty(BaseStrIntflag):
     NO_DATA_SOURCE_CONNECTION = 1 << 0  # Отсутствует связь серверного оборудования СОУ с источником «сырых» данных
     ABSENCE_MIN_PRESSURE_SENSORS_REQUIRED_NUMBER = 1 << 1  # Менее 4 КП с достоверными СИ давления
     ABSENCE_MIN_FLOW_METERS_REQUIRED_NUMBER = 1 << 2  # Недостоверность граничного СИ расхода
 
 
-class LdsStatusInitialization(IntFlag):
+class LdsStatusInitialization(BaseStrIntflag):
     ACCUMULATION_DATA = 1 << 0  # Накопление данных
     EXITING_FAULTY_MODE = 1 << 1  # Выход СОУ из режима «Неисправна»
     COLD_START_OF_SERVERS = 1 << 2  # Одновременный «холодный» запуск нескольких серверов СОУ
@@ -234,7 +254,7 @@ class LdsStatusInitialization(IntFlag):
     USER_ACTION = 1 << 4  # По команде пользователя
 
 
-class StationaryReason(IntFlag):
+class StationaryReason(BaseStrIntflag):
     """
     Причины режима работы МТ: Стационар
     """
@@ -245,7 +265,7 @@ class StationaryReason(IntFlag):
     ABSENCE_GRAVITY_SECTION_AND_TECHNOLOGICAL_SWITCHING = 1 << 1
 
 
-class UnStationaryReason(IntFlag):
+class UnStationaryReason(BaseStrIntflag):
     """
     Причины режима работы МТ: Нестационар
     """
@@ -278,7 +298,7 @@ class UnStationaryReason(IntFlag):
     COLD_START = 1 << 14  # Одновременный «холодный» запуск нескольких серверов СОУ
 
 
-class StoppedPumpingReason(IntFlag):
+class StoppedPumpingReason(BaseStrIntflag):
     """
     Причины режима работы МТ: Остановленный
     """
@@ -424,7 +444,6 @@ class SignalType(IntFlag):
 
 
 class GravityPipe(Enum):
-
     expected_lds_status_gravity_true = (1, "Наличие самотека")
     expected_lds_status_gravity_false = (0, "Отсутствие самотека")
 
@@ -434,3 +453,4 @@ class GravityPipe(Enum):
 
     def __str__(self):
         return f"{self.id} - {self.description}"
+        

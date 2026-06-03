@@ -12,7 +12,7 @@
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from constants.enums import (
     TU,
@@ -26,8 +26,8 @@ from constants.enums import (
 from constants.test_constants import BaseTN3Constants
 from models.export_reports_model import ReportDataExportedNotification
 from models.get_exported_files_list_model import ExportedDataItem
-from models.upload_exported_file_model import DownloadExportedDataReply
 from models.subscribe_main_page_signals_info_model import SignalsInfo
+from models.upload_exported_file_model import DownloadExportedDataReply
 from utils.helpers.report_xlsx_utils import LeakReportRow, ReportTitleInfo
 
 
@@ -103,7 +103,7 @@ class DiagnosticAreaStatusConfig:
     """
 
     leak_diagnostic_area_id: int
-    leak_du_expected_lds_status: int
+    leak_du_expected_lds_status: Any
     leak_diagnostic_area_pipe_id: Optional[int] = None
     # Соседние ДУ и их статусы: словари {diagnostic_area_pipe_id: leak_du_expected_lds_status}
     # Позволяет указывать 0..N соседей независимо от in/out.
@@ -111,8 +111,8 @@ class DiagnosticAreaStatusConfig:
     # Пример:
     #   in_neighbors={1: LdsStatus.DEGRADATION.value}
     #   out_neighbors={3: LdsStatus.DEGRADATION.value, 4: LdsStatus.DEGRADATION.value}
-    in_neighbors: dict[int, int] = field(default_factory=dict)
-    out_neighbors: dict[int, int] = field(default_factory=dict)
+    in_neighbors: dict[int, Any] = field(default_factory=dict)
+    out_neighbors: dict[int, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -147,16 +147,21 @@ class LeakTestConfig:
     output_test_delay_seconds: int = BaseTN3Constants.OUTPUT_TEST_DELAY
 
     # ===== Ожидаемые статусы =====
-    expected_lds_status: int = LdsStatus.SERVICEABLE.value
+    expected_lds_status: Any = LdsStatus.SERVICEABLE
     # Режим СОУ в xlsx export_leaks_report (колонка 'Режим работы СОУ')
     expected_lds_status_in_leaks_report: Optional[int] = None
-    expected_stationary_status: int = StationaryStatus.UNSTATIONARY.value
-    expected_algorithm_type: int = ReservedType.UNSTATIONARY_FLOW.value
-    expected_leak_status: int = ConfirmationStatus.CONFIRMED.value
-    expected_complete_leak_status: int = ConfirmationStatus.CONFIRMED_AND_LEAK_CLOSED.value
+    expected_report_stationary_status: int = StationaryStatus.STATIONARY.value
+    expected_stationary_status: Any = StationaryStatus.STATIONARY
+    expected_algorithm_type: Any = ReservedType.STATIONARY_FLOW
+    expected_leak_status: Any = ConfirmationStatus.CONFIRMED
+    expected_complete_leak_status: Any = ConfirmationStatus.CONFIRMED_AND_LEAK_CLOSED
 
     # ===== Конфигурация статусов СОУ во время утечки =====
     lds_status_during_leak_config: Optional[DiagnosticAreaStatusConfig] = None
+
+    # ===== Данные тест-кейсов =====
+    lds_status_after_confirming_leak_data: Optional[CaseData] = None
+    lds_status_after_completed_leak_data: Optional[CaseData] = None
 
     # ===== Тест-кейсы для этой утечки =====
     balance_algorithm_leak_waiting_test: Optional[CaseMarkers] = None
@@ -171,6 +176,8 @@ class LeakTestConfig:
     acknowledge_leak_in_journal_test: Optional[CaseMarkers] = None
     output_signals_test: Optional[CaseMarkers] = None
     lds_status_during_leak_test: Optional[CaseMarkers] = None
+    lds_status_after_confirming_leak_test: Optional[CaseMarkers] = None
+    lds_status_completed_leak_test: Optional[CaseMarkers] = None
     the_leak_is_complete_on_kg_test: Optional[CaseMarkers] = None
     leak_is_complete_in_output_signals_test: Optional[CaseMarkers] = None
     leak_is_complete_on_main_page_test: Optional[CaseMarkers] = None
@@ -222,7 +229,7 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     """
 
     # ===== Ожидаемый статусы для main_page_info =====
-    expected_stationary_status: int = StationaryStatus.STATIONARY.value
+    expected_stationary_status: Any = StationaryStatus.STATIONARY
     expected_main_page_signals: dict = field(default_factory=lambda: asdict(SignalsInfo()))
 
     # ===== Название Магистрального Нефтепровода =====
@@ -234,11 +241,35 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     mask_one_du: Optional[int] = None
     not_mask_du: Optional[int] = None
     linear_part_identifier_for_mask: Optional[int] = None
+
     technological_section: Optional[str] = None
     imitate_flowmeter_signal_test_data: Optional[CaseData] = None
-    imitate_pressure_senor_signal_test_data: Optional[CaseData] = None
-    lds_status_after_confirming_leak_data: Optional[CaseData] = None
-    lds_status_after_completed_leak_data: Optional[CaseData] = None
+    imitate_pressure_sensor_signal_test_data: Optional[CaseData] = None
+    # дефолтные значения для датчиков маскирования
+    mask_signal_test_data: Optional[CaseData] = CaseData(
+        params={
+            "pressure_sensor_address": BaseTN3Constants.PRESSURE_SENSOR_ADDRESS,
+            "flowmeter_address": BaseTN3Constants.FLOWMETER_ADDRESS,
+        }
+    )
+
+    # ----- Ожидаемые статусы для проверки режимов на ЭФ Диагностика сигналов -----
+    exp_tixoreczkaya_novovelichkovskaya_reg_lu: Optional[int] = None
+    exp_tixoreczkaya_novovelichkovskaya_reg_sou: Optional[int] = None
+    exp_novovelichkovskaya_krymskaya_reg_lu: Optional[int] = None
+    exp_novovelichkovskaya_krymskaya_reg_sou: Optional[int] = None
+    exp_krymskaya_grushovaya_reg_lu: Optional[int] = None
+    exp_krymskaya_grushovaya_reg_sou: Optional[int] = None
+    exp_backup_route_bejsug_reg_lu: Optional[int] = None
+    exp_backup_route_bejsug_reg_sou: Optional[int] = None
+    exp_backup_route_ponura_reg_lu: Optional[int] = None
+    exp_backup_route_ponura_reg_sou: Optional[int] = None
+    exp_backup_route_kuban_reg_lu: Optional[int] = None
+    exp_backup_route_kuban_reg_sou: Optional[int] = None
+    exp_npz_afipskij_reg_lu: Optional[int] = None
+    exp_npz_afipskij_reg_sou: Optional[int] = None
+    exp_npz_ilinskij_reg_lu: Optional[int] = None
+    exp_npz_ilinskij_reg_sou: Optional[int] = None
 
     # ===== Базовые тесты =====
     basic_info_test: Optional[CaseMarkers] = None
@@ -255,8 +286,7 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     lds_status_init_out_in_journal_test: Optional[CaseMarkers] = None
     mask_du_on_mini_scheme_test: Optional[CaseMarkers] = None
     unmask_du_on_mini_scheme_test: Optional[CaseMarkers] = None
-    lds_status_after_confirming_leak_test: Optional[CaseMarkers] = None
-    lds_status_completed_leak_test: Optional[CaseMarkers] = None
+    diagnostics_of_signals_after_initialization_test: Optional[CaseMarkers] = None
 
     # ===== Конфигурации утечек =====
     # Для наборов с одной утечкой
@@ -422,7 +452,7 @@ class ExportLeaksReportState:
     temp_file_path: Optional[Path] = None
     worksheet: Any = None
     title_info: Optional[ReportTitleInfo] = None
-    data_rows: List[LeakReportRow] = field(default_factory=list)
+    data_rows: list[LeakReportRow] = field(default_factory=list)
     target_row: Optional[LeakReportRow] = None
 
 
