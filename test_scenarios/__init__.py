@@ -28,4 +28,5 @@ __all__ = [
     scenarios.acknowledge_leak_in_journal,
     scenarios.output_signals,
     scenarios.export_leaks_report,
+    scenarios.export_lds_status_report,
 ]

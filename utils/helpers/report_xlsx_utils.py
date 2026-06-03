@@ -125,21 +125,31 @@ def build_export_report_file_name(
     tu_description: str,
     period_start: datetime,
     period_end: datetime,
+    report_name_part: str = ReportConst.LEAKS_REPORT_NAME_PART,
+    name_tu_separator: str = " ",
 ) -> str:
     """
-    Имя xlsx при скачивании: «Отчет об утечках Тихорецк-Новороссийск-3 DD.MM.YYYY HH_MM_SS - DD.MM.YYYY HH_MM_SS.xlsx».
+    Имя xlsx при скачивании: '{название}{sep}{ТУ} DD.MM.YYYY HH_MM_SS - DD.MM.YYYY HH_MM_SS.xlsx'.
+    По умолчанию - отчёт об утечках.
     """
     start_text = normalize_report_period_naive(period_start).strftime(ReportConst.REPORT_FILE_NAME_DATETIME_FORMAT)
     end_text = normalize_report_period_naive(period_end).strftime(ReportConst.REPORT_FILE_NAME_DATETIME_FORMAT)
     return (
-        f"{ReportConst.LEAKS_REPORT_NAME_PART} {tu_description} {start_text} - {end_text}"
+        f"{report_name_part}{name_tu_separator}{tu_description} {start_text} - {end_text}"
         f"{ReportConst.XLSX_EXTENSION}"
     )
 
 
-def parse_period_from_export_file_name(file_name: str) -> tuple[Optional[datetime], Optional[datetime]]:
+def parse_period_from_export_file_name(
+    file_name: str,
+    period_pattern: str | None = None,
+) -> tuple[Optional[datetime], Optional[datetime]]:
     """Извлекает границы периода из имени скачанного xlsx-файла."""
-    match = re.search(ReportConst.REPORT_FILE_NAME_PERIOD_PATTERN, file_name.strip(), re.IGNORECASE)
+    match = re.search(
+        period_pattern or ReportConst.REPORT_FILE_NAME_PERIOD_PATTERN,
+        file_name.strip(),
+        re.IGNORECASE,
+    )
     if match is None:
         return None, None
 
@@ -154,12 +164,16 @@ def parse_period_from_export_file_name(file_name: str) -> tuple[Optional[datetim
     return _parse_part(match.group("period_start")), _parse_part(match.group("period_end"))
 
 
-def parse_report_title(title_raw: object) -> ReportTitleInfo:
+def parse_report_title(
+    title_raw: object,
+    header_period_pattern: str | None = None,
+) -> ReportTitleInfo:
     """
     Парсит шапку отчёта с именованными группами period_start/period_end.
     """
     title_str = _stringify_cell(title_raw)
-    match = re.search(ReportConst.REPORT_HEADER_PERIOD_PATTERN, title_str)
+    pattern = header_period_pattern or ReportConst.REPORT_HEADER_PERIOD_PATTERN
+    match = re.search(pattern, title_str)
     if match is None:
         return ReportTitleInfo(raw_title=title_str)
 
@@ -188,12 +202,15 @@ def get_report_title_cell(worksheet: Worksheet) -> object:
     return worksheet.cell(row=ReportConst.REPORT_TITLE_ROW, column=1).value
 
 
-def get_report_column_headers(worksheet: Worksheet) -> List[str]:
-    """Возвращает непустые заголовки колонок из строки REPORT_COLUMN_HEADERS_ROW."""
+def get_report_column_headers(
+    worksheet: Worksheet,
+    headers_row: int = ReportConst.REPORT_COLUMN_HEADERS_ROW,
+) -> List[str]:
+    """Возвращает непустые заголовки колонок из указанной строки шапки."""
     headers: List[str] = []
     column_index = 1
     while True:
-        cell_value = worksheet.cell(row=ReportConst.REPORT_COLUMN_HEADERS_ROW, column=column_index).value
+        cell_value = worksheet.cell(row=headers_row, column=column_index).value
         if cell_value is None or not str(cell_value).strip():
             break
         headers.append(_stringify_cell(cell_value).strip())
@@ -247,14 +264,17 @@ def find_row_with_object(rows: List[LeakReportRow], object_substring: str) -> Op
     return None
 
 
-def save_report_bytes_to_temp_file(file_bytes: bytes) -> Optional[Path]:
+def save_report_bytes_to_temp_file(
+    file_bytes: bytes,
+    prefix: str = "leaks_report_",
+) -> Optional[Path]:
     """Сохраняет байты отчёта во временный xlsx-файл. При ошибке возвращает None."""
     import tempfile
 
     try:
         with tempfile.NamedTemporaryFile(
             suffix=ReportConst.XLSX_EXTENSION,
-            prefix="leaks_report_",
+            prefix=prefix,
             delete=False,
         ) as temp_file:
             temp_file.write(file_bytes)

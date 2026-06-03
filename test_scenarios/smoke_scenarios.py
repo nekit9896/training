@@ -22,21 +22,25 @@ from constants.enums import (
     LeakStatus,
     MessageType,
     ReplyStatus,
+    ReservedType,
     SignalType,
     SiteKpKp,
     StationaryStatus,
     UserActions,
 )
 from constants.test_constants import BaseTN3Constants as TestConst
+from constants.test_constants import ExportLdsStatusReportConstants as LdsReportConst
 from constants.test_constants import ExportReportConstants as ReportConst
 from models.get_messages_model import Filtering, FilteringObjects, Pagination
 from test_config.models_for_tests import (
     CaseData,
+    ExportLdsStatusReportState,
     ExportLeaksReportState,
     LDSStatusConfig,
     LeakTestConfig,
     SmokeSuiteConfig,
 )
+from utils.helpers import lds_status_report_xlsx_utils as lds_report_utils
 from utils.helpers import report_xlsx_utils as report_utils
 from utils.helpers import ws_test_utils as t_utils
 from utils.helpers.asserts import SoftAssertions, StepCheck
@@ -128,10 +132,11 @@ async def lds_status_initialization(ws_client, cfg: SmokeSuiteConfig):
         # Получает коллекцию статусов списка ДУ
         lds_status_set = {diagnostic_area.ldsStatus for diagnostic_area in diagnostic_areas}
         # Определяет режим работы СОУ по приоритету
-        lds_status = t_utils.determine_lds_status_by_priority(lds_status_set)
+        lds_status_int = t_utils.determine_lds_status_by_priority(lds_status_set)
+        lds_status = LdsStatus(lds_status_int) if lds_status_int else None
 
     StepCheck("Проверка режима работы СОУ", "ldsStatus").actual(lds_status).expected(
-        LdsStatus.INITIALIZATION.value
+        LdsStatus.INITIALIZATION
     ).equal_to()
 
 
@@ -497,6 +502,11 @@ async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
             {'tuIds': [cfg.tu_id], 'additionalProperties': None},
         )
         parsed_payload = parser.parse_main_page_msg(payload)
+        main_pipeline_stationary_status = (
+            StationaryStatus(parsed_payload.replyContent.tuInfo.stationaryStatus)
+            if parsed_payload.replyContent.tuInfo.stationaryStatus
+            else None
+        )
 
     with SoftAssertions() as soft_failures:
         StepCheck("Проверка id полученного ТУ", "tu_id", soft_failures).actual(
@@ -505,10 +515,10 @@ async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
 
         StepCheck(
             f"Проверка установки стационара для ТУ {cfg.tu_name}",
-            "stationary_status",
+            "stationaryStatus",
             soft_failures,
         ).actual(
-            parsed_payload.replyContent.tuInfo.stationaryStatus
+            main_pipeline_stationary_status
         ).expected(cfg.expected_stationary_status).equal_to()
 
 
@@ -568,6 +578,11 @@ async def main_page_info_unstationary(ws_client, cfg: SmokeSuiteConfig):
             {'tuIds': [cfg.tu_id], 'additionalProperties': None},
         )
         parsed_payload = parser.parse_main_page_msg(payload)
+        main_pipeline_stationary_status = (
+            StationaryStatus(parsed_payload.replyContent.tuInfo.stationaryStatus)
+            if parsed_payload.replyContent.tuInfo.stationaryStatus
+            else None
+        )
 
     with SoftAssertions() as soft_failures:
         StepCheck("Проверка id полученного ТУ", "tu_id", soft_failures).actual(
@@ -576,11 +591,9 @@ async def main_page_info_unstationary(ws_client, cfg: SmokeSuiteConfig):
 
         StepCheck(
             f"Проверка установки режима Нестационар для ТУ {cfg.tu_name}",
-            "stationary_status",
+            "stationaryStatus",
             soft_failures,
-        ).actual(parsed_payload.replyContent.tuInfo.stationaryStatus).expected(
-            StationaryStatus.UNSTATIONARY.value
-        ).equal_to()
+        ).actual(main_pipeline_stationary_status).expected(StationaryStatus.UNSTATIONARY).equal_to()
 
 
 async def leak_is_confirm_on_main_page(ws_client, cfg: SmokeSuiteConfig):
@@ -597,10 +610,11 @@ async def leak_is_confirm_on_main_page(ws_client, cfg: SmokeSuiteConfig):
         parsed_payload = parser.parse_main_page_msg(payload)
         main_page_leak_info = parsed_payload.replyContent.tuInfo.leaksInfo
         confirm_leak = t_utils.find_object_by_field(main_page_leak_info, "leakStatus", LeakStatus.CONFIRMED.value)
+        lds_status = LeakStatus(confirm_leak.leakStatus) if confirm_leak.leakStatus else None
 
-    StepCheck("Проверка подтвержденной утечки на ЭФ Состояние МТ", "leakStatus").actual(
-        confirm_leak.leakStatus
-    ).expected(LeakStatus.CONFIRMED.value).equal_to()
+    StepCheck("Проверка подтвержденной утечки на ЭФ Состояние МТ", "leakStatus").actual(lds_status).expected(
+        LeakStatus.CONFIRMED
+    ).equal_to()
 
 
 async def leak_is_complete_on_main_page(ws_client, cfg: SmokeSuiteConfig):
@@ -623,13 +637,15 @@ async def leak_is_complete_on_main_page(ws_client, cfg: SmokeSuiteConfig):
     ).is_empty()
 
 
-async def imitate_senor_signal(ws_client, cfg: SmokeSuiteConfig, test_data: CaseData):
+async def imitate_sensor_signal(ws_client, cfg: SmokeSuiteConfig, test_data: CaseData):
     """
     Проверка имитации сигнала датчика.
     """
     # Распаковка данных для теста
-    sensor_id = test_data.params.get("sensor_id")
+    sensor_address = test_data.params.get("sensor_address")
     sensor_val, sensor_quality = test_data.expected_result
+    # Получение актуального id датчика
+    sensor_id = TestConst.SENSOR_IDS_BY_ADDRESS.get(sensor_address)
 
     with allure.step(f"Отправка сообщения и обработка ответа об имитации сигнала датчика с id: {sensor_id}"):
         payload = await t_utils.connect_and_get_msg(
@@ -716,50 +732,26 @@ async def imitate_senor_signal(ws_client, cfg: SmokeSuiteConfig, test_data: Case
         ).expected(False).equal_to()
 
 
-async def mask_signal_msg(ws_client, cfg: SmokeSuiteConfig):
+async def mask_signal_test(ws_client, cfg: SmokeSuiteConfig, test_data: CaseData):
     """
     Проверка маскирования датчиков.
     """
-    with allure.step("Подключение по ws, получение и обработка данных датчиков давления и расхода"):
-        payload = await t_utils.connect_and_get_msg(
-            ws_client,
-            "GetInputSignalsRequest",
-            {
-                'tuId': cfg.tu_id,
-                'sorting': None,
-                'filtering': None,
-                'columnsSelection': 512,
-                'search': None,
-                'additionalProperties': None,
-            },
-        )
 
-        parsed_payload = parser.parse_input_signals_msg(payload)
-        # Получает список датчиков давления
-        pressure_sensor_list = [
-            sensor
-            for sensor in parsed_payload.replyContent
-            if sensor.signalType == TestConst.PRESSURE_SIGNAL_TYPE
-            and sensor.objectType == TestConst.PRESSURE_SENSOR_OBJECT_TYPE
-        ]
-        # Получает список расходомеров
-        flowmeter_list = [
-            sensor
-            for sensor in parsed_payload.replyContent
-            if sensor.signalType == TestConst.FLOW_SIGNAL_TYPE and sensor.objectType == TestConst.FLOWMETER_OBJECT_TYPE
-        ]
-        # Случайно выбирает 1 расходомер и 1 датчик давления
-        pressure_sensor = t_utils.get_random_item(pressure_sensor_list)
-        flowmeter = t_utils.get_random_item(flowmeter_list)
-
+    if not test_data:
+        pytest.fail("Данные датчиков отсутствуют")
+    pressure_sensor_address = test_data.params.get("pressure_sensor_address")
+    flowmeter_address = test_data.params.get("flowmeter_address")
+    # Получение актуальных id датчиков
+    pressure_sensor_id = TestConst.SENSOR_IDS_BY_ADDRESS.get(pressure_sensor_address)
+    flowmeter_id = TestConst.SENSOR_IDS_BY_ADDRESS.get(flowmeter_address)
     with allure.step("Маскирование датчиков"):
         with allure.step(
-            f"Отправка сообщения и обработка ответа о маскировании датчика давления с id: {pressure_sensor.id}"
+            f"Отправка сообщения и обработка ответа о маскировании датчика давления с id: {pressure_sensor_id}"
         ):
             payload = await t_utils.connect_and_get_msg(
                 ws_client,
                 "MaskSignalRequest",
-                {'id': pressure_sensor.id, 'tuId': cfg.tu_id, 'additionalProperties': None},
+                {'id': pressure_sensor_id, 'tuId': cfg.tu_id, 'additionalProperties': None},
             )
             parsed_payload = parser.parse_mask_signal_msg(payload)
             pressure_sensor_mask_reply_status = parsed_payload.replyStatus
@@ -768,11 +760,11 @@ async def mask_signal_msg(ws_client, cfg: SmokeSuiteConfig):
                 pressure_sensor_mask_reply_status
             ).expected(ReplyStatus.OK.value).equal_to()
 
-        with allure.step(f"Отправка сообщения и обработка ответа о маскировании расходомера с id: {flowmeter.id}"):
+        with allure.step(f"Отправка сообщения и обработка ответа о маскировании расходомера с id: {flowmeter_id}"):
             payload = await t_utils.connect_and_get_msg(
                 ws_client,
                 "MaskSignalRequest",
-                {'id': flowmeter.id, 'tuId': cfg.tu_id, 'additionalProperties': None},
+                {'id': flowmeter_id, 'tuId': cfg.tu_id, 'additionalProperties': None},
             )
             parsed_payload = parser.parse_mask_signal_msg(payload)
             flowmeter_mask_reply_status = parsed_payload.replyStatus
@@ -790,24 +782,24 @@ async def mask_signal_msg(ws_client, cfg: SmokeSuiteConfig):
             "InputSignalsContent",
             "SubscribeInputSignalsRequest",
             {
-                'signalIds': [pressure_sensor.id, flowmeter.id],
+                'signalIds': [pressure_sensor_id, flowmeter_id],
                 'tuId': cfg.tu_id,
                 'additionalProperties': None,
             },
         )
         parsed_payload = parser.parse_input_signals_info_msg(payload)
         sensor_data = parsed_payload.replyContent.inputSignals
-        pressure_sensor_mask_data = t_utils.find_object_by_field(sensor_data, "id", pressure_sensor.id)
-        flowmeter_mask_data = t_utils.find_object_by_field(sensor_data, "id", flowmeter.id)
+        pressure_sensor_mask_data = t_utils.find_object_by_field(sensor_data, "id", pressure_sensor_id)
+        flowmeter_mask_data = t_utils.find_object_by_field(sensor_data, "id", flowmeter_id)
 
     with allure.step("Снятие маскирования датчиков"):
         with allure.step(
-            f"Отправка сообщения и обработка ответа о снятии маскирования датчика давления с id: {pressure_sensor.id}"
+            f"Отправка сообщения и обработка ответа о снятии маскирования датчика давления с id: {pressure_sensor_id}"
         ):
             payload = await t_utils.connect_and_get_msg(
                 ws_client,
                 "UnmaskSignalRequest",
-                {'id': pressure_sensor.id, 'tuId': cfg.tu_id, 'additionalProperties': None},
+                {'id': pressure_sensor_id, 'tuId': cfg.tu_id, 'additionalProperties': None},
             )
             parsed_payload = parser.parse_unmask_signal_msg(payload)
             pressure_sensor_unmask_reply_status = parsed_payload.replyStatus
@@ -817,12 +809,12 @@ async def mask_signal_msg(ws_client, cfg: SmokeSuiteConfig):
             ).expected(ReplyStatus.OK.value).equal_to()
 
         with allure.step(
-            f"Отправка сообщения и обработка ответа о снятии маскирования расходомера с id: {flowmeter.id}"
+            f"Отправка сообщения и обработка ответа о снятии маскирования расходомера с id: {flowmeter_id}"
         ):
             payload = await t_utils.connect_and_get_msg(
                 ws_client,
                 "UnmaskSignalRequest",
-                {'id': flowmeter.id, 'tuId': cfg.tu_id, 'additionalProperties': None},
+                {'id': flowmeter_id, 'tuId': cfg.tu_id, 'additionalProperties': None},
             )
             parsed_payload = parser.parse_unmask_signal_msg(payload)
             flowmeter_unmask_reply_status = parsed_payload.replyStatus
@@ -840,27 +832,27 @@ async def mask_signal_msg(ws_client, cfg: SmokeSuiteConfig):
             "InputSignalsContent",
             "SubscribeInputSignalsRequest",
             {
-                'signalIds': [pressure_sensor.id, flowmeter.id],
+                'signalIds': [pressure_sensor_id, flowmeter_id],
                 'tuId': cfg.tu_id,
                 'additionalProperties': None,
             },
         )
         parsed_payload = parser.parse_input_signals_info_msg(payload)
         sensor_data = parsed_payload.replyContent.inputSignals
-        pressure_sensor_unmask_data = t_utils.find_object_by_field(sensor_data, "id", pressure_sensor.id)
-        flowmeter_unmask_data = t_utils.find_object_by_field(sensor_data, "id", flowmeter.id)
+        pressure_sensor_unmask_data = t_utils.find_object_by_field(sensor_data, "id", pressure_sensor_id)
+        flowmeter_unmask_data = t_utils.find_object_by_field(sensor_data, "id", flowmeter_id)
 
     with SoftAssertions() as soft_failures:
         StepCheck(
-            f"Проверка маскирования датчика давления с id: {pressure_sensor.id}", "isMasked", soft_failures
+            f"Проверка маскирования датчика давления с id: {pressure_sensor_id}", "isMasked", soft_failures
         ).actual(pressure_sensor_mask_data.isMasked).expected(True).equal_to()
-        StepCheck(f"Проверка маскирования расходомера с id: {flowmeter.id}", "isMasked", soft_failures).actual(
+        StepCheck(f"Проверка маскирования расходомера с id: {flowmeter_id}", "isMasked", soft_failures).actual(
             flowmeter_mask_data.isMasked
         ).expected(True).equal_to()
         StepCheck(
-            f"Проверка снятия маскирования датчика давления с id: {pressure_sensor.id}", "isMasked", soft_failures
+            f"Проверка снятия маскирования датчика давления с id: {pressure_sensor_id}", "isMasked", soft_failures
         ).actual(pressure_sensor_unmask_data.isMasked).expected(False).equal_to()
-        StepCheck(f"Проверка снятия маскирования расходомера с id: {flowmeter.id}", "isMasked", soft_failures).actual(
+        StepCheck(f"Проверка снятия маскирования расходомера с id: {flowmeter_id}", "isMasked", soft_failures).actual(
             flowmeter_unmask_data.isMasked
         ).expected(False).equal_to()
 
@@ -1379,14 +1371,15 @@ async def lds_status_initialization_out(ws_client, cfg: SmokeSuiteConfig):
             attachment_type=allure.attachment_type.TEXT,
         )
         lds_status_set = {diagnostic_area.ldsStatus for diagnostic_area in diagnostic_areas}
-        lds_status = t_utils.determine_lds_status_by_priority(lds_status_set)
+        lds_status_int = t_utils.determine_lds_status_by_priority(lds_status_set)
+        lds_status = LdsStatus(lds_status_int) if lds_status_int else None
 
     StepCheck(
         "Проверка: СОУ находится не в режиме 'Инициализация'",
         "ldsStatus",
     ).actual(
         lds_status
-    ).expected(LdsStatus.INITIALIZATION.value).is_not_equal_to()
+    ).expected(LdsStatus.INITIALIZATION).is_not_equal_to()
 
 
 async def lds_status_init_out_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_time):
@@ -1496,6 +1489,10 @@ async def leaks_content(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, 
         )
         leak_volume_m3 = t_utils.convert_leak_volume_m3(first_leak_info.leakVolume)
         leak_coordinate_round = round(first_leak_info.leakCoordinate, cfg.precision)
+        leak_algorithm_type = ReservedType(first_leak_info.type) if first_leak_info.type else None
+        leak_confirmation_status = (
+            ConfirmationStatus(first_leak_info.confirmationStatus) if first_leak_info.confirmationStatus else None
+        )
 
     with SoftAssertions() as soft_failures:
         StepCheck("Проверка id полученного ТУ", "tu_id", soft_failures).actual(
@@ -1507,10 +1504,10 @@ async def leaks_content(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, 
         ).is_not_none()
 
         StepCheck("Проверка статуса утечки", "confirmationStatus", soft_failures).actual(
-            first_leak_info.confirmationStatus
+            leak_confirmation_status
         ).expected(leak.expected_leak_status).equal_to()
 
-        StepCheck("Проверка источника события (алгоритм)", "type", soft_failures).actual(first_leak_info.type).expected(
+        StepCheck("Проверка источника события (алгоритм)", "type", soft_failures).actual(leak_algorithm_type).expected(
             leak.expected_algorithm_type
         ).equal_to()
 
@@ -1812,6 +1809,10 @@ async def all_leaks_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig,
         )
         leak_volume_m3 = t_utils.convert_leak_volume_m3(first_leak_info.volume)
         leak_coordinate_round = round(first_leak_info.leakCoordinate, cfg.precision)
+        leak_lds_status = LdsStatus(first_leak_info.ldsStatus) if first_leak_info.ldsStatus else None
+        leak_stationary_status = (
+            StationaryStatus(first_leak_info.stationaryStatus) if first_leak_info.stationaryStatus else None
+        )
 
     with SoftAssertions() as soft_failures:
         StepCheck("Проверка id полученного ТУ", "tu_id", soft_failures).actual(
@@ -1822,7 +1823,7 @@ async def all_leaks_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig,
             first_leak_info.diagnosticAreaName
         ).is_not_none()
 
-        StepCheck("Проверка статуса СОУ", "ldsStatus", soft_failures).actual(first_leak_info.ldsStatus).expected(
+        StepCheck("Проверка статуса СОУ", "ldsStatus", soft_failures).actual(leak_lds_status).expected(
             leak.expected_lds_status
         ).equal_to()
 
@@ -1854,9 +1855,9 @@ async def all_leaks_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig,
             f"значение допустимой погрешности по объему {leak.allowed_volume_m3}",
         )
 
-        StepCheck("Проверка режима ТУ", "stationaryStatus", soft_failures).actual(
-            first_leak_info.stationaryStatus
-        ).expected(leak.expected_stationary_status).equal_to()
+        StepCheck("Проверка режима ТУ", "stationaryStatus", soft_failures).actual(leak_stationary_status).expected(
+            leak.expected_stationary_status
+        ).equal_to()
 
 
 async def all_leaks_is_empty(ws_client, cfg: SmokeSuiteConfig):
@@ -1909,6 +1910,10 @@ async def tu_leaks_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, 
         )
         leak_volume_m3 = t_utils.convert_leak_volume_m3(first_leak_info.volume)
         leak_coordinate_round = round(first_leak_info.leakCoordinate, cfg.precision)
+        leak_lds_status = LdsStatus(first_leak_info.ldsStatus) if first_leak_info.ldsStatus else None
+        leak_stationary_status = (
+            StationaryStatus(first_leak_info.stationaryStatus) if first_leak_info.stationaryStatus else None
+        )
 
     with SoftAssertions() as soft_failures:
         StepCheck("Проверка id полученного ТУ", "tu_id", soft_failures).actual(
@@ -1919,7 +1924,7 @@ async def tu_leaks_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, 
             first_leak_info.controlledSiteId
         ).is_not_none()
 
-        StepCheck("Проверка статуса СОУ", "ldsStatus", soft_failures).actual(first_leak_info.ldsStatus).expected(
+        StepCheck("Проверка статуса СОУ", "ldsStatus", soft_failures).actual(leak_lds_status).expected(
             leak.expected_lds_status
         ).equal_to()
 
@@ -1951,9 +1956,9 @@ async def tu_leaks_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, 
             f"значение допустимой погрешности по объему {leak.allowed_volume_m3}",
         )
 
-        StepCheck("Проверка режима ТУ", "stationaryStatus", soft_failures).actual(
-            first_leak_info.stationaryStatus
-        ).expected(leak.expected_stationary_status).equal_to()
+        StepCheck("Проверка режима ТУ", "stationaryStatus", soft_failures).actual(leak_stationary_status).expected(
+            leak.expected_stationary_status
+        ).equal_to()
 
 
 async def lds_status_during_leak(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig):
@@ -1981,6 +1986,8 @@ async def lds_status_during_leak(ws_client, cfg: SmokeSuiteConfig, leak: LeakTes
     if not leak_diagnostic_area:
         pytest.fail(f"В сообщении не найден ДУ с id: {status_config.leak_diagnostic_area_id}")
 
+    leak_lds_status = LdsStatus(leak_diagnostic_area.ldsStatus) if leak_diagnostic_area.ldsStatus else None
+
     # Формат конфига: status_config.in_neighbors / status_config.out_neighbors (dict[id] = expected_status)
     in_neighbors: dict[int, int] = status_config.in_neighbors or {}
     out_neighbors: dict[int, int] = status_config.out_neighbors or {}
@@ -1994,18 +2001,19 @@ async def lds_status_during_leak(ws_client, cfg: SmokeSuiteConfig, leak: LeakTes
             f"Проверка режима работы СОУ на ДУ с утечкой, pipe_id ДУ: {status_config.leak_diagnostic_area_pipe_id}",
             "ldsStatus",
             soft_failures,
-        ).actual(leak_diagnostic_area.ldsStatus).expected(status_config.leak_du_expected_lds_status).equal_to()
+        ).actual(leak_lds_status).expected(status_config.leak_du_expected_lds_status).equal_to()
 
         # Проверки соседних ДУ: поддерживаются 0. N соседей
         for neighbor_pipe_id, expected_status in sorted(all_neighbors.items()):
             diagnostic_area = t_utils.find_diagnostic_area_by_pipe_id(flow_areas, neighbor_pipe_id)
+            diagnostic_area_lds_status = LdsStatus(diagnostic_area.ldsStatus) if diagnostic_area.ldsStatus else None
             if diagnostic_area:
                 found_diagnostic_area_count += 1
                 StepCheck(
                     f"Проверка режима работы СОУ на соседнем ДУ, pipe_id ДУ: {neighbor_pipe_id}",
                     "ldsStatus",
                     soft_failures,
-                ).actual(diagnostic_area.ldsStatus).expected(expected_status).equal_to()
+                ).actual(diagnostic_area_lds_status).expected(expected_status).equal_to()
         if found_diagnostic_area_count == 0:
             pytest.fail(f"Не найдены соседние с утечкой ДУ по pipe_id: {list(all_neighbors.keys())}")
 
@@ -2450,7 +2458,7 @@ async def balance_algorithm_leak_detected(ws_client, cfg: SmokeSuiteConfig, leak
             ).actual(abs(leak_diagnostic_area.debalance)).is_greater_than(threshold)
 
 
-async def balance_algorithm_leak_completed(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig):
+async def balance_algorithm_leak_completed(ws_client, cfg: SmokeSuiteConfig):
     """
     Проверка отсутствия утечки (isLeakDetected) через BalanceAlgorithmResults.
 
@@ -2520,17 +2528,21 @@ async def the_leak_is_complete_on_kg(ws_client, cfg: SmokeSuiteConfig, leak: Lea
         complete_leak = t_utils.find_object_by_field(
             leaks_list_info, "confirmationStatus", ConfirmationStatus.CONFIRMED_AND_LEAK_CLOSED.value
         )
+        leak_algorithm_type = ConfirmationStatus(complete_leak_info.type) if complete_leak_info.type else None
+        leak_confirmation_status = (
+            ConfirmationStatus(complete_leak.confirmationStatus) if complete_leak.confirmationStatus else None
+        )
 
     with SoftAssertions() as soft_failures:
         StepCheck("Проверка статуса утечки в КГ - завершена", "confirmationStatus", soft_failures).actual(
-            complete_leak.confirmationStatus
+            leak_confirmation_status
         ).expected(leak.expected_complete_leak_status).equal_to()
         StepCheck("Проверка наличия названия участка утечки", "diagnosticAreaName", soft_failures).actual(
             complete_leak_info.diagnosticAreaName
         ).is_not_none()
-        StepCheck("Проверка источника события (алгоритм)", "type", soft_failures).actual(
-            complete_leak_info.type
-        ).expected(leak.expected_algorithm_type).equal_to()
+        StepCheck("Проверка источника события (алгоритм)", "type", soft_failures).actual(leak_algorithm_type).expected(
+            leak.expected_algorithm_type
+        ).equal_to()
         StepCheck("Проверка координаты утечки", "leakCoordinate", soft_failures).actual(
             leak_coordinate_round
         ).is_close_to(
@@ -2658,6 +2670,7 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
 
     Скачанный файл удаляется по завершению, прикладывается к Allure только при падении теста.
     """
+    #  Создаем универсальный словарь для сбора фактических результатов ответов с бэка
     actual_report_state = ExportLeaksReportState()
 
     with allure.step("Подготовка параметров сценария формирования отчёта об утечках"):
@@ -2677,7 +2690,10 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
             actual_report_state.period_end
         )
         actual_report_state.expected_mt_mode = ReportConst.STATIONARY_STATUS_TO_REPORT_TEXT.get(
-            leak.expected_stationary_status
+            leak.expected_report_stationary_status
+        )
+        actual_report_state.expected_lds_status_text = LdsStatus.report_text_by_value(
+            leak.expected_lds_status_in_leaks_report
         )
         actual_report_state.tu_description_lower = cfg.technological_unit.description.lower()
         time_offset_hours = t_utils.report_time_offset_hours()
@@ -2895,6 +2911,7 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
             leak_volume_value = target_row.leak_volume if target_row else None
             mt_mode_lower = target_row.mt_mode.lower() if target_row else ""
             expected_mt_mode_lower = actual_report_state.expected_mt_mode.lower()
+            expected_lds_status_lower = actual_report_state.expected_lds_status_text.lower()
             masking_not_masked_lower = ReportConst.MASKING_NOT_MASKED_TEXT.lower()
             period_start_lo, period_start_hi, period_end_lo, period_end_hi = (
                 report_utils.report_period_comparison_bounds(
@@ -2926,12 +2943,11 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
                 ).contains(object_value_lower, actual_report_state.tu_description_lower)
 
                 StepCheck(
-                    f"Колонка '{ReportConst.COL_LDS_STATUS}'",
+                    f"Колонка '{ReportConst.COL_LDS_STATUS}' содержит "
+                    f"'{actual_report_state.expected_lds_status_text}'",
                     ReportConst.COL_LDS_STATUS,
                     soft_failures,
-                ).actual(
-                    lds_status_value
-                ).expected(ReportConst.LDS_STATUS_OK_TEXT).equal_to()
+                ).contains(lds_status_value.lower(), expected_lds_status_lower)
 
                 StepCheck(
                     f"Колонка '{ReportConst.COL_MASK_INFO}' содержит '{ReportConst.MASKING_NOT_MASKED_TEXT}'",
@@ -2967,14 +2983,6 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
                     actual_report_state.temp_file_path, actual_report_state.report_file_name
                 )
         raise
-    finally:
-        with allure.step("Удаление временного xlsx файла"):
-            temp_path = actual_report_state.temp_file_path
-            if temp_path is not None:
-                try:
-                    temp_path.unlink(missing_ok=True)
-                except OSError:
-                    pass
 
     with allure.step("Проверка имени файла отчёта"):
         with SoftAssertions() as soft_failures:
@@ -3042,3 +3050,348 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
             StepCheck("В нотификации нет текста ошибки", "errorMessage", soft_failures).actual(
                 notification_error_message
             ).is_empty()
+
+
+async def export_lds_status_report(
+    ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time: datetime
+):
+    """
+    Сценарий формирования xlsx-отчёта о режиме работы СОУ.
+    """
+    report_state = ExportLdsStatusReportState()
+
+    with allure.step("Подготовка параметров сценария формирования отчёта о режиме работы СОУ"):
+        report_state.report_test = leak.export_lds_status_report_test
+        StepCheck("В конфигурации задан export_lds_status_report_test", "export_lds_status_report_test").actual(
+            report_state.report_test
+        ).is_not_none()
+        report_state.period_start = t_utils.localize_as_moscow(imitator_start_time)
+        report_state.period_end = t_utils.localize_as_moscow(
+            imitator_start_time + timedelta(minutes=report_state.report_test.offset)
+        )
+        report_state.period_start_naive = report_utils.normalize_report_period_naive(report_state.period_start)
+        report_state.period_end_naive = report_utils.normalize_report_period_naive(report_state.period_end)
+        report_state.tu_description_lower = cfg.technological_unit.description.lower()
+        time_offset_hours = t_utils.report_time_offset_hours()
+        StepCheck(
+            f"Смещение timeOffset для запросов отчёта (часовой пояс {TestConst.ZONE_INFO})",
+            "time_offset_hours",
+        ).actual(time_offset_hours).is_not_none()
+        report_state.time_offset_hours = time_offset_hours
+
+        allure.attach(
+            f"period.start={report_state.period_start}\n"
+            f"period.end={report_state.period_end}\n"
+            f"offset_minutes={report_state.report_test.offset}\n"
+            f"sections={LdsReportConst.SECTION_NAMES}",
+            name="Фильтр периода отчёта о режиме СОУ",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+    with allure.step(f"Этап 1. Подписка на пуш-нотификации {ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST}"):
+        await t_utils.connect(ws_client, ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST, [])
+
+    with allure.step(f"Этап 2. Запрос формирования отчёта {ReportConst.EXPORT_REPORTS_COMMAND_REQUEST}"):
+        request_payload = {
+            "tuId": cfg.tu_id,
+            "exportedDataTypes": [ExportedDataType.LDS_STATUS_REPORT.value],
+            "timeOffset": report_state.time_offset_hours,
+            "period": {
+                "start": t_utils.datetime_to_msgpack_timestamp(report_state.period_start),
+                "end": t_utils.datetime_to_msgpack_timestamp(report_state.period_end),
+                "additionalProperties": {},
+            },
+        }
+        await t_utils.connect(ws_client, ReportConst.EXPORT_REPORTS_COMMAND_REQUEST, request_payload)
+
+    with allure.step(
+        f"Этап 3. Ожидание пуш-нотификации {ReportConst.REPORT_DATA_EXPORTED_NOTIFICATION} о готовности отчёта"
+    ):
+        report_state.notification = await t_utils.poll_for_report_export_notification(
+            ws_client=ws_client,
+            parser=parser,
+            total_wait_seconds=ReportConst.NOTIFICATION_TIMEOUT_SECONDS,
+            poll_interval_seconds=ReportConst.LIST_POLL_INTERVAL_SECONDS,
+        )
+
+    with allure.step(f"Этап 4. Лонг-поллинг {ReportConst.GET_EXPORTED_DATA_LIST_REQUEST} до появления отчёта в списке"):
+        report_state.report_item = await t_utils.poll_for_exported_file(
+            ws_client=ws_client,
+            parser=parser,
+            list_limit=ReportConst.EXPORTED_DATA_LIST_LIMIT,
+            expected_data_type=ExportedDataType.LDS_STATUS_REPORT,
+            name_substring=LdsReportConst.LDS_STATUS_REPORT_NAME_PART,
+            tu_name_substring=cfg.technological_unit.description,
+            period_start=report_state.period_start,
+            period_end=report_state.period_end,
+            total_wait_seconds=ReportConst.LIST_POLL_TOTAL_WAIT_SECONDS,
+            poll_interval_seconds=ReportConst.LIST_POLL_INTERVAL_SECONDS,
+        )
+
+    with allure.step("Подготовка данных найденного отчёта в списке"):
+        report_item = report_state.report_item
+        if report_item is not None:
+            allure.attach(
+                f"id={report_item.id}, name={report_item.name}, "
+                f"exportedDataType={report_item.exportedDataType}, "
+                f"start={t_utils.format_datetime_moscow(report_item.start)}, "
+                f"end={t_utils.format_datetime_moscow(report_item.end)}",
+                name="Найденный отчёт в списке",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+        report_state.report_file_name = report_utils.build_export_report_file_name(
+            cfg.technological_unit.description,
+            report_state.period_start,
+            report_state.period_end,
+            LdsReportConst.LDS_STATUS_REPORT_NAME_PART,
+            ". ",
+        )
+
+    with allure.step("Проверка: отчёт найден в списке сформированных файлов"):
+        StepCheck("Отчёт найден в списке сформированных файлов", "report_item").actual(
+            report_state.report_item
+        ).is_not_none()
+
+    with allure.step(
+        f"Этап 5. Streaming-вызов {ReportConst.DOWNLOAD_EXPORTED_DATA_REQUEST} по id={report_state.report_item.id}"
+    ):
+        download_request = {
+            "exportedDataId": report_state.report_item.id,
+            "exportedDataType": ExportedDataType.LDS_STATUS_REPORT.to_download_name(),
+            "additionalProperties": None,
+            "timeOffset": report_state.time_offset_hours,
+        }
+        download_purpose = (
+            f"скачивание xlsx-отчёта о режиме СОУ (exportedDataId={report_state.report_item.id}) "
+            f"после формирования отчёта и выбора файла в списке GetExportedDataListRequest"
+        )
+        await t_utils.connect_stream(
+            ws_client,
+            ReportConst.DOWNLOAD_EXPORTED_DATA_REQUEST,
+            download_request,
+            purpose=download_purpose,
+        )
+        report_state.download_invocation_id = ws_client.invocation_id
+
+    with allure.step("Этап 6. Получение fileChunk - скачивание отчёта о режиме СОУ"):
+        report_state.download_reply = await t_utils.receive_download_exported_data_reply(
+            ws_client=ws_client,
+            parser=parser,
+            invocation_id=report_state.download_invocation_id,
+            request_name=ReportConst.DOWNLOAD_EXPORTED_DATA_REQUEST,
+            total_wait_seconds=ReportConst.DOWNLOAD_TIMEOUT_SECONDS,
+            purpose=download_purpose,
+        )
+
+    with allure.step("Извлечение данных ответа на скачивание"):
+        download_reply = report_state.download_reply
+        download_reply_status = download_reply.replyStatus
+        has_download_reply_content = download_reply.replyContent is not None
+        report_state.file_bytes = download_reply.replyContent.fileChunk if has_download_reply_content else None
+        is_xlsx_signature = (
+            report_utils.is_xlsx_file_bytes(report_state.file_bytes) if report_state.file_bytes else False
+        )
+
+    with allure.step("Проверка ответа на скачивание и формата xlsx"):
+        StepCheck("Проверка статуса ответа на скачивание", "replyStatus").actual(download_reply_status).expected(
+            ReplyStatus.OK.value
+        ).equal_to()
+        StepCheck("Проверка наличия контента ответа на скачивание", "replyContent").actual(
+            has_download_reply_content
+        ).expected(True).equal_to()
+        StepCheck("Проверка наличия байт файла", "fileChunk").actual(report_state.file_bytes).is_not_empty()
+        StepCheck("Проверка xlsx (zip) сигнатуры файла", "file_signature").actual(is_xlsx_signature).expected(
+            True
+        ).equal_to()
+
+    with allure.step("Подготовка данных для проверки имени файла отчёта"):
+        report_file_name = report_state.report_file_name
+        report_file_name_lower = report_file_name.lower()
+        file_name_period_start, file_name_period_end = report_utils.parse_period_from_export_file_name(
+            report_file_name,
+            LdsReportConst.REPORT_FILE_NAME_PERIOD_PATTERN,
+        )
+        period_start_lo, period_start_hi, period_end_lo, period_end_hi = report_utils.report_period_comparison_bounds(
+            report_state.period_start_naive,
+            report_state.period_end_naive,
+        )
+        has_xlsx_extension = report_utils.is_xlsx_extension(report_file_name)
+        lds_report_name_part_lower = LdsReportConst.LDS_STATUS_REPORT_NAME_PART.lower()
+
+    try:
+        with allure.step("Этап 7. Сохранение и разбор xlsx-отчёта о режиме СОУ"):
+            report_state.temp_file_path = report_utils.save_report_bytes_to_temp_file(
+                report_state.file_bytes,
+                prefix="lds_status_report_",
+            )
+            StepCheck("Временный xlsx файл создан", "temp_file_path").actual(report_state.temp_file_path).is_not_none()
+            report_state.worksheet = report_utils.load_report_worksheet(report_state.temp_file_path)
+            report_state.parsed_report = lds_report_utils.parse_lds_status_report_worksheet(
+                report_state.worksheet,
+                LdsReportConst.SECTION_NAMES,
+            )
+            allure.attach(
+                f"Шапка (raw): {report_state.parsed_report.title_info.raw_title}\n"
+                f"period_start: {report_state.parsed_report.title_info.period_start}\n"
+                f"period_end: {report_state.parsed_report.title_info.period_end}\n"
+                f"total_duration: {report_state.parsed_report.total_duration_raw}",
+                name="Шапка отчёта о режиме СОУ",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+            allure.attach(
+                lds_report_utils.format_section_rows_for_allure(report_state.parsed_report.section_rows),
+                name="Строки участков отчёта",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+
+        with allure.step("Подготовка данных таблицы отчёта для проверки"):
+            parsed_report = report_state.parsed_report
+            expected_section_names = LdsReportConst.SECTION_NAMES
+            section_rows = parsed_report.section_rows
+            total_duration_seconds = parsed_report.total_duration_seconds
+            duration_tolerance = LdsReportConst.TOTAL_DURATION_TOLERANCE_SECONDS
+
+        with allure.step("Проверка содержимого таблицы отчёта о режиме СОУ"):
+            StepCheck("Лист xlsx открыт", "worksheet").actual(report_state.worksheet).is_not_none()
+            with SoftAssertions() as soft_failures:
+                StepCheck(
+                    "Количество строк участков в отчёте",
+                    "section_rows_count",
+                    soft_failures,
+                ).actual(
+                    len(section_rows)
+                ).expected(len(expected_section_names)).equal_to()
+
+                for section_index, expected_section_name in enumerate(expected_section_names):
+                    actual_section_name = (
+                        section_rows[section_index].section_name if section_index < len(section_rows) else None
+                    )
+                    StepCheck(
+                        f"Наименование участка #{section_index + 1}",
+                        LdsReportConst.COL_SECTION,
+                        soft_failures,
+                    ).actual(actual_section_name).expected(expected_section_name).equal_to()
+
+                for section_row in section_rows:
+                    for column_name in LdsReportConst.MODE_DURATION_COLUMNS:
+                        cell_value = section_row.cells.get(column_name)
+                        StepCheck(
+                            f"Длительность '{column_name}' для участка '{section_row.section_name}' заполнена",
+                            column_name,
+                            soft_failures,
+                        ).actual(lds_report_utils.is_duration_cell_filled(cell_value)).expected(True).equal_to()
+
+                StepCheck(
+                    "В отчёте найдена строка 'Суммарное время работы:'",
+                    "total_work_duration_label",
+                    soft_failures,
+                ).actual(parsed_report.total_label_row_index).is_not_none()
+                StepCheck(
+                    "Суммарное время работы в отчёте не нулевое",
+                    "total_work_duration",
+                    soft_failures,
+                ).actual(
+                    total_duration_seconds
+                ).is_greater_than(0, LdsReportConst.ZERO_DURATION_TEXT)
+
+                for section_row in section_rows:
+                    duration_diff = abs(section_row.modes_sum_seconds - (total_duration_seconds or 0))
+                    StepCheck(
+                        f"Сумма режимов СОУ для '{section_row.section_name}' "
+                        f"совпадает с суммарным временем (+-{duration_tolerance} с)",
+                        "modes_sum_seconds",
+                        soft_failures,
+                    ).actual(duration_diff).is_less_than(
+                        duration_tolerance + 1,
+                        f"погрешность {duration_tolerance} с",
+                    )
+
+        with allure.step("Подготовка данных шапки отчёта для проверки"):
+            title_info = parsed_report.title_info
+            report_title_lower = title_info.raw_title.lower()
+            column_headers = parsed_report.column_headers
+            header_period_start = title_info.period_start
+            header_period_end = title_info.period_end
+
+        with allure.step("Проверка двойной шапки отчёта о режиме СОУ"):
+            with SoftAssertions() as soft_failures:
+                StepCheck(
+                    f"В шапке отчёта присутствует '{LdsReportConst.LDS_STATUS_REPORT_NAME_PART}'",
+                    "report_title",
+                    soft_failures,
+                ).contains(report_title_lower, lds_report_name_part_lower)
+                StepCheck(
+                    "Время начала периода в шапке совпадает с фильтром запроса (+-1 мин)",
+                    "period_start",
+                    soft_failures,
+                ).actual(header_period_start).is_between(period_start_lo, period_start_hi)
+                StepCheck(
+                    "Время конца периода в шапке совпадает с фильтром запроса (+-1 мин)",
+                    "period_end",
+                    soft_failures,
+                ).actual(header_period_end).is_between(period_end_lo, period_end_hi)
+                StepCheck(
+                    "Названия колонок в шапке отчёта",
+                    "column_headers",
+                    soft_failures,
+                ).actual(
+                    column_headers
+                ).expected(LdsReportConst.EXPECTED_COLUMN_HEADERS).equal_to()
+
+        with allure.step("Проверка имени файла отчёта о режиме СОУ"):
+            with SoftAssertions() as soft_failures:
+                StepCheck(f"Имя файла оканчивается на {ReportConst.XLSX_EXTENSION}", "file_name", soft_failures).actual(
+                    has_xlsx_extension
+                ).expected(True).equal_to()
+                StepCheck(
+                    f"Имя файла содержит '{LdsReportConst.LDS_STATUS_REPORT_NAME_PART}'",
+                    "file_name",
+                    soft_failures,
+                ).contains(report_file_name_lower, lds_report_name_part_lower)
+                StepCheck(
+                    f"Имя файла содержит описание ТУ '{cfg.technological_unit.description}'",
+                    "file_name",
+                    soft_failures,
+                ).contains(report_file_name_lower, report_state.tu_description_lower)
+                StepCheck(
+                    "Дата начала периода в имени файла совпадает с фильтром запроса (+-1 мин)",
+                    "period_start_in_file_name",
+                    soft_failures,
+                ).actual(file_name_period_start).is_between(period_start_lo, period_start_hi)
+                StepCheck(
+                    "Дата конца периода в имени файла совпадает с фильтром запроса (+-1 мин)",
+                    "period_end_in_file_name",
+                    soft_failures,
+                ).actual(file_name_period_end).is_between(period_end_lo, period_end_hi)
+
+    except Exception:
+        with allure.step("Прикрепление xlsx отчёта к Allure при падении теста"):
+            if report_state.temp_file_path and report_state.report_file_name:
+                report_utils.attach_report_file_to_allure(report_state.temp_file_path, report_state.report_file_name)
+        raise
+
+    with allure.step("Проверка пуш-нотификации о готовности отчёта"):
+        notification = report_state.notification
+        notification_reply_status = notification.replyStatus if notification else None
+        notification_reply_content = notification.replyContent if notification else None
+        notification_export_status = notification_reply_content.exportStatus if notification_reply_content else None
+        notification_error_message = (
+            (notification_reply_content.errorMessage or "") if notification_reply_content else ""
+        )
+        with SoftAssertions() as soft_failures:
+            StepCheck("Получена пуш-нотификация о готовности отчёта", "notification", soft_failures).actual(
+                notification
+            ).is_not_none()
+            StepCheck("Проверка статуса пуш-нотификации", "replyStatus", soft_failures).actual(
+                notification_reply_status
+            ).expected(ReplyStatus.OK.value).equal_to()
+            StepCheck("Проверка наличия контента нотификации", "replyContent", soft_failures).actual(
+                notification_reply_content
+            ).is_not_none()
+            StepCheck("Проверка exportStatus в нотификации", "exportStatus", soft_failures).actual(
+                notification_export_status
+            ).expected(ExportStatus.DONE).equal_to()
+            StepCheck("В нотификации нет текста ошибки", "errorMessage", soft_failures).actual(
+                notification_error_message
+            ).is_empty()
+            
