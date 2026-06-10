@@ -731,6 +731,10 @@ async def poll_for_exported_file(
     return None
 
 
+def _normalize_report_text_for_match(text: str) -> str:
+    return text.lower().replace("ё", "е")
+
+
 def _normalize_report_period_datetime(value: datetime) -> datetime:
     """Приводит datetime периода отчёта к московскому времени без микросекунд."""
     return localize_as_moscow(value).replace(microsecond=0)
@@ -766,17 +770,17 @@ def find_matching_exported_item(
     """
     Ищет элемент списка по типу, подстрокам в имени (отчёт + ТУ) и периоду start/end с допуском.
     """
-    name_substring_lower = name_substring.lower()
-    tu_name_lower = tu_name_substring.lower()
+    name_substring_normalized = _normalize_report_text_for_match(name_substring)
+    tu_name_normalized = _normalize_report_text_for_match(tu_name_substring)
 
     matched_items = []
     for item in items:
         if item.exportedDataType != expected_data_type:
             continue
-        item_name_lower = (item.name or "").lower()
-        if name_substring_lower not in item_name_lower:
+        item_name_normalized = _normalize_report_text_for_match(item.name or "")
+        if name_substring_normalized not in item_name_normalized:
             continue
-        if tu_name_lower not in item_name_lower:
+        if tu_name_normalized not in item_name_normalized:
             continue
         if item.start is None or item.end is None:
             continue
