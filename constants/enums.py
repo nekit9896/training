@@ -453,4 +453,9 @@ class GravityPipe(Enum):
 
     def __str__(self):
         return f"{self.id} - {self.description}"
-        
+
+
+class MeasureConversionRule(Enum):
+    MPA_MEASURE = "MPA_MEASURE"
+    KG_CM_MEASURE = "KG_CM_MEASURE"
+    

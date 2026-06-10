@@ -5,6 +5,11 @@
 from constants.enums import StationaryStatus
 
 
+class MeasureUnitConstants:
+    MPA_MEASURE: str = "MPa"
+    KG_CM_MEASURE: str = "kgf/cm^2"
+
+
 class BaseTN3Constants:
     # ===== Константы для запросов журнала =====
     COLUMN_SELECTION_DEF = [

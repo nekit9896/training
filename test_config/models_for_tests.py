@@ -18,6 +18,7 @@ from constants.enums import (
     TU,
     ConfirmationStatus,
     LdsStatus,
+    MeasureConversionRule,
     RejectionCriteria,
     RejectionSensorTag,
     ReservedType,
@@ -46,6 +47,9 @@ class BaseSuiteConfig:
 
     # ===== Технологический участок =====
     technological_unit: TU = TU.TIKHORETSK_NOVOROSSIYSK_3
+
+    # ===== Правила конвертации единиц измерения давления на стенде =====
+    measure_conversion_rules: Optional[MeasureConversionRule] = None
 
     # ===== Общие константы (можно переопределить) =====
     allowed_distance_diff_meters: int = BaseTN3Constants.ALLOWED_DISTANCE_DIFF_METERS
