@@ -21,9 +21,9 @@ def conversion_rules_need_update(rules_json: dict[str, Any], rule: MeasureConver
     return any(signal.get("OriginUnit") == source_unit for signal in rules_json.get("Signals", []))
 
 
-def apply_measure_conversion_rule(rules_json: dict[str, Any], rule: MeasureConversionRule) -> tuple[dict[str, Any], int]:
+def apply_measure_conversion_rule(rules_json: dict[str, Any], rule: MeasureConversionRule) -> dict[str, Any]:
     """
-    Возвращает копию rules_json с заменой единиц давления и число заменённых сигналов.
+    Возвращает копию rules_json с заменой единиц давления.
 
     Замена строго по полному совпадению OriginUnit с исходной единицей давления
     (kgf/cm^2 <-> MPa). Остальные единицы (cSt, m^3/h, rpm и т.д.) не затрагиваются.
@@ -32,8 +32,7 @@ def apply_measure_conversion_rule(rules_json: dict[str, Any], rule: MeasureConve
     result = copy.deepcopy(rules_json)
 
     for signal in result.get("Signals", []):
-        origin_unit = signal.get("OriginUnit")
-        if origin_unit == source_unit:
+        if signal.get("OriginUnit") == source_unit:
             signal["OriginUnit"] = target_unit
-            
-    return result 
+
+    return result
