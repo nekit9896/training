@@ -350,3 +350,23 @@ class ClickHouseCmdGenerator(BaseCmdGenerator):
         Создает путь к файлу конфигурации конкретного стенда
         """
         return PurePosixPath(CH_const.CONFIG_PATH) / self._configuration_file_name
+
+
+class SignalUnitConversionCmdGenerator(BaseCmdGenerator):
+    def generate_scp_signal_rules_from_stand_cmd(self) -> str:
+        """
+        Генерирует команду копирования signal_unit_conversion_rules.json со стенда на runner
+        """
+        remote_path = self._generate_path_to_remote_signal_rules()
+        return f"{self._scp_cmd} {self._username}@{self._host}:{remote_path} ."
+
+    def generate_scp_signal_rules_to_stand_cmd(self, local_file_path: str) -> str:
+        """
+        Генерирует команду копирования локального файла на стенд 
+        """
+        remote_path = self._generate_path_to_remote_signal_rules()
+        return f"{self._scp_cmd} {local_file_path} {self._username}@{self._host}:{remote_path}"
+
+    @staticmethod
+    def _generate_path_to_remote_signal_rules() -> PurePosixPath:
+        return PurePosixPath(Im_const.CONFIG_PATH) / Im_const.SIGNAL_UNIT_CONVERSION_RULES_FILE_NAME
