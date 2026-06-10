@@ -1,25 +1,39 @@
+import copy
 from typing import Any
 
 from constants.enums import MeasureConversionRule
 from constants.test_constants import MeasureUnitConstants
 
 
-def apply_measure_conversion_rule(rules_json: dict[str, Any], rule: MeasureConversionRule) -> dict[str, Any]:
-    """
-    Заменяет единицы измерения давления в signal_unit_conversion_rules.json
-  согласно правилу набора данных.
-    """
+def _resolve_unit_mapping(rule: MeasureConversionRule) -> tuple[str, str]:
     if rule == MeasureConversionRule.MPA_MEASURE:
-        source_unit = MeasureUnitConstants.KG_CM_MEASURE
-        target_unit = MeasureUnitConstants.MPA_MEASURE
-    elif rule == MeasureConversionRule.KG_CM_MEASURE:
-        source_unit = MeasureUnitConstants.MPA_MEASURE
-        target_unit = MeasureUnitConstants.KG_CM_MEASURE
-    else:
-        raise ValueError(f"Неизвестное правило конвертации единиц измерения: {rule}")
+        return MeasureUnitConstants.KG_CM_MEASURE, MeasureUnitConstants.MPA_MEASURE
+    if rule == MeasureConversionRule.KG_CM_MEASURE:
+        return MeasureUnitConstants.MPA_MEASURE, MeasureUnitConstants.KG_CM_MEASURE
+    raise ValueError(f"Неизвестное правило конвертации единиц измерения: {rule}")
 
-    for signal in rules_json.get("Signals", []):
-        if signal.get("OriginUnit") == source_unit:
+
+def conversion_rules_need_update(rules_json: dict[str, Any], rule: MeasureConversionRule) -> bool:
+    """
+    Проверяет, есть ли в файле единицы давления, которые нужно заменить по правилу набора.
+    """
+    source_unit, _ = _resolve_unit_mapping(rule)
+    return any(signal.get("OriginUnit") == source_unit for signal in rules_json.get("Signals", []))
+
+
+def apply_measure_conversion_rule(rules_json: dict[str, Any], rule: MeasureConversionRule) -> tuple[dict[str, Any], int]:
+    """
+    Возвращает копию rules_json с заменой единиц давления и число заменённых сигналов.
+
+    Замена строго по полному совпадению OriginUnit с исходной единицей давления
+    (kgf/cm^2 <-> MPa). Остальные единицы (cSt, m^3/h, rpm и т.д.) не затрагиваются.
+    """
+    source_unit, target_unit = _resolve_unit_mapping(rule)
+    result = copy.deepcopy(rules_json)
+
+    for signal in result.get("Signals", []):
+        origin_unit = signal.get("OriginUnit")
+        if origin_unit == source_unit:
             signal["OriginUnit"] = target_unit
-
-    return rules_json
+            
+    return result 

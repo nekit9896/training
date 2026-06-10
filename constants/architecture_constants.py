@@ -21,7 +21,7 @@ class ImitatorConstants:
     STAND_ENV_NAMING: str = os.environ.get("STAND_NAME")[:-1]
     CONFIG_PATH: str = f"/data/{STAND_ENV_NAMING}/configs"
     SIGNAL_UNIT_CONVERSION_RULES_FILE_NAME: str = "signal_unit_conversion_rules.json"
-    SIGNAL_UNIT_CONVERSION_RULES_BACKUP_DIR: str = ".stand_backup"
+    SIGNAL_UNIT_CONVERSION_RULES_BACKUP_DIR: str = "original_conversion_rules"
     SOURCE_TYPE_DEF_VALUE: str = "inflow"
     SPEED_DEF_VALUE: int = 1
     NS_DEF_VALUE: int = 2

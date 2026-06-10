@@ -9,7 +9,10 @@ from constants.architecture_constants import ClickhouseConstants as CH_const
 from constants.architecture_constants import ImitatorConstants as Im_const
 from constants.enums import MeasureConversionRule
 from infra.cmd_generator import SignalUnitConversionCmdGenerator
-from utils.helpers.signal_unit_conversion_utils import apply_measure_conversion_rule
+from utils.helpers.signal_unit_conversion_utils import (
+    apply_measure_conversion_rule,
+    conversion_rules_need_update,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +20,8 @@ logger = logging.getLogger(__name__)
 class SignalUnitConversionManager:
     """
     Управляет signal_unit_conversion_rules.json на стенде:
-    - скачивает оригинал в backup перед прогоном набора
-    - подкладывает изменённую версию в CONFIG_PATH
+    - скачивает оригинал в original_conversion_rules/ перед прогоном набора
+    - подкладывает изменённую версию в CONFIG_PATH (имя на сервере не меняется)
     - восстанавливает оригинал в teardown
     """
 
@@ -32,13 +35,13 @@ class SignalUnitConversionManager:
         self._cmd_generator = SignalUnitConversionCmdGenerator(stand_client.username, stand_client.host)
         self._local_file = Path(Im_const.SIGNAL_UNIT_CONVERSION_RULES_FILE_NAME)
         self._backup_file = (
-            Path(Im_const.SIGNAL_UNIT_CONVERSION_RULES_BACKUP_DIR) / f"{self._local_file.name}.original"
+            Path(Im_const.SIGNAL_UNIT_CONVERSION_RULES_BACKUP_DIR) / Im_const.SIGNAL_UNIT_CONVERSION_RULES_FILE_NAME
         )
         self._modified = False
 
     def setup_signal_unit_conversion_rules(self) -> None:
         """
-        Скачивает оригинальный файл со стенда, сохраняет backup и загружает изменённую версию.
+        Скачивает файл со стенда, при необходимости меняет единицы и загружает обратно.
         """
         if self._measure_conversion_rule is None:
             logger.info("[SETUP] [SKIP] measure_conversion_rules не задан для набора данных")
@@ -46,8 +49,16 @@ class SignalUnitConversionManager:
 
         try:
             self._download_from_stand()
-            self._save_backup()
             rules_json = self._read_local_file()
+
+            if not conversion_rules_need_update(rules_json, self._measure_conversion_rule):
+                logger.info(
+                    "[SETUP] [OK] signal_unit_conversion_rules.json уже настроен корректно для набора данных "
+                    f"(правило {self._measure_conversion_rule.name})"
+                )
+                return
+
+            self._save_backup()
             modified_rules = apply_measure_conversion_rule(rules_json, self._measure_conversion_rule)
             self._write_local_file(modified_rules)
             self._upload_to_stand(self._local_file)
@@ -63,7 +74,7 @@ class SignalUnitConversionManager:
 
     def restore_signal_unit_conversion_rules(self) -> None:
         """
-        Возвращает оригинальный signal_unit_conversion_rules.json на стенд.
+        Возвращает оригинальный signal_unit_conversion_rules.json на стенд
         """
         if not self._modified:
             logger.info("[TEARDOWN] [SKIP] signal_unit_conversion_rules.json не изменялся")
@@ -71,7 +82,7 @@ class SignalUnitConversionManager:
 
         if not self._backup_file.exists():
             error_msg = (
-                "[TEARDOWN] [ERROR] Backup signal_unit_conversion_rules.json не найден: "
+                "[TEARDOWN] [ERROR] Оригинал signal_unit_conversion_rules.json не найден: "
                 f"{self._backup_file}"
             )
             logger.error(error_msg)
@@ -80,7 +91,10 @@ class SignalUnitConversionManager:
         try:
             self._upload_to_stand(self._backup_file)
             self._modified = False
-            logger.info("[TEARDOWN] [OK] signal_unit_conversion_rules.json восстановлен из backup")
+            logger.info(
+                "[TEARDOWN] [OK] signal_unit_conversion_rules.json восстановлен на стенде "
+                f"из {self._backup_file}"
+            )
         except Exception as error:
             error_msg = "[TEARDOWN] [ERROR] Ошибка при восстановлении signal_unit_conversion_rules.json"
             logger.exception(error_msg)
@@ -99,7 +113,7 @@ class SignalUnitConversionManager:
         shutil.copy2(self._local_file, self._backup_file)
 
     def _upload_to_stand(self, local_file: Path) -> None:
-        upload_cmd = self._cmd_generator.generate_scp_signal_rules_to_stand_cmd(local_file.name)
+        upload_cmd = self._cmd_generator.generate_scp_signal_rules_to_stand_cmd(local_file.as_posix())
         self._stand_client.run_cmd(upload_cmd, timeout=CH_const.LONG_PROCESS_TIMEOUT_S, use_ssh=False)
 
     def _read_local_file(self) -> dict[str, Any]:

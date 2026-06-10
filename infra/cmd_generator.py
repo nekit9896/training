@@ -360,12 +360,12 @@ class SignalUnitConversionCmdGenerator(BaseCmdGenerator):
         remote_path = self._generate_path_to_remote_signal_rules()
         return f"{self._scp_cmd} {self._username}@{self._host}:{remote_path} ."
 
-    def generate_scp_signal_rules_to_stand_cmd(self, local_file_name: str) -> str:
+    def generate_scp_signal_rules_to_stand_cmd(self, local_file_path: str) -> str:
         """
-        Генерирует команду копирования signal_unit_conversion_rules.json с runner на стенд
+        Генерирует команду копирования локального файла на стенд 
         """
         remote_path = self._generate_path_to_remote_signal_rules()
-        return f"{self._scp_cmd} {local_file_name} {self._username}@{self._host}:{remote_path}"
+        return f"{self._scp_cmd} {local_file_path} {self._username}@{self._host}:{remote_path}"
 
     @staticmethod
     def _generate_path_to_remote_signal_rules() -> PurePosixPath:
