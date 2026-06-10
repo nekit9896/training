@@ -245,3 +245,60 @@ class ExportLdsStatusReportConstants:
         r'(?P<period_end>\d{2}\.\d{2}\.\d{4} \d{2}_\d{2}_\d{2})'
         r'\.xlsx$'
     )
+
+
+class ExportRejectedReportConstants:
+    """Константы для теста формирования xlsx-отчёта об отбракованных входных данных"""
+
+    REJECTED_REPORT_NAME_PART: str = "Отчет об отбракованных входных данных"
+    REJECTED_REPORT_NAME_PART_ALT: str = "Отчёт об отбракованных входных данных"
+
+    REPORT_TITLE_ROW: int = 1
+    REPORT_COLUMN_HEADERS_ROW: int = 2
+    REPORT_DATA_FIRST_ROW: int = 3
+
+    COL_DATETIME: str = "Дата и время"
+    COL_OBJECT: str = "Объект"
+    COL_EVENT: str = "Событие"
+    COL_VALUE: str = "Значение"
+    COL_DURATION: str = "Продолжительность отбраковки"
+    COL_TAG: str = "Тег сигнала"
+
+    EXPECTED_COLUMN_HEADERS: list = [
+        COL_DATETIME,
+        COL_OBJECT,
+        COL_EVENT,
+        COL_VALUE,
+        COL_DURATION,
+        COL_TAG,
+    ]
+
+    REPORT_HEADER_PERIOD_PATTERN: str = (
+        r'[Оо]тч[её]т об отбракованных входных данных с '
+        r'(?P<period_start>\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2})'
+        r' по (?P<period_end>\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2})'
+    )
+    REPORT_FILE_NAME_PERIOD_PATTERN: str = (
+        r'^[Оо]тч[её]т об отбракованных входных данных (?P<tu>.+?) '
+        r'(?P<period_start>\d{2}\.\d{2}\.\d{4} \d{2}_\d{2}_\d{2})'
+        r' - '
+        r'(?P<period_end>\d{2}\.\d{2}\.\d{4} \d{2}_\d{2}_\d{2})'
+        r'\.xlsx$'
+    )
+
+    TIME_FILTER_TOLERANCE_SECONDS: int = 60
+
+    # Суффикс сигнала в колонке «Объект» отчёта (после последней точки в строке)
+    REPORT_SIGNAL_FLOW: str = "Расход"
+    REPORT_SIGNAL_PRESSURE: str = "Давление"
+    REPORT_SIGNAL_SUFFIX_BY_EXPECTED_NAME: dict = {
+        BaseTN3Constants.JOURNAL_SIGNAL_FLOW: REPORT_SIGNAL_FLOW,
+        BaseTN3Constants.JOURNAL_SIGNAL_PRESSURE: REPORT_SIGNAL_PRESSURE,
+    }
+
+    # Разбор колонки «Объект»: участок трубопровода и суффикс сигнала разделяются последней точкой
+    OBJECT_SIGNAL_SEPARATOR: str = "."
+    OBJECT_SIGNAL_RSPLIT_MAXSPLIT: int = 1
+
+    REJECTED_REPORT_HEADER_TITLE_PART: str = "отчет об отбракованных входных данных с"
+    REJECTED_REPORT_HEADER_TITLE_PART_ALT: str = "отчёт об отбракованных входных данных с"

@@ -57,6 +57,23 @@ def _generate_rejection_params() -> List[Any]:
 REJECTION_PARAMS: List[Any] = _generate_rejection_params()
 
 
+def _generate_suite_params() -> List[Any]:
+    """Генерирует параметры для suite-level тестов отбраковки (один параметр на набор)."""
+    params = []
+    for config in ALL_IS_REJECTED_CONFIGS:
+        params.append(
+            pytest.param(
+                config,
+                id=config.suite_name,
+                marks=_get_suite_markers(config),
+            )
+        )
+    return params
+
+
+SUITE_PARAMS: List[Any] = _generate_suite_params()
+
+
 # ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
 
 
@@ -199,3 +216,44 @@ class TestIsRejectedScenarios:
             ),
         )
         await scenarios.rejection_scheme_signals_state(ws_client, config, rejection_case)
+
+
+@pytest.mark.parametrize("config", SUITE_PARAMS)
+class TestIsRejectedReport:
+    """Suite-level тест общего отчёта по отбраковкам"""
+
+    @pytest.mark.asyncio
+    async def test_rejection_report(
+        self,
+        ws_client: WebSocketClient,
+        config: IsRejectedConfig,
+        imitator_start_time: datetime,
+    ) -> None:
+        """[ExportReports] Проверка общего отчёта об отбракованных входных данных"""
+        tag = "ExportReports"
+        title = (
+            f"[{tag}] Проверка общего отчёта об отбракованных входных данных. "
+            f"ЭФ: Выпадашка отчётов"
+        )
+        _apply_allure_markers(
+            config.rejection_report_test,
+            tag,
+            title,
+            (
+                f"Проверка формирования и содержимого xlsx-отчёта об отбракованных входных данных "
+                f"на наборе данных {config.suite_name},\n"
+                f"на технологическом участке {config.technological_unit.description}\n"
+                f"Период отчёта: от старта имитатора до старта + "
+                f"{config.rejection_report_test.offset} мин.\n"
+                "Этапы сценария:\n"
+                "1) SubscribeReportsDataExportedRequest - подписка на пуш-нотификации\n"
+                "2) ExportReportsCommandRequest - запрос формирования отчёта (тип RejectedReport)\n"
+                "3) Ожидание ReportDataExportedNotification\n"
+                "4) Лонг-поллинг GetExportedDataListRequest - поиск отчёта в списке\n"
+                "5) DownloadExportedDataRequest (StreamInvocation) - скачивание по exportedDataId\n"
+                "6) Проверка xlsx: шапка, колонки, строки по каждому RejectionTestCase из набора\n"
+                "7) Проверка имени файла (.xlsx, название отчёта, ТУ, период +-1 мин)\n"
+                "Во вложениях Allure xlsx прикладывается только при падении теста"
+            ),
+        )
+        await scenarios.export_rejection_report(ws_client, config, imitator_start_time)

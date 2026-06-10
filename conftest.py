@@ -198,6 +198,11 @@ IS_REJECTED_LEVEL_TEST_MAPPING = {
     'test_rejection_scheme_signals_state': 'rejection_scheme_signals_state_test',
 }
 
+# Suite-level тесты отбраковки (маркеры из IsRejectedConfig - параметр config)
+IS_REJECTED_SUITE_LEVEL_MAPPING = {
+    'test_rejection_report': 'rejection_report_test',
+}
+
 # Мержим все вместе чтобы не переписывать логику коллектора айтемов (тестов)
 SUITE_LEVEL_TEST_MAPPING = {**SMOKE_SUITE_LEVEL_MAPPING, **LDS_STATUS_SUITE_LEVEL_MAPPING}
 
@@ -227,6 +232,12 @@ def _get_test_markers_config(item, test_name):
         rejection_case = params['rejection_case']
         attr_name = IS_REJECTED_LEVEL_TEST_MAPPING[test_name]
         return getattr(rejection_case, attr_name, None)
+
+    # Suite-level тесты отбраковки (без rejection_case)
+    if 'config' in params and 'rejection_case' not in params and test_name in IS_REJECTED_SUITE_LEVEL_MAPPING:
+        suite_config = params['config']
+        attr_name = IS_REJECTED_SUITE_LEVEL_MAPPING[test_name]
+        return getattr(suite_config, attr_name, None)
 
     # Для suite-level тестов берём из config
     if 'config' in params:
@@ -288,6 +299,7 @@ def pytest_collection_modifyitems(session, config, items):
             test_name in SUITE_LEVEL_TEST_MAPPING
             or test_name in LEAK_LEVEL_TEST_MAPPING
             or test_name in IS_REJECTED_LEVEL_TEST_MAPPING
+            or test_name in IS_REJECTED_SUITE_LEVEL_MAPPING
         ):  # noqa: E501
             # Конфиг теста = None - исключаем тест из прогона
             deselected_items.append(item)

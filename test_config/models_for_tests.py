@@ -413,6 +413,19 @@ class RejectionTestCase:
 
 
 @dataclass
+class RejectionReportRow:
+    """Разобранная строка отчёта об отбракованных входных данных."""
+
+    row_index: int
+    datetime_value: Optional[datetime] = None
+    object_value: str = ""
+    event_value: str = ""
+    value_text: str = ""
+    duration_seconds: int = 0
+    tag_value: str = ""
+
+
+@dataclass
 class IsRejectedConfig(BaseSuiteConfig):
     """
     Конфигурация тестового набора отбраковки сигналов.
@@ -424,6 +437,7 @@ class IsRejectedConfig(BaseSuiteConfig):
 
     main_pipeline: str = ""
     rejection_cases: list[RejectionTestCase] = field(default_factory=list)
+    rejection_report_test: Optional[CaseMarkers] = None
 
 
 @dataclass
@@ -454,6 +468,38 @@ class ExportLeaksReportState:
     title_info: Optional[ReportTitleInfo] = None
     data_rows: list[LeakReportRow] = field(default_factory=list)
     target_row: Optional[LeakReportRow] = None
+
+
+@dataclass
+class ExportRejectedReportState:
+    """
+    Состояние сценария формирования xlsx-отчёта об отбракованных входных данных.
+    Поля с префиксом expected_ - из конфигурации теста, actual_ - из ответов бэка и разбора xlsx.
+    """
+
+    # --- expected: конфигурация теста и расчётные ожидания ---
+    expected_report_test: Optional[CaseMarkers] = None
+    expected_period_start: Optional[datetime] = None
+    expected_period_end: Optional[datetime] = None
+    expected_period_start_naive: Optional[datetime] = None
+    expected_period_end_naive: Optional[datetime] = None
+    expected_tu_description_lower: str = ""
+    expected_file_name: str = ""
+
+    # --- actual: ответы бэка ---
+    actual_time_offset_hours: Optional[int] = None
+    actual_notification: Optional[ReportDataExportedNotification] = None
+    actual_report_item: Optional[ExportedDataItem] = None
+    actual_download_invocation_id: Optional[str] = None
+    actual_download_reply: Optional[DownloadExportedDataReply] = None
+    actual_file_bytes: Optional[bytes] = None
+
+    # --- actual: разбор xlsx ---
+    actual_temp_file_path: Optional[Path] = None
+    actual_worksheet: Any = None
+    actual_title_info: Optional[ReportTitleInfo] = None
+    actual_data_rows: list[RejectionReportRow] = field(default_factory=list)
+    actual_monitored_tag_rows: list[RejectionReportRow] = field(default_factory=list)
 
 
 @dataclass

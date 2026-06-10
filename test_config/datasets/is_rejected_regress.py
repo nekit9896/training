@@ -38,6 +38,7 @@ IS_REJECTED_REGRESS_CONFIG = IsRejectedConfig(
     archive_name=ARCHIVE_NAME,
     technological_unit=TECHNOLOGICAL_UNIT,
     main_pipeline=MAIN_PIPELINE,
+    rejection_report_test=CaseMarkers(test_case_id="210", offset=70),
     rejection_cases=[
         # ===== emptyFilterSettings =====
         RejectionTestCase(
