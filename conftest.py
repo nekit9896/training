@@ -16,7 +16,7 @@ from constants.architecture_constants import ImitatorConstants as ImConst
 from constants.architecture_constants import WebSocketClientConstants as WSCliConst
 from constants.enums import RejectionSensorTag
 from infra.stand_setup_manager import StandSetupManager
-from test_config.datasets import ALL_SMOKE_CONFIGS
+from test_config.datasets import ALL_SMOKE_CONFIGS, get_config_by_name
 
 
 def pytest_addoption(parser):
@@ -33,10 +33,10 @@ def pytest_addoption(parser):
 
 def _find_config_by_suite_name(suite_name: str):
     """Находит конфиг по имени набора данных."""
-    for config in ALL_SMOKE_CONFIGS:
-        if config.suite_name == suite_name:
-            return config
-    return None
+    try:
+        return get_config_by_name(suite_name)
+    except ValueError:
+        return None
 
 
 @pytest.fixture(autouse=True)
@@ -432,6 +432,13 @@ def pytest_runtest_setup(item):
         # stop old
         if stand_manager := cfg["stand_manager"]:
             stand_manager.stop_imitator_wrapper()
+            try:
+                stand_manager.restore_signal_unit_conversion_rules()
+            except Exception:
+                logger.exception(
+                    "[ERROR] [SETUP] Ошибка при восстановлении signal_unit_conversion_rules.json "
+                    "перед запуском нового набора"
+                )
             if not os.environ.get("RUN_WITHOUT_TESTOPS", "False").lower() == "true":
                 # При запуске с TestOps удаляет данные прогона
                 stand_manager.server_test_data_remover()
@@ -446,8 +453,17 @@ def pytest_runtest_setup(item):
 
         imitator_duration = compute_imitator_duration(item, current_test_suite)
 
+        suite_config = _find_config_by_suite_name(current_test_suite)
+        measure_conversion_rules = (
+            suite_config.measure_conversion_rules if suite_config is not None else None
+        )
+
         stand_manager = StandSetupManager(
-            duration_m=imitator_duration, test_data_id=data_id, test_data_name=test_data_name, tu_id=tu_id
+            duration_m=imitator_duration,
+            test_data_id=data_id,
+            test_data_name=test_data_name,
+            tu_id=tu_id,
+            measure_conversion_rules=measure_conversion_rules,
         )
         cfg["stand_manager"] = stand_manager
         try:
@@ -505,6 +521,12 @@ def pytest_runtest_teardown(item, nextitem):
     if next_suite != cfg["current_suite"]:
         if stand_manager := cfg["stand_manager"]:
             stand_manager.stop_imitator_wrapper()
+            try:
+                stand_manager.restore_signal_unit_conversion_rules()
+            except Exception:
+                logger.exception(
+                    "[ERROR] [TEARDOWN] Ошибка при восстановлении signal_unit_conversion_rules.json"
+                )
             if not os.environ.get("RUN_WITHOUT_TESTOPS", "False").lower() == "true":
                 # При запуске с TestOps удаляет данные прогона
                 stand_manager.server_test_data_remover()
@@ -606,6 +628,12 @@ def pytest_sessionfinish(session, exitstatus):
                 stand_manager.stop_imitator_wrapper()
             except Exception:
                 logger.exception("[ERROR] [TEARDOWN] Ошибка при остановке имитатора")
+            try:
+                stand_manager.restore_signal_unit_conversion_rules()
+            except Exception:
+                logger.exception(
+                    "[ERROR] [TEARDOWN] Ошибка при восстановлении signal_unit_conversion_rules.json"
+                )
             try:
                 stand_manager.server_test_data_remover()
             except Exception:
