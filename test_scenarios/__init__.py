@@ -29,4 +29,5 @@ __all__ = [
     scenarios.output_signals,
     scenarios.export_leaks_report,
     scenarios.export_lds_status_report,
+    scenarios.export_mt_mode_report,
 ]

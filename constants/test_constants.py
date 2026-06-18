@@ -247,6 +247,66 @@ class ExportLdsStatusReportConstants:
     )
 
 
+class ExportMtModeReportConstants:
+    """Константы для теста формирования xlsx-отчёта о режиме работы МТ"""
+
+    MT_MODE_REPORT_NAME_PART: str = "Отчет о режиме работы МТ"
+    SECTION_NAMES: list[str] = [
+        "НПС-5 Тихорецкая - НПС-3 Нововеличковская",
+        "НПС-3 Нововеличковская - НПС-2 Крымская",
+        "НПС-2 Крымская - НПС Грушовая",
+    ]
+    TOTAL_WORK_DURATION_LABEL: str = "Суммарное время работы:"
+    ZERO_DURATION_TEXT: str = "0:00:00"
+    TOTAL_DURATION_TOLERANCE_SECONDS: int = 5
+    DURATION_PARTS_COUNT_H_MM_SS: int = 3
+    DURATION_PARTS_COUNT_MM_SS: int = 2
+
+    REPORT_TITLE_ROW: int = 1
+    REPORT_COLUMN_HEADERS_ROW: int = 2
+    REPORT_DATA_FIRST_ROW: int = 3
+
+    COL_SECTION: str = "Наименование участка"
+    COL_STOPPED: str = "Остановленный"
+    COL_UNSTATIONARY: str = "Нестационарный"
+    COL_STATIONARY: str = "Стационарный"
+
+    MODE_DURATION_COLUMNS: list = [
+        COL_STOPPED,
+        COL_UNSTATIONARY,
+        COL_STATIONARY,
+    ]
+
+    EXPECTED_COLUMN_HEADERS: list = [COL_SECTION, *MODE_DURATION_COLUMNS]
+
+    STATIONARY_STATUS_TO_COLUMN: dict = {
+        StationaryStatus.STOPPED.value: COL_STOPPED,
+        StationaryStatus.UNSTATIONARY.value: COL_UNSTATIONARY,
+        StationaryStatus.STATIONARY.value: COL_STATIONARY,
+    }
+
+    REPORT_HEADER_PERIOD_PATTERN: str = (
+        r'Отчет о режиме работы МТ с (?P<period_start>\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2})'
+        r' по (?P<period_end>\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2})'
+    )
+    REPORT_FILE_NAME_PERIOD_PATTERN: str = (
+        r'^Отчет о режиме работы МТ\. (?P<tu>.+?) '
+        r'(?P<period_start>\d{2}\.\d{2}\.\d{4} \d{2}_\d{2}_\d{2})'
+        r' - '
+        r'(?P<period_end>\d{2}\.\d{2}\.\d{4} \d{2}_\d{2}_\d{2})'
+        r'\.xlsx$'
+    )
+
+    CHART_TITLE_ROW: int = 2
+    CHART_TITLE_COLUMN: int = 6
+    CHART_FORMULA_ROW: int = 3
+    CHART_FORMULA_COLUMN: int = 9
+    CHART_TITLE_PREFIX: str = "Режим работы МТ"
+    CHART_DATA_SHEET_NAME: str = "Режим работы МТ"
+    CHART_CATEGORY_RANGE: str = "$B$2:$D$2"
+    CHART_VALUES_RANGE: str = "$I$5:$L$5"
+
+
 class ExportRejectedReportConstants:
     """Константы для теста формирования xlsx-отчёта об отбракованных входных данных"""
 

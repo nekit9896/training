@@ -105,21 +105,26 @@ def format_duration_seconds(total_seconds: int) -> str:
     return f"{hours}:{minutes:02d}:{seconds:02d}"
 
 
-def _find_total_work_duration(worksheet: Worksheet) -> Tuple[Optional[int], str, Optional[int]]:
+def find_total_work_duration(
+    worksheet: Worksheet,
+    *,
+    data_first_row: int,
+    total_work_duration_label: str,
+) -> Tuple[Optional[int], str, Optional[int]]:
     """
-    Ищет строку "Суммарное время работы:" и парсит длительность рядом (в той же или следующей строке).
+    Ищет строку «Суммарное время работы:» и парсит длительность рядом.
 
-    Возвращает: (секунды, сырое значение ячейки, номер строки с меткой) или (None, "", None).
+    Возвращает (секунды, сырое значение ячейки, номер строки с меткой) или (None, "", None).
     """
     for row_index, row_values in enumerate(
-        worksheet.iter_rows(min_row=LdsReportConst.REPORT_DATA_FIRST_ROW, values_only=True),
-        start=LdsReportConst.REPORT_DATA_FIRST_ROW,
+        worksheet.iter_rows(min_row=data_first_row, values_only=True),
+        start=data_first_row,
     ):
         for column_index, cell_value in enumerate(row_values):
             if cell_value is None:
                 continue
             cell_text = _stringify_cell(cell_value).strip()
-            if LdsReportConst.TOTAL_WORK_DURATION_LABEL not in cell_text:
+            if total_work_duration_label not in cell_text:
                 continue
 
             duration_candidates = []
@@ -138,6 +143,19 @@ def _find_total_work_duration(worksheet: Worksheet) -> Tuple[Optional[int], str,
             return None, "", row_index
 
     return None, "", None
+
+
+def _find_total_work_duration(worksheet: Worksheet) -> Tuple[Optional[int], str, Optional[int]]:
+    """
+    Ищет строку "Суммарное время работы:" и парсит длительность рядом (в той же или следующей строке).
+
+    Возвращает: (секунды, сырое значение ячейки, номер строки с меткой) или (None, "", None).
+    """
+    return find_total_work_duration(
+        worksheet,
+        data_first_row=LdsReportConst.REPORT_DATA_FIRST_ROW,
+        total_work_duration_label=LdsReportConst.TOTAL_WORK_DURATION_LABEL,
+    )
 
 
 def parse_lds_status_report_worksheet(
@@ -193,20 +211,6 @@ def parse_lds_status_report_worksheet(
         total_duration_raw=total_duration_raw,
         total_label_row_index=total_label_row_index,
     )
-
-
-def format_section_rows_for_allure(section_rows: List[LdsStatusReportSectionRow]) -> str:
-    lines = []
-    for row in section_rows:
-        durations_text = ", ".join(
-            f"{column}={format_duration_seconds(seconds)}"
-            for column, seconds in row.mode_durations_seconds.items()
-        )
-        lines.append(
-            f"row#{row.row_index}: {row.section_name} | sum={format_duration_seconds(row.modes_sum_seconds)} | "
-            f"{durations_text}"
-        )
-    return "\n".join(lines)
 
 
 __all__ = [

@@ -187,6 +187,7 @@ class LeakTestConfig:
     balance_algorithm_leak_completed_test: Optional[CaseMarkers] = None
     export_leaks_report_test: Optional[CaseMarkers] = None
     export_lds_status_report_test: Optional[CaseMarkers] = None
+    export_mt_mode_report_test: Optional[CaseMarkers] = None
 
     @property
     def leak_diagnostic_area_id(self) -> Optional[int]:
@@ -522,3 +523,35 @@ class ExportLdsStatusReportState:
     temp_file_path: Optional[Path] = None
     worksheet: Any = None
     parsed_report: Any = None
+
+
+@dataclass
+class ExportMtModeReportState:
+    """
+    Состояние сценария формирования xlsx-отчёта о режиме работы МТ.
+    Поля с префиксом expected_ - из конфигурации теста, actual_ - из ответов бэка и разбора xlsx.
+    """
+
+    # --- expected: конфигурация теста и расчётные ожидания ---
+    expected_report_test: Optional[CaseMarkers] = None
+    expected_period_start: Optional[datetime] = None
+    expected_period_end: Optional[datetime] = None
+    expected_period_start_naive: Optional[datetime] = None
+    expected_period_end_naive: Optional[datetime] = None
+    expected_tu_description_lower: str = ""
+    expected_file_name: str = ""
+    expected_section_names: list[str] = field(default_factory=list)
+    expected_dominant_mode_column: str = ""
+
+    # --- actual: ответы бэка ---
+    actual_time_offset_hours: Optional[int] = None
+    actual_notification: Optional[ReportDataExportedNotification] = None
+    actual_report_item: Optional[ExportedDataItem] = None
+    actual_download_invocation_id: Optional[str] = None
+    actual_download_reply: Optional[DownloadExportedDataReply] = None
+    actual_file_bytes: Optional[bytes] = None
+
+    # --- actual: разбор xlsx ---
+    actual_temp_file_path: Optional[Path] = None
+    actual_worksheet: Any = None
+    actual_parsed_report: Any = None

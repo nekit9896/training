@@ -30,17 +30,20 @@ from constants.enums import (
 )
 from constants.test_constants import BaseTN3Constants as TestConst
 from constants.test_constants import ExportLdsStatusReportConstants as LdsReportConst
+from constants.test_constants import ExportMtModeReportConstants as MtReportConst
 from constants.test_constants import ExportReportConstants as ReportConst
 from models.get_messages_model import Filtering, FilteringObjects, Pagination
 from test_config.models_for_tests import (
     CaseData,
     ExportLdsStatusReportState,
     ExportLeaksReportState,
+    ExportMtModeReportState,
     LDSStatusConfig,
     LeakTestConfig,
     SmokeSuiteConfig,
 )
 from utils.helpers import lds_status_report_xlsx_utils as lds_report_utils
+from utils.helpers import mt_mode_report_xlsx_utils as mt_report_utils
 from utils.helpers import report_xlsx_utils as report_utils
 from utils.helpers import ws_test_utils as t_utils
 from utils.helpers.asserts import SoftAssertions, StepCheck
@@ -3394,4 +3397,424 @@ async def export_lds_status_report(
             StepCheck("В нотификации нет текста ошибки", "errorMessage", soft_failures).actual(
                 notification_error_message
             ).is_empty()
-            
+
+
+async def export_mt_mode_report(
+    ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time: datetime
+):
+    """
+    Сценарий формирования xlsx-отчёта о режиме работы МТ.
+
+    Этапы:
+    1. Подписка SubscribeReportsDataExportedRequest на пуш-нотификации.
+    2. Отправка ExportReportsCommandRequest (тип StationaryStatusReport, фильтр по периоду).
+    3. Ожидание ReportDataExportedNotification о готовности отчёта.
+    4. Лонг-поллинг GetExportedDataListRequest до появления отчёта в списке.
+    5. DownloadExportedDataRequest и получение fileChunk.
+    6. Проверка xlsx: участки, длительности режимов МТ, доминирующий режим, диаграмма.
+    7. Проверка двойной шапки и имени файла.
+
+    Скачанный файл удаляется по завершению, прикладывается к Allure только при падении теста.
+    """
+    report_state = ExportMtModeReportState()
+
+    with allure.step("Подготовка параметров сценария формирования отчёта о режиме работы МТ"):
+        report_state.expected_report_test = leak.export_mt_mode_report_test
+        StepCheck("В конфигурации задан export_mt_mode_report_test", "export_mt_mode_report_test").actual(
+            report_state.expected_report_test
+        ).is_not_none()
+
+        report_state.expected_period_start = t_utils.localize_as_moscow(imitator_start_time)
+        report_state.expected_period_end = t_utils.localize_as_moscow(
+            imitator_start_time + timedelta(minutes=report_state.expected_report_test.offset)
+        )
+        report_state.expected_period_start_naive = report_utils.normalize_report_period_naive(
+            report_state.expected_period_start
+        )
+        report_state.expected_period_end_naive = report_utils.normalize_report_period_naive(
+            report_state.expected_period_end
+        )
+        report_state.expected_tu_description_lower = cfg.technological_unit.description.lower()
+        report_state.expected_section_names = list(MtReportConst.SECTION_NAMES)
+        report_state.expected_dominant_mode_column = MtReportConst.STATIONARY_STATUS_TO_COLUMN.get(
+            leak.expected_report_stationary_status
+        )
+        report_state.expected_file_name = report_utils.build_export_report_file_name(
+            cfg.technological_unit.description,
+            report_state.expected_period_start,
+            report_state.expected_period_end,
+            MtReportConst.MT_MODE_REPORT_NAME_PART,
+            ". ",
+        )
+
+        time_offset_hours = t_utils.report_time_offset_hours()
+        StepCheck(
+            f"Смещение timeOffset для запросов отчёта (часовой пояс {TestConst.ZONE_INFO})",
+            "time_offset_hours",
+        ).actual(time_offset_hours).is_not_none()
+        report_state.actual_time_offset_hours = time_offset_hours
+
+        StepCheck(
+            "Для набора задан ожидаемый доминирующий режим МТ",
+            "expected_dominant_mode_column",
+        ).actual(report_state.expected_dominant_mode_column).is_not_none()
+
+        allure.attach(
+            f"period.start={report_state.expected_period_start}\n"
+            f"period.end={report_state.expected_period_end}\n"
+            f"offset_minutes={report_state.expected_report_test.offset}\n"
+            f"sections={report_state.expected_section_names}\n"
+            f"expected_dominant_mode_column={report_state.expected_dominant_mode_column}",
+            name="Фильтр периода отчёта о режиме МТ",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+    with allure.step(f"Этап 1. Подписка на пуш-нотификации {ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST}"):
+        await t_utils.connect(ws_client, ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST, [])
+
+    with allure.step(f"Этап 2. Запрос формирования отчёта {ReportConst.EXPORT_REPORTS_COMMAND_REQUEST}"):
+        request_payload = {
+            "tuId": cfg.tu_id,
+            "exportedDataTypes": [ExportedDataType.STATIONARY_STATUS_REPORT.value],
+            "timeOffset": report_state.actual_time_offset_hours,
+            "period": {
+                "start": t_utils.datetime_to_msgpack_timestamp(report_state.expected_period_start),
+                "end": t_utils.datetime_to_msgpack_timestamp(report_state.expected_period_end),
+                "additionalProperties": {},
+            },
+        }
+        await t_utils.connect(ws_client, ReportConst.EXPORT_REPORTS_COMMAND_REQUEST, request_payload)
+
+    with allure.step(
+        f"Этап 3. Ожидание пуш-нотификации {ReportConst.REPORT_DATA_EXPORTED_NOTIFICATION} о готовности отчёта"
+    ):
+        report_state.actual_notification = await t_utils.poll_for_report_export_notification(
+            ws_client=ws_client,
+            parser=parser,
+            total_wait_seconds=ReportConst.NOTIFICATION_TIMEOUT_SECONDS,
+            poll_interval_seconds=ReportConst.LIST_POLL_INTERVAL_SECONDS,
+        )
+
+    with allure.step(f"Этап 4. Лонг-поллинг {ReportConst.GET_EXPORTED_DATA_LIST_REQUEST} до появления отчёта в списке"):
+        report_state.actual_report_item = await t_utils.poll_for_exported_file(
+            ws_client=ws_client,
+            parser=parser,
+            list_limit=ReportConst.EXPORTED_DATA_LIST_LIMIT,
+            expected_data_type=ExportedDataType.STATIONARY_STATUS_REPORT,
+            name_substring=MtReportConst.MT_MODE_REPORT_NAME_PART,
+            tu_name_substring=cfg.technological_unit.description,
+            period_start=report_state.expected_period_start,
+            period_end=report_state.expected_period_end,
+            total_wait_seconds=ReportConst.LIST_POLL_TOTAL_WAIT_SECONDS,
+            poll_interval_seconds=ReportConst.LIST_POLL_INTERVAL_SECONDS,
+        )
+
+    with allure.step("Подготовка данных найденного отчёта в списке"):
+        report_item = report_state.actual_report_item
+        if report_item is not None:
+            allure.attach(
+                f"id={report_item.id}, name={report_item.name}, "
+                f"exportedDataType={report_item.exportedDataType}, "
+                f"start={t_utils.format_datetime_moscow(report_item.start)}, "
+                f"end={t_utils.format_datetime_moscow(report_item.end)}",
+                name="Найденный отчёт в списке",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+
+    with allure.step("Проверка: отчёт найден в списке сформированных файлов"):
+        StepCheck("Отчёт найден в списке сформированных файлов", "report_item").actual(
+            report_state.actual_report_item
+        ).is_not_none()
+
+    with allure.step(
+        f"Этап 5. Streaming-вызов {ReportConst.DOWNLOAD_EXPORTED_DATA_REQUEST} "
+        f"по id={report_state.actual_report_item.id}"
+    ):
+        download_request = {
+            "exportedDataId": report_state.actual_report_item.id,
+            "exportedDataType": ExportedDataType.STATIONARY_STATUS_REPORT.to_download_name(),
+            "additionalProperties": None,
+            "timeOffset": report_state.actual_time_offset_hours,
+        }
+        download_purpose = (
+            f"скачивание xlsx-отчёта о режиме МТ (exportedDataId={report_state.actual_report_item.id}) "
+            f"после формирования отчёта и выбора файла в списке GetExportedDataListRequest"
+        )
+        await t_utils.connect_stream(
+            ws_client,
+            ReportConst.DOWNLOAD_EXPORTED_DATA_REQUEST,
+            download_request,
+            purpose=download_purpose,
+        )
+        report_state.actual_download_invocation_id = ws_client.invocation_id
+
+    with allure.step("Этап 6. Получение fileChunk - скачивание отчёта о режиме МТ"):
+        report_state.actual_download_reply = await t_utils.receive_download_exported_data_reply(
+            ws_client=ws_client,
+            parser=parser,
+            invocation_id=report_state.actual_download_invocation_id,
+            request_name=ReportConst.DOWNLOAD_EXPORTED_DATA_REQUEST,
+            total_wait_seconds=ReportConst.DOWNLOAD_TIMEOUT_SECONDS,
+            purpose=download_purpose,
+        )
+
+    with allure.step("Извлечение данных ответа на скачивание"):
+        download_reply = report_state.actual_download_reply
+        download_reply_status = download_reply.replyStatus
+        has_download_reply_content = download_reply.replyContent is not None
+        report_state.actual_file_bytes = download_reply.replyContent.fileChunk if has_download_reply_content else None
+        is_xlsx_signature = (
+            report_utils.is_xlsx_file_bytes(report_state.actual_file_bytes)
+            if report_state.actual_file_bytes
+            else False
+        )
+
+    with allure.step("Проверка ответа на скачивание и формата xlsx"):
+        StepCheck("Проверка статуса ответа на скачивание", "replyStatus").actual(download_reply_status).expected(
+            ReplyStatus.OK.value
+        ).equal_to()
+        StepCheck("Проверка наличия контента ответа на скачивание", "replyContent").actual(
+            has_download_reply_content
+        ).expected(True).equal_to()
+        StepCheck("Проверка наличия байт файла", "fileChunk").actual(report_state.actual_file_bytes).is_not_empty()
+        StepCheck("Проверка xlsx (zip) сигнатуры файла", "file_signature").actual(is_xlsx_signature).expected(
+            True
+        ).equal_to()
+
+    with allure.step("Подготовка данных для проверки имени файла отчёта"):
+        report_file_name = report_state.expected_file_name
+        report_file_name_lower = report_file_name.lower()
+        file_name_period_start, file_name_period_end = report_utils.parse_period_from_export_file_name(
+            report_file_name,
+            MtReportConst.REPORT_FILE_NAME_PERIOD_PATTERN,
+        )
+        period_start_lo, period_start_hi, period_end_lo, period_end_hi = report_utils.report_period_comparison_bounds(
+            report_state.expected_period_start_naive,
+            report_state.expected_period_end_naive,
+        )
+        has_xlsx_extension = report_utils.is_xlsx_extension(report_file_name)
+        mt_report_name_part_lower = MtReportConst.MT_MODE_REPORT_NAME_PART.lower()
+
+    try:
+        with allure.step("Этап 7. Сохранение и разбор xlsx-отчёта о режиме МТ"):
+            report_state.actual_temp_file_path = report_utils.save_report_bytes_to_temp_file(
+                report_state.actual_file_bytes,
+                prefix="mt_mode_report_",
+            )
+            StepCheck("Временный xlsx файл создан", "temp_file_path").actual(
+                report_state.actual_temp_file_path
+            ).is_not_none()
+            report_state.actual_worksheet = report_utils.load_report_worksheet(report_state.actual_temp_file_path)
+            report_state.actual_parsed_report = mt_report_utils.parse_mt_mode_report_worksheet(
+                report_state.actual_worksheet,
+                report_state.expected_section_names,
+                source_file_path=report_state.actual_temp_file_path,
+            )
+            parsed_report = report_state.actual_parsed_report
+            allure.attach(
+                f"Шапка (raw): {parsed_report.title_info.raw_title}\n"
+                f"period_start: {parsed_report.title_info.period_start}\n"
+                f"period_end: {parsed_report.title_info.period_end}\n"
+                f"total_duration: {parsed_report.total_duration_raw}\n"
+                f"chart_title: {parsed_report.chart_title_raw}\n"
+                f"chart_formula: {parsed_report.chart_series_formula}",
+                name="Шапка отчёта о режиме МТ",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+            allure.attach(
+                mt_report_utils.format_section_rows_for_allure(parsed_report.section_rows),
+                name="Строки участков отчёта",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+
+        with allure.step("Подготовка данных таблицы отчёта для проверки"):
+            parsed_report = report_state.actual_parsed_report
+            section_rows = parsed_report.section_rows
+            total_duration_seconds = parsed_report.total_duration_seconds
+            duration_tolerance = MtReportConst.TOTAL_DURATION_TOLERANCE_SECONDS
+            mode_totals = mt_report_utils.sum_duration_columns_across_rows(
+                section_rows,
+                MtReportConst.MODE_DURATION_COLUMNS,
+            )
+
+        with allure.step("Проверка содержимого таблицы отчёта о режиме МТ"):
+            StepCheck("Лист xlsx открыт", "worksheet").actual(report_state.actual_worksheet).is_not_none()
+            with SoftAssertions() as soft_failures:
+                StepCheck(
+                    "Количество строк участков в отчёте",
+                    "section_rows_count",
+                    soft_failures,
+                ).actual(len(section_rows)).expected(len(report_state.expected_section_names)).equal_to()
+
+                for section_index, expected_section_name in enumerate(report_state.expected_section_names):
+                    actual_section_name = (
+                        section_rows[section_index].section_name if section_index < len(section_rows) else None
+                    )
+                    StepCheck(
+                        f"Наименование участка #{section_index + 1}",
+                        MtReportConst.COL_SECTION,
+                        soft_failures,
+                    ).actual(actual_section_name).expected(expected_section_name).equal_to()
+
+                for section_row in section_rows:
+                    for column_name in MtReportConst.MODE_DURATION_COLUMNS:
+                        cell_value = section_row.cells.get(column_name)
+                        StepCheck(
+                            f"Длительность '{column_name}' для участка '{section_row.section_name}' заполнена",
+                            column_name,
+                            soft_failures,
+                        ).actual(mt_report_utils.is_duration_cell_filled(cell_value)).expected(True).equal_to()
+
+                StepCheck(
+                    "В отчёте найдена строка 'Суммарное время работы:'",
+                    "total_work_duration_label",
+                    soft_failures,
+                ).actual(parsed_report.total_label_row_index).is_not_none()
+                StepCheck(
+                    "Суммарное время работы в отчёте не нулевое",
+                    "total_work_duration",
+                    soft_failures,
+                ).actual(total_duration_seconds).is_greater_than(0, MtReportConst.ZERO_DURATION_TEXT)
+
+                for section_row in section_rows:
+                    duration_diff = abs(section_row.modes_sum_seconds - (total_duration_seconds or 0))
+                    StepCheck(
+                        f"Сумма режимов МТ для '{section_row.section_name}' "
+                        f"совпадает с суммарным временем (+-{duration_tolerance} с)",
+                        "modes_sum_seconds",
+                        soft_failures,
+                    ).actual(duration_diff).is_less_than(
+                        duration_tolerance + 1,
+                        f"погрешность {duration_tolerance} с",
+                    )
+
+                StepCheck(
+                    f"Суммарное время режима '{report_state.expected_dominant_mode_column}' "
+                    "максимально среди режимов МТ",
+                    "dominant_mode_total_seconds",
+                    soft_failures,
+                ).actual(
+                    mt_report_utils.is_expected_dominant_mode_column(
+                        mode_totals,
+                        report_state.expected_dominant_mode_column,
+                    )
+                ).expected(True).equal_to()
+                allure.attach(
+                    "\n".join(
+                        f"{column_name}: {lds_report_utils.format_duration_seconds(total_seconds)}"
+                        for column_name, total_seconds in mode_totals.items()
+                    ),
+                    name="Суммарные длительности режимов МТ по всем участкам",
+                    attachment_type=allure.attachment_type.TEXT,
+                )
+
+        with allure.step("Проверка диаграммы режимов МТ"):
+            with SoftAssertions() as soft_failures:
+                StepCheck(
+                    f"Заголовок диаграммы в F{MtReportConst.CHART_TITLE_ROW} содержит "
+                    f"'{MtReportConst.CHART_TITLE_PREFIX}' и описание ТУ",
+                    "chart_title",
+                    soft_failures,
+                ).actual(
+                    mt_report_utils.is_chart_title_valid(
+                        parsed_report.chart_title_raw,
+                        cfg.technological_unit.description,
+                    )
+                ).expected(True).equal_to()
+                StepCheck(
+                    f"В I{MtReportConst.CHART_FORMULA_ROW} задана формула SERIES для диаграммы",
+                    "chart_series_formula",
+                    soft_failures,
+                ).actual(
+                    mt_report_utils.is_valid_mt_mode_chart_series_formula(parsed_report.chart_series_formula)
+                ).expected(True).equal_to()
+
+        with allure.step("Подготовка данных шапки отчёта для проверки"):
+            title_info = parsed_report.title_info
+            report_title_lower = title_info.raw_title.lower()
+            column_headers = parsed_report.column_headers
+            header_period_start = title_info.period_start
+            header_period_end = title_info.period_end
+
+        with allure.step("Проверка двойной шапки отчёта о режиме МТ"):
+            with SoftAssertions() as soft_failures:
+                StepCheck(
+                    f"В шапке отчёта присутствует '{MtReportConst.MT_MODE_REPORT_NAME_PART}'",
+                    "report_title",
+                    soft_failures,
+                ).contains(report_title_lower, mt_report_name_part_lower)
+                StepCheck(
+                    "Время начала периода в шапке совпадает с фильтром запроса (+-1 мин)",
+                    "period_start",
+                    soft_failures,
+                ).actual(header_period_start).is_between(period_start_lo, period_start_hi)
+                StepCheck(
+                    "Время конца периода в шапке совпадает с фильтром запроса (+-1 мин)",
+                    "period_end",
+                    soft_failures,
+                ).actual(header_period_end).is_between(period_end_lo, period_end_hi)
+                StepCheck(
+                    "Названия колонок в шапке отчёта",
+                    "column_headers",
+                    soft_failures,
+                ).actual(column_headers).expected(MtReportConst.EXPECTED_COLUMN_HEADERS).equal_to()
+
+        with allure.step("Проверка имени файла отчёта о режиме МТ"):
+            with SoftAssertions() as soft_failures:
+                StepCheck(f"Имя файла оканчивается на {ReportConst.XLSX_EXTENSION}", "file_name", soft_failures).actual(
+                    has_xlsx_extension
+                ).expected(True).equal_to()
+                StepCheck(
+                    f"Имя файла содержит '{MtReportConst.MT_MODE_REPORT_NAME_PART}'",
+                    "file_name",
+                    soft_failures,
+                ).contains(report_file_name_lower, mt_report_name_part_lower)
+                StepCheck(
+                    f"Имя файла содержит описание ТУ '{cfg.technological_unit.description}'",
+                    "file_name",
+                    soft_failures,
+                ).contains(report_file_name_lower, report_state.expected_tu_description_lower)
+                StepCheck(
+                    "Дата начала периода в имени файла совпадает с фильтром запроса (+-1 мин)",
+                    "period_start_in_file_name",
+                    soft_failures,
+                ).actual(file_name_period_start).is_between(period_start_lo, period_start_hi)
+                StepCheck(
+                    "Дата конца периода в имени файла совпадает с фильтром запроса (+-1 мин)",
+                    "period_end_in_file_name",
+                    soft_failures,
+                ).actual(file_name_period_end).is_between(period_end_lo, period_end_hi)
+
+    except Exception:
+        with allure.step("Прикрепление xlsx отчёта к Allure при падении теста"):
+            if report_state.actual_temp_file_path and report_state.expected_file_name:
+                report_utils.attach_report_file_to_allure(
+                    report_state.actual_temp_file_path,
+                    report_state.expected_file_name,
+                )
+        raise
+
+    with allure.step("Проверка пуш-нотификации о готовности отчёта"):
+        notification = report_state.actual_notification
+        notification_reply_status = notification.replyStatus if notification else None
+        notification_reply_content = notification.replyContent if notification else None
+        notification_export_status = notification_reply_content.exportStatus if notification_reply_content else None
+        notification_error_message = (
+            (notification_reply_content.errorMessage or "") if notification_reply_content else ""
+        )
+        with SoftAssertions() as soft_failures:
+            StepCheck("Получена пуш-нотификация о готовности отчёта", "notification", soft_failures).actual(
+                notification
+            ).is_not_none()
+            StepCheck("Проверка статуса пуш-нотификации", "replyStatus", soft_failures).actual(
+                notification_reply_status
+            ).expected(ReplyStatus.OK.value).equal_to()
+            StepCheck("Проверка наличия контента нотификации", "replyContent", soft_failures).actual(
+                notification_reply_content
+            ).is_not_none()
+            StepCheck("Проверка exportStatus в нотификации", "exportStatus", soft_failures).actual(
+                notification_export_status
+            ).expected(ExportStatus.DONE).equal_to()
+            StepCheck("В нотификации нет текста ошибки", "errorMessage", soft_failures).actual(
+                notification_error_message
+            ).is_empty()

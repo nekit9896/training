@@ -188,6 +188,7 @@ LEAK_LEVEL_TEST_MAPPING = {
     'test_completed_leak_info_in_journal': 'completed_leak_info_in_journal_test',
     'test_export_leaks_report': 'export_leaks_report_test',
     'test_export_lds_status_report': 'export_lds_status_report_test',
+    'test_export_mt_mode_report': 'export_mt_mode_report_test',
 }
 
 # Тесты уровня отбраковки (маркеры из RejectionTestCase - параметр rejection_case)
