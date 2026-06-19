@@ -3622,7 +3622,7 @@ async def export_mt_mode_report(
                 attachment_type=allure.attachment_type.TEXT,
             )
             allure.attach(
-                mt_report_utils.format_section_rows_for_allure(parsed_report.section_rows),
+                lds_report_utils.format_section_rows_for_allure(parsed_report.section_rows),
                 name="Строки участков отчёта",
                 attachment_type=allure.attachment_type.TEXT,
             )
@@ -3659,46 +3659,87 @@ async def export_mt_mode_report(
                 for section_row in section_rows:
                     for column_name in MtReportConst.MODE_DURATION_COLUMNS:
                         cell_value = section_row.cells.get(column_name)
+                        duration_text = (section_row.cells.get(column_name) or "").strip() or MtReportConst.ZERO_DURATION_TEXT
                         StepCheck(
-                            f"Длительность '{column_name}' для участка '{section_row.section_name}' заполнена",
-                            column_name,
+                            f"Участок '{section_row.section_name}': колонка '{column_name}'",
+                            "длительность",
                             soft_failures,
-                        ).actual(mt_report_utils.is_duration_cell_filled(cell_value)).expected(True).equal_to()
+                        ).actual(mt_report_utils.is_duration_cell_filled(cell_value)).is_true_with_details(
+                            expected_text="указано время в формате H:MM:SS (допускается 0:00:00)",
+                            actual_text=duration_text,
+                        )
 
+                total_duration_text = (
+                    parsed_report.total_duration_raw
+                    or lds_report_utils.format_duration_seconds(total_duration_seconds or 0)
+                )
+                total_label_row = parsed_report.total_label_row_index
                 StepCheck(
-                    "В отчёте найдена строка 'Суммарное время работы:'",
-                    "total_work_duration_label",
+                    "В отчёте присутствует строка 'Суммарное время работы:'",
+                    "структура отчёта",
                     soft_failures,
-                ).actual(parsed_report.total_label_row_index).is_not_none()
+                ).actual(total_label_row is not None).is_true_with_details(
+                    expected_text=f"найдена строка с текстом '{MtReportConst.TOTAL_WORK_DURATION_LABEL}'",
+                    actual_text=(
+                        f"строка {total_label_row} содержит '{MtReportConst.TOTAL_WORK_DURATION_LABEL}'"
+                        if total_label_row is not None
+                        else "строка не найдена"
+                    ),
+                )
                 StepCheck(
-                    "Суммарное время работы в отчёте не нулевое",
-                    "total_work_duration",
+                    "Суммарное время работы в отчёте больше нуля",
+                    "суммарное время",
                     soft_failures,
-                ).actual(total_duration_seconds).is_greater_than(0, MtReportConst.ZERO_DURATION_TEXT)
+                ).actual((total_duration_seconds or 0) > 0).is_true_with_details(
+                    expected_text="суммарное время больше 0:00:00",
+                    actual_text=total_duration_text,
+                )
 
                 for section_row in section_rows:
                     duration_diff = abs(section_row.modes_sum_seconds - (total_duration_seconds or 0))
+                    section_sum_text = lds_report_utils.format_duration_seconds(section_row.modes_sum_seconds)
+                    diff_text = lds_report_utils.format_duration_seconds(duration_diff)
+                    sums_match = duration_diff < duration_tolerance + 1
                     StepCheck(
-                        f"Сумма режимов МТ для '{section_row.section_name}' "
-                        f"совпадает с суммарным временем (+-{duration_tolerance} с)",
-                        "modes_sum_seconds",
+                        f"Участок '{section_row.section_name}': сумма режимов МТ совпадает с общим временем "
+                        f"(±{duration_tolerance} с)",
+                        "согласованность длительностей",
                         soft_failures,
-                    ).actual(duration_diff).is_less_than(
-                        duration_tolerance + 1,
-                        f"погрешность {duration_tolerance} с",
+                    ).actual(sums_match).is_true_with_details(
+                        expected_text=(
+                            f"сумма режимов ({section_sum_text}) равна суммарному времени ({total_duration_text}), "
+                            f"погрешность не более {duration_tolerance} с"
+                        ),
+                        actual_text=(
+                            f"сумма режимов: {section_sum_text}, суммарное время: {total_duration_text}, "
+                            f"разница: {diff_text} ({duration_diff} с)"
+                        ),
                     )
 
+                dominant_column = report_state.expected_dominant_mode_column
+                dominant_total = mode_totals.get(dominant_column, 0)
+                max_column = max(mode_totals, key=mode_totals.get)
+                max_total = mode_totals[max_column]
+                all_modes_text = ", ".join(
+                    f"'{column_name}': {lds_report_utils.format_duration_seconds(total_seconds)}"
+                    for column_name, total_seconds in mode_totals.items()
+                )
                 StepCheck(
-                    f"Суммарное время режима '{report_state.expected_dominant_mode_column}' "
-                    "максимально среди режимов МТ",
-                    "dominant_mode_total_seconds",
+                    f"Режим '{dominant_column}' имеет максимальное суммарное время по всем участкам",
+                    "доминирующий режим МТ",
                     soft_failures,
                 ).actual(
-                    mt_report_utils.is_expected_dominant_mode_column(
-                        mode_totals,
-                        report_state.expected_dominant_mode_column,
-                    )
-                ).expected(True).equal_to()
+                    mt_report_utils.is_expected_dominant_mode_column(mode_totals, dominant_column)
+                ).is_true_with_details(
+                    expected_text=(
+                        f"'{dominant_column}': {lds_report_utils.format_duration_seconds(dominant_total)} - "
+                        f"наибольшее время; по всем участкам: {all_modes_text}"
+                    ),
+                    actual_text=(
+                        f"наибольшее время у режима '{max_column}': "
+                        f"{lds_report_utils.format_duration_seconds(max_total)}"
+                    ),
+                )
                 allure.attach(
                     "\n".join(
                         f"{column_name}: {lds_report_utils.format_duration_seconds(total_seconds)}"
@@ -3709,25 +3750,39 @@ async def export_mt_mode_report(
                 )
 
         with allure.step("Проверка диаграммы режимов МТ"):
+            chart_formula = parsed_report.chart_series_formula or "(формула не найдена)"
             with SoftAssertions() as soft_failures:
                 StepCheck(
-                    f"Заголовок диаграммы в F{MtReportConst.CHART_TITLE_ROW} содержит "
-                    f"'{MtReportConst.CHART_TITLE_PREFIX}' и описание ТУ",
-                    "chart_title",
+                    f"Заголовок диаграммы в ячейке F{MtReportConst.CHART_TITLE_ROW}",
+                    "заголовок диаграммы",
                     soft_failures,
                 ).actual(
                     mt_report_utils.is_chart_title_valid(
                         parsed_report.chart_title_raw,
                         cfg.technological_unit.description,
                     )
-                ).expected(True).equal_to()
+                ).is_true_with_details(
+                    expected_text=(
+                        f"содержит '{MtReportConst.CHART_TITLE_PREFIX}' "
+                        f"и название ТУ '{cfg.technological_unit.description}'"
+                    ),
+                    actual_text=parsed_report.chart_title_raw.replace("\n", " / ") or "(пусто)",
+                )
                 StepCheck(
-                    f"В I{MtReportConst.CHART_FORMULA_ROW} задана формула SERIES для диаграммы",
-                    "chart_series_formula",
+                    f"Диаграмма построена по данным листа '{MtReportConst.CHART_DATA_SHEET_NAME}' "
+                    f"(ожидается формула SERIES в I{MtReportConst.CHART_FORMULA_ROW})",
+                    "источник данных диаграммы",
                     soft_failures,
                 ).actual(
                     mt_report_utils.is_valid_mt_mode_chart_series_formula(parsed_report.chart_series_formula)
-                ).expected(True).equal_to()
+                ).is_true_with_details(
+                    expected_text=(
+                        f"в ячейке I{MtReportConst.CHART_FORMULA_ROW} задана формула SERIES (или РЯД), "
+                        f"которая ссылается на категории {MtReportConst.CHART_CATEGORY_RANGE} "
+                        f"и значения {MtReportConst.CHART_VALUES_RANGE} листа '{MtReportConst.CHART_DATA_SHEET_NAME}'"
+                    ),
+                    actual_text=chart_formula,
+                )
 
         with allure.step("Подготовка данных шапки отчёта для проверки"):
             title_info = parsed_report.title_info

@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from openpyxl import load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
 from constants.test_constants import ExportMtModeReportConstants as MtReportConst
@@ -23,6 +24,7 @@ from utils.helpers.report_xlsx_utils import (
     build_column_cells,
     get_report_column_headers,
     parse_report_title,
+    read_worksheet_cell_formula,
     read_worksheet_cell_value,
     sum_duration_columns_across_rows,
 )
@@ -64,11 +66,40 @@ class MtModeReportParsed:
     chart_series_formula: str = ""
 
 
+def _find_mt_mode_chart_series_formula(source_file_path: Path) -> str:
+    """Ищет формулу SERIES/РЯД: сначала в I3, затем по всем ячейкам листа xlsx."""
+    formula = read_worksheet_cell_formula(
+        source_file_path,
+        MtReportConst.CHART_FORMULA_ROW,
+        MtReportConst.CHART_FORMULA_COLUMN,
+    )
+    if is_valid_mt_mode_chart_series_formula(formula):
+        return formula
+
+    if not source_file_path.exists():
+        return ""
+
+    workbook = None
+    try:
+        workbook = load_workbook(filename=str(source_file_path), read_only=False, data_only=False)
+        for worksheet in workbook.worksheets:
+            for row in worksheet.iter_rows():
+                for cell in row:
+                    value = cell.value
+                    if isinstance(value, str) and is_valid_mt_mode_chart_series_formula(value):
+                        return value
+    except Exception:
+        return ""
+    finally:
+        if workbook is not None:
+            workbook.close()
+
+    return ""
+
+
 def read_mt_mode_chart_metadata(source_file_path: Path) -> tuple[str, str]:
     """
-    Читает заголовок (F2) и формулу диаграммы (I3).
-
-    Формулу читаем с data_only=False: иначе openpyxl вернёт вычисленное значение, а не SERIES(...).
+    Читает заголовок (F2) и формулу диаграммы (I3 или первую подходящую SERIES/РЯД в листе xlsx).
     """
     chart_title_value = read_worksheet_cell_value(
         source_file_path,
@@ -76,14 +107,8 @@ def read_mt_mode_chart_metadata(source_file_path: Path) -> tuple[str, str]:
         MtReportConst.CHART_TITLE_COLUMN,
         data_only=True,
     )
-    chart_formula_value = read_worksheet_cell_value(
-        source_file_path,
-        MtReportConst.CHART_FORMULA_ROW,
-        MtReportConst.CHART_FORMULA_COLUMN,
-        data_only=False,
-    )
     chart_title_raw = _stringify_cell(chart_title_value)
-    chart_series_formula = chart_formula_value if isinstance(chart_formula_value, str) else ""
+    chart_series_formula = _find_mt_mode_chart_series_formula(source_file_path)
     return chart_title_raw, chart_series_formula
 
 
@@ -190,21 +215,6 @@ def parse_mt_mode_report_worksheet(
         chart_title_raw=chart_title_raw,
         chart_series_formula=chart_series_formula,
     )
-
-
-def format_mt_mode_section_rows_for_allure(section_rows: List[MtModeReportSectionRow]) -> str:
-    """Форматирует строки участков отчёта о режиме МТ для вложения в Allure."""
-    lines = []
-    for row in section_rows:
-        durations_text = ", ".join(
-            f"{column}={format_duration_seconds(seconds)}"
-            for column, seconds in row.mode_durations_seconds.items()
-        )
-        lines.append(
-            f"row#{row.row_index}: {row.section_name} | sum={format_duration_seconds(row.modes_sum_seconds)} | "
-            f"{durations_text}"
-        )
-    return "\n".join(lines)
 
 
 __all__ = [
