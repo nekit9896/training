@@ -299,8 +299,6 @@ class ExportMtModeReportConstants:
 
     CHART_TITLE_ROW: int = 2
     CHART_TITLE_COLUMN: int = 6
-    CHART_FORMULA_ROW: int = 3
-    CHART_FORMULA_COLUMN: int = 9
     CHART_TITLE_PREFIX: str = "Режим работы МТ"
     CHART_DATA_SHEET_NAME: str = "Режим работы МТ"
     CHART_CATEGORY_RANGE: str = "$B$2:$D$2"

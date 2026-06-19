@@ -3617,12 +3617,13 @@ async def export_mt_mode_report(
                 f"period_end: {parsed_report.title_info.period_end}\n"
                 f"total_duration: {parsed_report.total_duration_raw}\n"
                 f"chart_title: {parsed_report.chart_title_raw}\n"
-                f"chart_formula: {parsed_report.chart_series_formula}",
+                f"embedded_chart_refs: "
+                f"{mt_report_utils.format_embedded_chart_formulas_for_allure(parsed_report.embedded_chart_formulas)}",
                 name="Шапка отчёта о режиме МТ",
                 attachment_type=allure.attachment_type.TEXT,
             )
             allure.attach(
-                lds_report_utils.format_section_rows_for_allure(parsed_report.section_rows),
+                mt_report_utils.format_mt_mode_section_rows_for_allure(parsed_report.section_rows),
                 name="Строки участков отчёта",
                 attachment_type=allure.attachment_type.TEXT,
             )
@@ -3750,7 +3751,9 @@ async def export_mt_mode_report(
                 )
 
         with allure.step("Проверка диаграммы режимов МТ"):
-            chart_formula = parsed_report.chart_series_formula or "(формула не найдена)"
+            chart_refs_text = mt_report_utils.format_embedded_chart_formulas_for_allure(
+                parsed_report.embedded_chart_formulas
+            )
             with SoftAssertions() as soft_failures:
                 StepCheck(
                     f"Заголовок диаграммы в ячейке F{MtReportConst.CHART_TITLE_ROW}",
@@ -3769,19 +3772,18 @@ async def export_mt_mode_report(
                     actual_text=parsed_report.chart_title_raw.replace("\n", " / ") or "(пусто)",
                 )
                 StepCheck(
-                    f"Диаграмма построена по данным листа '{MtReportConst.CHART_DATA_SHEET_NAME}' "
-                    f"(ожидается формула SERIES в I{MtReportConst.CHART_FORMULA_ROW})",
+                    f"Встроенная диаграмма построена по данным листа '{MtReportConst.CHART_DATA_SHEET_NAME}'",
                     "источник данных диаграммы",
                     soft_failures,
                 ).actual(
-                    mt_report_utils.is_valid_mt_mode_chart_series_formula(parsed_report.chart_series_formula)
+                    mt_report_utils.is_valid_mt_mode_embedded_chart(parsed_report.embedded_chart_formulas)
                 ).is_true_with_details(
                     expected_text=(
-                        f"в ячейке I{MtReportConst.CHART_FORMULA_ROW} задана формула SERIES (или РЯД), "
-                        f"которая ссылается на категории {MtReportConst.CHART_CATEGORY_RANGE} "
-                        f"и значения {MtReportConst.CHART_VALUES_RANGE} листа '{MtReportConst.CHART_DATA_SHEET_NAME}'"
+                        f"в xlsx есть встроенная диаграмма, серия которой ссылается на лист "
+                        f"'{MtReportConst.CHART_DATA_SHEET_NAME}': категории {MtReportConst.CHART_CATEGORY_RANGE}, "
+                        f"значения {MtReportConst.CHART_VALUES_RANGE}"
                     ),
-                    actual_text=chart_formula,
+                    actual_text=chart_refs_text,
                 )
 
         with allure.step("Подготовка данных шапки отчёта для проверки"):

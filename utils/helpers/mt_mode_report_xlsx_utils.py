@@ -4,11 +4,12 @@
 
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from openpyxl import load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
 from constants.test_constants import ExportMtModeReportConstants as MtReportConst
@@ -24,7 +25,6 @@ from utils.helpers.report_xlsx_utils import (
     build_column_cells,
     get_report_column_headers,
     parse_report_title,
-    read_worksheet_cell_formula,
     read_worksheet_cell_value,
     sum_duration_columns_across_rows,
 )
@@ -63,72 +63,90 @@ class MtModeReportParsed:
     total_duration_raw: str = ""
     total_label_row_index: Optional[int] = None
     chart_title_raw: str = ""
-    chart_series_formula: str = ""
+    embedded_chart_formulas: List[str] = field(default_factory=list)
 
 
-def _find_mt_mode_chart_series_formula(source_file_path: Path) -> str:
-    """Ищет формулу SERIES/РЯД: сначала в I3, затем по всем ячейкам листа xlsx."""
-    formula = read_worksheet_cell_formula(
-        source_file_path,
-        MtReportConst.CHART_FORMULA_ROW,
-        MtReportConst.CHART_FORMULA_COLUMN,
-    )
-    if is_valid_mt_mode_chart_series_formula(formula):
-        return formula
+def _compact_chart_reference(reference: str) -> str:
+    """Убирает пробелы и кавычки для сравнения ссылок вида 'Лист'!$A$1."""
+    return reference.replace("'", "").replace(" ", "").upper()
 
+
+def extract_embedded_chart_formulas(source_file_path: Path) -> List[str]:
+    """
+    Извлекает формулы ссылок (<c:f>) из XML встроенных диаграмм xlsx.
+
+    Серия диаграммы в Excel хранится не в ячейке, а в xl/charts/chart*.xml.
+    """
     if not source_file_path.exists():
-        return ""
+        return []
 
-    workbook = None
+    formulas: List[str] = []
     try:
-        workbook = load_workbook(filename=str(source_file_path), read_only=False, data_only=False)
-        for worksheet in workbook.worksheets:
-            for row in worksheet.iter_rows():
-                for cell in row:
-                    value = cell.value
-                    if isinstance(value, str) and is_valid_mt_mode_chart_series_formula(value):
-                        return value
+        with zipfile.ZipFile(source_file_path, "r") as archive:
+            chart_files = sorted(
+                name
+                for name in archive.namelist()
+                if name.startswith("xl/charts/chart") and name.endswith(".xml")
+            )
+            for chart_file in chart_files:
+                root = ET.fromstring(archive.read(chart_file))
+                for element in root.iter():
+                    tag_name = element.tag.rsplit("}", 1)[-1]
+                    if tag_name == "f" and element.text:
+                        formula = element.text.strip()
+                        if formula:
+                            formulas.append(formula)
     except Exception:
-        return ""
-    finally:
-        if workbook is not None:
-            workbook.close()
+        return []
 
-    return ""
+    return formulas
 
 
-def read_mt_mode_chart_metadata(source_file_path: Path) -> tuple[str, str]:
+def _chart_reference_matches(reference: str, *, sheet_name: str, range_address: str) -> bool:
+    compact_reference = _compact_chart_reference(reference)
+    compact_sheet = _compact_chart_reference(sheet_name)
+    compact_range = range_address.replace(" ", "").upper()
+    return compact_sheet in compact_reference and compact_range in compact_reference
+
+
+def is_valid_mt_mode_embedded_chart(chart_formulas: List[str]) -> bool:
     """
-    Читает заголовок (F2) и формулу диаграммы (I3 или первую подходящую SERIES/РЯД в листе xlsx).
+    Проверяет, что встроенная диаграмма ссылается на ожидаемые диапазоны листа данных.
+
+    Эквивалент формулы =РЯД('Режим работы МТ'!$I$3,'Режим работы МТ'!$B$2:$D$2,'Режим работы МТ'!$I$5:$L$5,1),
+    в OOXML ссылки хранятся отдельными элементами <c:f>.
     """
+    if not chart_formulas:
+        return False
+
+    sheet_name = MtReportConst.CHART_DATA_SHEET_NAME
+    has_category = any(
+        _chart_reference_matches(formula, sheet_name=sheet_name, range_address=MtReportConst.CHART_CATEGORY_RANGE)
+        for formula in chart_formulas
+    )
+    has_values = any(
+        _chart_reference_matches(formula, sheet_name=sheet_name, range_address=MtReportConst.CHART_VALUES_RANGE)
+        for formula in chart_formulas
+    )
+    return has_category and has_values
+
+
+def format_embedded_chart_formulas_for_allure(chart_formulas: List[str]) -> str:
+    """Форматирует ссылки встроенной диаграммы для отображения в Allure."""
+    if not chart_formulas:
+        return "встроенная диаграмма не найдена"
+    return "; ".join(chart_formulas)
+
+
+def read_mt_mode_chart_title(source_file_path: Path) -> str:
+    """Читает заголовок диаграммы из ячейки F2."""
     chart_title_value = read_worksheet_cell_value(
         source_file_path,
         MtReportConst.CHART_TITLE_ROW,
         MtReportConst.CHART_TITLE_COLUMN,
         data_only=True,
     )
-    chart_title_raw = _stringify_cell(chart_title_value)
-    chart_series_formula = _find_mt_mode_chart_series_formula(source_file_path)
-    return chart_title_raw, chart_series_formula
-
-
-def is_valid_mt_mode_chart_series_formula(formula: str) -> bool:
-    """Проверяет, что в ячейке диаграммы задана формула SERIES/РЯД с ожидаемыми диапазонами."""
-    if not formula.startswith("="):
-        return False
-
-    formula_normalized = formula.replace(" ", "")
-    formula_upper = formula_normalized.upper()
-    has_series_function = formula_upper.startswith("=SERIES(") or formula_normalized.startswith("=РЯД(")
-    if not has_series_function:
-        return False
-
-    required_fragments = (
-        MtReportConst.CHART_DATA_SHEET_NAME,
-        MtReportConst.CHART_CATEGORY_RANGE,
-        MtReportConst.CHART_VALUES_RANGE,
-    )
-    return all(fragment in formula for fragment in required_fragments)
+    return _stringify_cell(chart_title_value)
 
 
 def is_chart_title_valid(chart_title_raw: str, tu_description: str) -> bool:
@@ -158,7 +176,7 @@ def parse_mt_mode_report_worksheet(
     Разбирает лист xlsx-отчёта о режиме МТ: шапка, колонки, строки участков и суммарное время.
 
     В section_rows попадают только участки из expected_section_names (без учёта регистра).
-    Метаданные диаграммы читаются из source_file_path отдельно (формула требует data_only=False).
+    Метаданные диаграммы читаются из source_file_path: заголовок из F2, серия - из XML диаграммы.
     """
     headers = get_report_column_headers(worksheet, MtReportConst.REPORT_COLUMN_HEADERS_ROW)
     title_info = parse_report_title(
@@ -201,9 +219,10 @@ def parse_mt_mode_report_worksheet(
         )
 
     chart_title_raw = ""
-    chart_series_formula = ""
+    embedded_chart_formulas: List[str] = []
     if source_file_path is not None:
-        chart_title_raw, chart_series_formula = read_mt_mode_chart_metadata(source_file_path)
+        chart_title_raw = read_mt_mode_chart_title(source_file_path)
+        embedded_chart_formulas = extract_embedded_chart_formulas(source_file_path)
 
     return MtModeReportParsed(
         title_info=title_info,
@@ -213,19 +232,36 @@ def parse_mt_mode_report_worksheet(
         total_duration_raw=total_duration_raw,
         total_label_row_index=total_label_row_index,
         chart_title_raw=chart_title_raw,
-        chart_series_formula=chart_series_formula,
+        embedded_chart_formulas=embedded_chart_formulas,
     )
+
+
+def format_mt_mode_section_rows_for_allure(section_rows: List[MtModeReportSectionRow]) -> str:
+    """Форматирует строки участков отчёта о режиме МТ для вложения в Allure."""
+    lines = []
+    for row in section_rows:
+        durations_text = ", ".join(
+            f"{column}={format_duration_seconds(seconds)}"
+            for column, seconds in row.mode_durations_seconds.items()
+        )
+        lines.append(
+            f"row#{row.row_index}: {row.section_name} | sum={format_duration_seconds(row.modes_sum_seconds)} | "
+            f"{durations_text}"
+        )
+    return "\n".join(lines)
 
 
 __all__ = [
     "MtModeReportParsed",
     "MtModeReportSectionRow",
+    "extract_embedded_chart_formulas",
+    "format_embedded_chart_formulas_for_allure",
+    "format_mt_mode_section_rows_for_allure",
     "is_chart_title_valid",
     "is_duration_cell_filled",
     "is_expected_dominant_mode_column",
-    "is_valid_mt_mode_chart_series_formula",
+    "is_valid_mt_mode_embedded_chart",
     "parse_mt_mode_report_worksheet",
-    "read_mt_mode_chart_metadata",
-    "format_mt_mode_section_rows_for_allure",
+    "read_mt_mode_chart_title",
     "sum_duration_columns_across_rows",
 ]

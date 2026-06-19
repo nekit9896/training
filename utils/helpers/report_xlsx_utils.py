@@ -290,37 +290,6 @@ def read_worksheet_cell_value(
     return worksheet.cell(row=row, column=column).value
 
 
-def read_worksheet_cell_formula(
-    file_path: Path,
-    row: int,
-    column: int,
-    *,
-    sheet_index: int = ReportConst.DEFAULT_SHEET_INDEX,
-) -> str:
-    """
-    Читает формулу ячейки из xlsx.
-
-    read_only-режим openpyxl не возвращает формулы, поэтому загрузка выполняется
-    с read_only=False и data_only=False.
-    """
-    if not file_path.exists():
-        return ""
-    workbook = None
-    try:
-        workbook = load_workbook(filename=str(file_path), read_only=False, data_only=False)
-        sheet_names = workbook.sheetnames
-        if not sheet_names:
-            return ""
-        worksheet = workbook[sheet_names[sheet_index]]
-        value = worksheet.cell(row=row, column=column).value
-        return value if isinstance(value, str) else ""
-    except Exception:
-        return ""
-    finally:
-        if workbook is not None:
-            workbook.close()
-
-
 def sum_duration_columns_across_rows(
     section_rows: list,
     mode_duration_columns: list[str],
