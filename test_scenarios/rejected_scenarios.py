@@ -328,9 +328,7 @@ async def export_rejection_report(ws_client, cfg: IsRejectedConfig, imitator_sta
             attachment_type=allure.attachment_type.TEXT,
         )
 
-    with allure.step(
-        f"Этап 1. Подписка на пуш-нотификации ({ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST})"
-    ):
+    with allure.step(f"Этап 1. Подписка на пуш-нотификации ({ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST})"):
         # без подписки не придёт уведомление о готовности отчёта
         await t_utils.connect(ws_client, ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST, [])
 
@@ -454,9 +452,11 @@ async def export_rejection_report(ws_client, cfg: IsRejectedConfig, imitator_sta
                 actual_file_name,
                 RejectedReportConst.REPORT_FILE_NAME_PERIOD_PATTERN,
             )
-            period_start_lo, period_start_hi, period_end_lo, period_end_hi = report_utils.report_period_comparison_bounds(
-                report_state.expected_period_start_naive,
-                report_state.expected_period_end_naive,
+            period_start_lo, period_start_hi, period_end_lo, period_end_hi = (
+                report_utils.report_period_comparison_bounds(
+                    report_state.expected_period_start_naive,
+                    report_state.expected_period_end_naive,
+                )
             )
             has_xlsx_extension = report_utils.is_xlsx_extension(actual_file_name)
             rejected_report_file_name_part_lower = RejectedReportConst.REJECTED_REPORT_NAME_PART.lower()
@@ -532,7 +532,9 @@ async def export_rejection_report(ws_client, cfg: IsRejectedConfig, imitator_sta
                     "Названия колонок во второй строке шапки отчёта",
                     "column_headers",
                     soft_failures,
-                ).actual(column_headers).expected(RejectedReportConst.EXPECTED_COLUMN_HEADERS).equal_to()
+                ).actual(
+                    column_headers
+                ).expected(RejectedReportConst.EXPECTED_COLUMN_HEADERS).equal_to()
 
         with allure.step("Проверка строк отчёта по каждому RejectionTestCase из конфигурации набора"):
             # Проверяем только установление отбраковок: каждый кейс из набора должен быть в таблице
@@ -553,9 +555,7 @@ async def export_rejection_report(ws_client, cfg: IsRejectedConfig, imitator_sta
                     expected_signal_suffix = rejection_report_utils.report_signal_suffix_by_expected_name(
                         rejection_case.expected_signal_name,
                     )
-                    case_label = (
-                        f"события '{report_event}' - {rejection_case.sensor.description}"
-                    )
+                    case_label = f"события '{report_event}' - {rejection_case.sensor.description}"
 
                     StepCheck(
                         f"В отчёте найдена отбраковка для {case_label} в интервале времени "
@@ -625,7 +625,9 @@ async def export_rejection_report(ws_client, cfg: IsRejectedConfig, imitator_sta
             ).actual(
                 rejected_report_file_name_part_lower in actual_file_name_lower
                 or rejected_report_file_name_part_alt_lower in actual_file_name_lower
-            ).expected(True).equal_to()
+            ).expected(
+                True
+            ).equal_to()
             StepCheck(
                 f"Имя файла содержит описание ТУ '{cfg.technological_unit.description}'",
                 "file_name",
