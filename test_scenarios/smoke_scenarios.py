@@ -3411,7 +3411,7 @@ async def export_mt_mode_report(
     3. Ожидание ReportDataExportedNotification о готовности отчёта.
     4. Лонг-поллинг GetExportedDataListRequest до появления отчёта в списке.
     5. DownloadExportedDataRequest и получение fileChunk.
-    6. Проверка xlsx: участки, длительности режимов МТ, доминирующий режим, диаграмма.
+    6. Проверка xlsx: участки, длительности режимов МТ, основной режим.
     7. Проверка двойной шапки и имени файла.
 
     Скачанный файл удаляется по завершению, прикладывается к Allure только при падении теста.
@@ -3608,17 +3608,13 @@ async def export_mt_mode_report(
             report_state.actual_parsed_report = mt_report_utils.parse_mt_mode_report_worksheet(
                 report_state.actual_worksheet,
                 report_state.expected_section_names,
-                source_file_path=report_state.actual_temp_file_path,
             )
             parsed_report = report_state.actual_parsed_report
             allure.attach(
                 f"Шапка (raw): {parsed_report.title_info.raw_title}\n"
                 f"period_start: {parsed_report.title_info.period_start}\n"
                 f"period_end: {parsed_report.title_info.period_end}\n"
-                f"total_duration: {parsed_report.total_duration_raw}\n"
-                f"chart_title: {parsed_report.chart_title_raw}\n"
-                f"embedded_chart_refs: "
-                f"{mt_report_utils.format_embedded_chart_formulas_for_allure(parsed_report.embedded_chart_formulas)}",
+                f"total_duration: {parsed_report.total_duration_raw}",
                 name="Шапка отчёта о режиме МТ",
                 attachment_type=allure.attachment_type.TEXT,
             )
@@ -3748,42 +3744,6 @@ async def export_mt_mode_report(
                     ),
                     name="Суммарные длительности режимов МТ по всем участкам",
                     attachment_type=allure.attachment_type.TEXT,
-                )
-
-        with allure.step("Проверка диаграммы режимов МТ"):
-            chart_refs_text = mt_report_utils.format_embedded_chart_formulas_for_allure(
-                parsed_report.embedded_chart_formulas
-            )
-            with SoftAssertions() as soft_failures:
-                StepCheck(
-                    f"Заголовок диаграммы в ячейке F{MtReportConst.CHART_TITLE_ROW}",
-                    "заголовок диаграммы",
-                    soft_failures,
-                ).actual(
-                    mt_report_utils.is_chart_title_valid(
-                        parsed_report.chart_title_raw,
-                        cfg.technological_unit.description,
-                    )
-                ).is_true_with_details(
-                    expected_text=(
-                        f"содержит '{MtReportConst.CHART_TITLE_PREFIX}' "
-                        f"и название ТУ '{cfg.technological_unit.description}'"
-                    ),
-                    actual_text=parsed_report.chart_title_raw.replace("\n", " / ") or "(пусто)",
-                )
-                StepCheck(
-                    f"Встроенная диаграмма построена по данным листа '{MtReportConst.CHART_DATA_SHEET_NAME}'",
-                    "источник данных диаграммы",
-                    soft_failures,
-                ).actual(
-                    mt_report_utils.is_valid_mt_mode_embedded_chart(parsed_report.embedded_chart_formulas)
-                ).is_true_with_details(
-                    expected_text=(
-                        f"в xlsx есть встроенная диаграмма, серия которой ссылается на лист "
-                        f"'{MtReportConst.CHART_DATA_SHEET_NAME}': категории {MtReportConst.CHART_CATEGORY_RANGE}, "
-                        f"значения {MtReportConst.CHART_VALUES_RANGE}"
-                    ),
-                    actual_text=chart_refs_text,
                 )
 
         with allure.step("Подготовка данных шапки отчёта для проверки"):

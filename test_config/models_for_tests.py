@@ -501,6 +501,11 @@ class ExportRejectedReportState:
     actual_title_info: Optional[ReportTitleInfo] = None
     actual_data_rows: list[RejectionReportRow] = field(default_factory=list)
     actual_monitored_tag_rows: list[RejectionReportRow] = field(default_factory=list)
+    actual_header_column_headers: list[str] = field(default_factory=list)
+    actual_header_period_start: Optional[datetime] = None
+    actual_header_period_end: Optional[datetime] = None
+    actual_header_contains_expected_title: bool = False
+    actual_case_checks: list = field(default_factory=list)
 
 
 @dataclass

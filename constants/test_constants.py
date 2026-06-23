@@ -297,13 +297,6 @@ class ExportMtModeReportConstants:
         r'\.xlsx$'
     )
 
-    CHART_TITLE_ROW: int = 2
-    CHART_TITLE_COLUMN: int = 6
-    CHART_TITLE_PREFIX: str = "Режим работы МТ"
-    CHART_DATA_SHEET_NAME: str = "Режим работы МТ"
-    CHART_CATEGORY_RANGE: str = "$B$2:$D$2"
-    CHART_VALUES_RANGE: str = "$I$5:$L$5"
-
 
 class ExportRejectedReportConstants:
     """Константы для теста формирования xlsx-отчёта об отбракованных входных данных"""

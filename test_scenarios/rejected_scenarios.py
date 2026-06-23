@@ -28,7 +28,6 @@ from utils.helpers import rejection_report_xlsx_utils as rejection_report_utils
 from utils.helpers import report_xlsx_utils as report_utils
 from utils.helpers import ws_test_utils as t_utils
 from utils.helpers.asserts import SoftAssertions, StepCheck
-from utils.helpers.lds_status_report_xlsx_utils import format_duration_seconds
 from utils.helpers.ws_message_parser import ws_message_parser as parser
 
 
@@ -498,17 +497,24 @@ async def export_rejection_report(ws_client, cfg: IsRejectedConfig, imitator_sta
                 attachment_type=allure.attachment_type.TEXT,
             )
 
-            with allure.step("Подготовка данных шапки xlsx для проверки"):
-                title_info = report_state.actual_title_info
-                column_headers = report_utils.get_report_column_headers(
-                    report_state.actual_worksheet,
-                    headers_row=RejectedReportConst.REPORT_COLUMN_HEADERS_ROW,
-                )
-                header_period_start = title_info.period_start
-                header_period_end = title_info.period_end
-                header_contains_expected_title = rejection_report_utils.report_header_contains_expected_title(
-                    title_info.raw_title
-                )
+        with allure.step("Подготовка данных шапки xlsx для проверки"):
+            title_info = report_state.actual_title_info
+            report_state.actual_header_column_headers = report_utils.get_report_column_headers(
+                report_state.actual_worksheet,
+                headers_row=RejectedReportConst.REPORT_COLUMN_HEADERS_ROW,
+            )
+            report_state.actual_header_period_start = title_info.period_start
+            report_state.actual_header_period_end = title_info.period_end
+            report_state.actual_header_contains_expected_title = (
+                rejection_report_utils.report_header_contains_expected_title(title_info.raw_title)
+            )
+
+        with allure.step("Подготовка данных для проверки строк отчёта по RejectionTestCase"):
+            report_state.actual_case_checks = rejection_report_utils.prepare_rejection_report_case_checks(
+                report_state.actual_monitored_tag_rows,
+                cfg.rejection_cases,
+                imitator_start_time,
+            )
 
         with allure.step("Проверка первой строки шапки xlsx-отчёта"):
             StepCheck("Лист xlsx открыт", "worksheet").actual(report_state.actual_worksheet).is_not_none()
@@ -517,90 +523,79 @@ async def export_rejection_report(ws_client, cfg: IsRejectedConfig, imitator_sta
                     "Первая строка шапки содержит заголовок отчёта об отбракованных входных данных",
                     "report_title",
                     soft_failures,
-                ).actual(header_contains_expected_title).expected(True).equal_to()
+                ).actual(report_state.actual_header_contains_expected_title).expected(True).equal_to()
                 StepCheck(
                     "Время начала периода в первой строке шапки совпадает с фильтром запроса (+-1 мин)",
                     "period_start",
                     soft_failures,
-                ).actual(header_period_start).is_between(period_start_lo, period_start_hi)
+                ).actual(report_state.actual_header_period_start).is_between(period_start_lo, period_start_hi)
                 StepCheck(
                     "Время конца периода в первой строке шапки совпадает с фильтром запроса (+-1 мин)",
                     "period_end",
                     soft_failures,
-                ).actual(header_period_end).is_between(period_end_lo, period_end_hi)
+                ).actual(report_state.actual_header_period_end).is_between(period_end_lo, period_end_hi)
                 StepCheck(
                     "Названия колонок во второй строке шапки отчёта",
                     "column_headers",
                     soft_failures,
                 ).actual(
-                    column_headers
+                    report_state.actual_header_column_headers
                 ).expected(RejectedReportConst.EXPECTED_COLUMN_HEADERS).equal_to()
 
         with allure.step("Проверка строк отчёта по каждому RejectionTestCase из конфигурации набора"):
-            # Проверяем только установление отбраковок: каждый кейс из набора должен быть в таблице
             with SoftAssertions() as soft_failures:
-                for rejection_case in cfg.rejection_cases:
-                    report_event = rejection_report_utils.expected_event_to_report_event(rejection_case.expected_event)
-                    window_start, window_end = rejection_report_utils.get_case_time_window(
-                        imitator_start_time,
-                        rejection_case,
-                    )
-                    raw_case_rows = rejection_report_utils.filter_rows_for_rejection_case(
-                        report_state.actual_monitored_tag_rows,
-                        rejection_case,
-                        imitator_start_time,
-                    )
-                    merged_case_rows = rejection_report_utils.merge_rejection_rows(raw_case_rows)
-                    primary_row = rejection_report_utils.select_primary_merged_row(merged_case_rows)
-                    expected_signal_suffix = rejection_report_utils.report_signal_suffix_by_expected_name(
-                        rejection_case.expected_signal_name,
-                    )
-                    case_label = f"события '{report_event}' - {rejection_case.sensor.description}"
-
+                for case_check in report_state.actual_case_checks:
                     StepCheck(
-                        f"В отчёте найдена отбраковка для {case_label} в интервале времени "
-                        f"{window_start} - {window_end}",
+                        f"В отчёте найдена отбраковка для {case_check.case_label} в интервале времени "
+                        f"{case_check.window_start} - {case_check.window_end}",
                         RejectedReportConst.COL_TAG,
                         soft_failures,
-                    ).actual(primary_row).is_not_none()
+                    ).actual(case_check.row_found).is_true_with_details(
+                        expected_text=(
+                            f"найдена строка с тегом {case_check.tag_description} "
+                            f"и событием '{case_check.report_event}'"
+                        ),
+                        actual_text=case_check.found_row_summary,
+                    )
 
-                    if primary_row is None:
+                    if not case_check.row_found:
                         continue
 
-                    merge_key = rejection_report_utils.build_merge_key(primary_row)
-                    expected_duration_seconds = rejection_report_utils.sum_duration_for_merge_key(
-                        raw_case_rows,
-                        merge_key,
-                    )
-                    pipe_section, actual_signal_suffix = rejection_report_utils.split_object_column(
-                        primary_row.object_value
-                    )
-
                     StepCheck(
-                        f"Для {case_label} время получения отбраковки в допустимом диапазоне",
+                        f"Для {case_check.case_label} время получения отбраковки в допустимом диапазоне",
                         RejectedReportConst.COL_DATETIME,
                         soft_failures,
-                    ).actual(primary_row.datetime_value).is_between(window_start, window_end)
+                    ).actual(case_check.datetime_in_window).is_true_with_details(
+                        expected_text=(
+                            f"дата и время в диапазоне {case_check.window_start} — {case_check.window_end}"
+                        ),
+                        actual_text=case_check.datetime_actual_text,
+                    )
 
                     StepCheck(
-                        f"Для {case_label} суммарная продолжительность отбраковки "
-                        f"({format_duration_seconds(expected_duration_seconds)}) совпадает",
+                        f"Для {case_check.case_label} суммарная продолжительность отбраковки "
+                        f"({case_check.expected_duration_text}) совпадает",
                         RejectedReportConst.COL_DURATION,
                         soft_failures,
-                    ).actual(primary_row.duration_seconds).expected(expected_duration_seconds).equal_to()
+                    ).actual(case_check.actual_duration_seconds).expected(
+                        case_check.expected_duration_seconds
+                    ).equal_to()
 
                     StepCheck(
-                        f"Для {case_label} участок трубопровода в колонке '{RejectedReportConst.COL_OBJECT}' не пустой",
+                        f"Для {case_check.case_label} участок трубопровода в колонке "
+                        f"'{RejectedReportConst.COL_OBJECT}' не пустой",
                         RejectedReportConst.COL_OBJECT,
                         soft_failures,
-                    ).actual(pipe_section).is_not_empty()
+                    ).actual(case_check.pipe_section).is_not_empty()
 
                     StepCheck(
-                        f"Для {case_label} после последней точки в колонке '{RejectedReportConst.COL_OBJECT}' "
-                        f"указан сигнал '{expected_signal_suffix}'",
+                        f"Для {case_check.case_label} после последней точки в колонке "
+                        f"'{RejectedReportConst.COL_OBJECT}' указан сигнал '{case_check.expected_signal_suffix}'",
                         RejectedReportConst.COL_OBJECT,
                         soft_failures,
-                    ).actual(actual_signal_suffix).expected(expected_signal_suffix).equal_to()
+                    ).actual(case_check.actual_signal_suffix).expected(
+                        case_check.expected_signal_suffix
+                    ).equal_to()
 
     except Exception:
         with allure.step("Прикрепление xlsx отчёта к Allure при падении теста"):
