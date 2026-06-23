@@ -112,7 +112,7 @@ def find_total_work_duration(
     total_work_duration_label: str,
 ) -> Tuple[Optional[int], str, Optional[int]]:
     """
-    Ищет строку «Суммарное время работы:» и парсит длительность рядом.
+    Ищет строку "Суммарное время работы:" и парсит длительность рядом.
 
     Возвращает (секунды, сырое значение ячейки, номер строки с меткой) или (None, "", None).
     """
@@ -145,19 +145,6 @@ def find_total_work_duration(
     return None, "", None
 
 
-def _find_total_work_duration(worksheet: Worksheet) -> Tuple[Optional[int], str, Optional[int]]:
-    """
-    Ищет строку "Суммарное время работы:" и парсит длительность рядом (в той же или следующей строке).
-
-    Возвращает: (секунды, сырое значение ячейки, номер строки с меткой) или (None, "", None).
-    """
-    return find_total_work_duration(
-        worksheet,
-        data_first_row=LdsReportConst.REPORT_DATA_FIRST_ROW,
-        total_work_duration_label=LdsReportConst.TOTAL_WORK_DURATION_LABEL,
-    )
-
-
 def parse_lds_status_report_worksheet(
     worksheet: Worksheet,
     expected_section_names: List[str],
@@ -172,7 +159,11 @@ def parse_lds_status_report_worksheet(
         worksheet.cell(row=LdsReportConst.REPORT_TITLE_ROW, column=1).value,
         LdsReportConst.REPORT_HEADER_PERIOD_PATTERN,
     )
-    total_duration_seconds, total_duration_raw, total_label_row_index = _find_total_work_duration(worksheet)
+    total_duration_seconds, total_duration_raw, total_label_row_index = find_total_work_duration(
+        worksheet,
+        data_first_row=LdsReportConst.REPORT_DATA_FIRST_ROW,
+        total_work_duration_label=LdsReportConst.TOTAL_WORK_DURATION_LABEL,
+    )
 
     section_rows: List[LdsStatusReportSectionRow] = []
     expected_names_lower = {name.lower() for name in expected_section_names}
@@ -216,6 +207,7 @@ def parse_lds_status_report_worksheet(
 __all__ = [
     "LdsStatusReportParsed",
     "LdsStatusReportSectionRow",
+    "find_total_work_duration",
     "format_duration_seconds",
     "format_section_rows_for_allure",
     "is_duration_cell_filled",
