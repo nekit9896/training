@@ -5,14 +5,15 @@ from urllib.parse import urlparse
 from clients.subprocess_client import SubprocessClient
 from constants.architecture_constants import EnvKeyConstants
 from constants.architecture_constants import ImitatorConstants as Im_const
-from constants.enums import TU
+from constants.enums import TU, MeasureConversionRule
 from infra.clickhouse_manager import ClickHouseManager
-from infra.configuration_manager import ConfigurationManager
 from infra.cmd_generator import ImitatorCmdGenerator
+from infra.configuration_manager import ConfigurationManager
 from infra.docker_manager import DockerContainerManager
 from infra.imitator_data_uploader import ImitatorDataUploader
 from infra.imitator_manager import ImitatorManager
 from infra.redis_manager import RedisCleaner
+from infra.signal_unit_conversion_manager import SignalUnitConversionManager
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ class StandSetupManager:
         test_data_id: int,  # id тест кейса из которого будут загружены данные
         test_data_name: str,  # Название архива данных имитатора для загрузки из TestOps
         tu_id: int,
+        measure_conversion_rules: MeasureConversionRule | None = None,
         username: str = os.environ.get(EnvKeyConstants.SSH_USER_DEV),
         stand_name: str = os.environ.get(EnvKeyConstants.STAND_NAME),
     ) -> None:
@@ -46,6 +48,7 @@ class StandSetupManager:
         self._test_data_id = test_data_id
         self._test_data_name = test_data_name
         self._tu_id = tu_id
+        self._measure_conversion_rules = measure_conversion_rules
         self._username = username
         self._stand_name = stand_name
         self._configuration_file_name = self._get_configuration_file_name()
@@ -76,12 +79,22 @@ class StandSetupManager:
                 self._uploader.upload_with_confirm()
 
             self.stop_all_containers()
+            if self._signal_unit_conversion_manager is not None:
+                self._signal_unit_conversion_manager.setup_signal_unit_conversion_rules()
+            else:
+                logger.info("[SETUP] [SKIP] measure_conversion_rules не задан для набора данных")
             self.clean_redis_and_clickhouse()
             self.start_containers_without_core()
         except Exception as error:
             error_msg = "[SETUP] [ERROR] Ошибка подготовки стенда к запуску имитатора"
             logger.exception(error_msg)
             raise RuntimeError(error_msg) from error
+
+    def restore_signal_unit_conversion_rules(self) -> None:
+        """
+        Возвращает оригинальный signal_unit_conversion_rules.json на стенд.
+        """
+        self._signal_unit_conversion_manager.restore_signal_unit_conversion_rules()
 
     def clean_redis_and_clickhouse(self):
         """
@@ -256,9 +269,13 @@ class StandSetupManager:
                 self._stand_client, self._infra_client, self._configuration_file_name
             )
             self._configuration_manager = ConfigurationManager(self._configuration_file_name)
+            self._signal_unit_conversion_manager = SignalUnitConversionManager(
+                self._stand_client, self._measure_conversion_rules
+            )
             self._docker_manager = DockerContainerManager(self._stand_client)
             self._redis_cleaner = RedisCleaner(self._infra_client, self._stand_name)
         except Exception as error:
             error_msg = "[SETUP] [ERROR] Ошибка инициализации клиентов"
             logger.exception(error_msg)
             raise RuntimeError(error_msg) from error
+            

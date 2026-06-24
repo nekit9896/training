@@ -221,3 +221,4 @@ class UploadDataSubprocessClient:
         check_cmd = self._cmd_generator.generate_check_remote_data_cmd()
         result = self._client.run_cmd(check_cmd, need_output=True)
         return result == Im_const.CMD_STATUS_OK
+        

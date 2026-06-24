@@ -20,6 +20,8 @@ class ImitatorConstants:
     SANDBOX_TAGS: str = "tags.txt"
     STAND_ENV_NAMING: str = os.environ.get("STAND_NAME")[:-1]
     CONFIG_PATH: str = f"/data/{STAND_ENV_NAMING}/configs"
+    SIGNAL_UNIT_CONVERSION_RULES_FILE_NAME: str = "signal_unit_conversion_rules.json"
+    SIGNAL_UNIT_CONVERSION_RULES_BACKUP_DIR: str = "original_conversion_rules"
     SOURCE_TYPE_DEF_VALUE: str = "inflow"
     SPEED_DEF_VALUE: int = 1
     NS_DEF_VALUE: int = 2
@@ -163,3 +165,4 @@ class EnvKeyConstants:
     DATA_PATH: str = "DATA_PATH"
     OPC_URL: str = "OPC_URL"
     TU_ID: str = "TU_ID"
+    

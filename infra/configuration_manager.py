@@ -2,8 +2,8 @@ import json
 import logging
 from typing import Any
 
-from utils.helpers.configuration_utils import extract_sensor_ids_by_address
 from constants.architecture_constants import ImitatorConstants as Imitator_const
+from utils.helpers.configuration_utils import extract_sensor_ids_by_address
 
 logger = logging.getLogger(__name__)
 
@@ -47,3 +47,4 @@ class ConfigurationManager:
                 raise OSError(error_msg) from error
         logger.exception(error_msg)
         raise OSError(error_msg)
+        

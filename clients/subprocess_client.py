@@ -61,7 +61,7 @@ class SubprocessClient:
         :return: результат выполнения команды
         """
         final_cmd = self._wrap_ssh_cmd(cmd, use_ssh)
-        logging.info(f"[RUN] Выполняю команду: {final_cmd}")
+        logging.info(f"[RUN] Выполняю команду: {final_cmd[:200]}")
         try:
             return subprocess.run(
                 final_cmd,
@@ -124,7 +124,7 @@ class SubprocessClient:
         :return: Вывод
         """
         result = self._exec_run(cmd, check, timeout, use_ssh)
-        logging.info(f"[RUN] [OK] Команда выполнена успешно: {cmd}")
+        logging.info(f"[RUN] [OK] Команда выполнена успешно: {cmd[:200]}")
         if need_output:
             output = result.stdout.strip()
             return output
@@ -170,3 +170,4 @@ class SubprocessClient:
         """
 
         return os.device_encoding(1) or Im_const.WIN_ENCODING_CP866
+        
