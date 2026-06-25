@@ -165,3 +165,4 @@ class EnvKeyConstants:
     DATA_PATH: str = "DATA_PATH"
     OPC_URL: str = "OPC_URL"
     TU_ID: str = "TU_ID"
+    

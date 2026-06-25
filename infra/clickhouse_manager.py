@@ -56,16 +56,17 @@ class ClickHouseManager:
         """
 
         evo_id_pairs_chunks = self._split_pairs_list()
-        for chunk in evo_id_pairs_chunks:
-            self._delete_clickhouse_keys(chunk)
-            self._check_clickhouse_keys(chunk)
-        logger.info(f"[CLICKHOUSE] [OK] Успех! Данные всех датчиков в таблице {CH_const.LAST_VALUE_TABLE_NAME} удалены")
+        for table_name in CH_const.CH_TABLE_NAMES:
+            for chunk in evo_id_pairs_chunks:
+                self._delete_clickhouse_keys(chunk, table_name)
+                self._check_clickhouse_keys(chunk, table_name)
+            logger.info(f"[CLICKHOUSE] [OK] Успех! Данные всех датчиков в таблице {table_name} удалены")
 
-    def _delete_clickhouse_keys(self, evo_id_pairs: List[tuple]) -> None:
+    def _delete_clickhouse_keys(self, evo_id_pairs: List[tuple], table_name) -> None:
         """
         Метод удаления данных по ключам из ClickHouse командой, используя clickhouse-client
         """
-        delete_cmd = self._cmd_generator.generate_delete_clickhouse_keys_cmd(evo_id_pairs)
+        delete_cmd = self._cmd_generator.generate_delete_clickhouse_keys_cmd(evo_id_pairs, table_name)
         try:
             self._infra_client.run_cmd(delete_cmd)
         except Exception as error:
@@ -73,12 +74,12 @@ class ClickHouseManager:
             logger.exception(error_msg)
             raise RuntimeError(error_msg) from error
 
-    def _check_clickhouse_keys(self, evo_id_pairs: List[tuple]) -> None:
+    def _check_clickhouse_keys(self, evo_id_pairs: List[tuple], table_name: str) -> None:
         """
         Метод проверки удаления данных по ключам из ClickHouse командой, используя clickhouse-client
         """
 
-        check_cmd = self._cmd_generator.generate_check_sensor_data_click_cmd(evo_id_pairs)
+        check_cmd = self._cmd_generator.generate_check_sensor_data_click_cmd(evo_id_pairs, table_name)
         try:
             result = self._infra_client.run_cmd(check_cmd, need_output=True)
             try:
@@ -193,3 +194,4 @@ class ClickHouseManager:
             # fmt: on
             for i in range(0, len(self._evo_id_pairs), CH_const.EVO_ID_PAIRS_CHUNK_SIZE)
         ]
+        

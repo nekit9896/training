@@ -5,10 +5,10 @@ from urllib.parse import urlparse
 from clients.subprocess_client import SubprocessClient
 from constants.architecture_constants import EnvKeyConstants
 from constants.architecture_constants import ImitatorConstants as Im_const
-from constants.enums import MeasureConversionRule, TU
+from constants.enums import TU, MeasureConversionRule
 from infra.clickhouse_manager import ClickHouseManager
-from infra.configuration_manager import ConfigurationManager
 from infra.cmd_generator import ImitatorCmdGenerator
+from infra.configuration_manager import ConfigurationManager
 from infra.docker_manager import DockerContainerManager
 from infra.imitator_data_uploader import ImitatorDataUploader
 from infra.imitator_manager import ImitatorManager
@@ -79,13 +79,22 @@ class StandSetupManager:
                 self._uploader.upload_with_confirm()
 
             self.stop_all_containers()
-            self._signal_unit_conversion_manager.setup_signal_unit_conversion_rules()
+            if self._signal_unit_conversion_manager is not None:
+                self._signal_unit_conversion_manager.setup_signal_unit_conversion_rules()
+            else:
+                logger.info("[SETUP] [SKIP] measure_conversion_rules не задан для набора данных")
             self.clean_redis_and_clickhouse()
             self.start_containers_without_core()
         except Exception as error:
             error_msg = "[SETUP] [ERROR] Ошибка подготовки стенда к запуску имитатора"
             logger.exception(error_msg)
             raise RuntimeError(error_msg) from error
+
+    def restore_signal_unit_conversion_rules(self) -> None:
+        """
+        Возвращает оригинальный signal_unit_conversion_rules.json на стенд.
+        """
+        self._signal_unit_conversion_manager.restore_signal_unit_conversion_rules()
 
     def clean_redis_and_clickhouse(self):
         """
@@ -163,12 +172,6 @@ class StandSetupManager:
             error_msg = "[TEARDOWN] [ERROR] Не удалось остановить имитатор"
             logger.exception(error_msg)
             raise RuntimeError(error_msg) from error
-
-    def restore_signal_unit_conversion_rules(self) -> None:
-        """
-        Возвращает оригинальный signal_unit_conversion_rules.json на стенд.
-        """
-        self._signal_unit_conversion_manager.restore_signal_unit_conversion_rules()
 
     def server_test_data_remover(self):
         """
@@ -275,3 +278,4 @@ class StandSetupManager:
             error_msg = "[SETUP] [ERROR] Ошибка инициализации клиентов"
             logger.exception(error_msg)
             raise RuntimeError(error_msg) from error
+            

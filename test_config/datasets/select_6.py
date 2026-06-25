@@ -139,5 +139,6 @@ SELECT_6_CONFIG = SmokeSuiteConfig(
         # ----- Тест ExportReports -----
         export_leaks_report_test=CaseMarkers(test_case_id="234", offset=62),
         export_lds_status_report_test=CaseMarkers(test_case_id="235", offset=63),
+        export_mt_mode_report_test=CaseMarkers(test_case_id="", offset=64),
     ),
 )

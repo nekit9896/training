@@ -15,8 +15,9 @@ from constants.architecture_constants import EnvKeyConstants as EnvConst
 from constants.architecture_constants import ImitatorConstants as ImConst
 from constants.architecture_constants import WebSocketClientConstants as WSCliConst
 from constants.enums import RejectionSensorTag
+from constants.test_constants import BaseTN3Constants
 from infra.stand_setup_manager import StandSetupManager
-from test_config.datasets import ALL_SMOKE_CONFIGS, get_config_by_name
+from test_config.datasets import get_config_by_name
 
 
 def pytest_addoption(parser):
@@ -88,11 +89,12 @@ def pytest_configure(config):
     }
 
 
-def _update_rejection_sensor_ids(stand_manager: StandSetupManager) -> None:
+def _update_sensor_ids(stand_manager: StandSetupManager) -> None:
     """
-    Для тестов отбраковки обновляет sensor_id по address из конфигурации стенда.
+    Для тестов датчиков обновляет sensor_id по address из конфигурации стенда.
     """
     sensor_ids_by_address = stand_manager.get_sensor_ids_by_address()
+    BaseTN3Constants.SENSOR_IDS_BY_ADDRESS.update(sensor_ids_by_address)
     RejectionSensorTag.update_ids_from_config(sensor_ids_by_address)
 
 
@@ -116,13 +118,13 @@ def pytest_runtest_makereport(item, call):
 SMOKE_SUITE_LEVEL_MAPPING = {
     'test_basic_info': 'basic_info_test',
     'test_journal_info': 'journal_info_test',
-    'test_imitate_flowmeter_signal': 'imitate_flowmeter_signal_test',
     'test_imitate_pressure_sensor_signal': 'imitate_pressure_sensor_signal_test',
+    'test_imitate_flowmeter_signal': 'imitate_flowmeter_signal_test',
     'test_lds_status_initialization': 'lds_status_initialization_test',
     'test_lds_status_init_in_journal': 'lds_status_init_in_journal_test',
     'test_main_page_info': 'main_page_info_test',
     'test_main_page_info_signals': 'main_page_info_signals_test',
-    'test_mask_signal_msg': 'mask_signal_test',
+    'test_mask_signal': 'mask_signal_test',
     'test_mask_info_in_journal': 'mask_info_in_journal_test',
     'test_lds_status_initialization_out': 'lds_status_initialization_out_test',
     'test_lds_status_init_out_in_journal': 'lds_status_init_out_in_journal_test',
@@ -131,38 +133,50 @@ SMOKE_SUITE_LEVEL_MAPPING = {
     'test_unmask_du_on_mini_scheme': 'unmask_du_on_mini_scheme_test',
     'test_lds_status_after_confirming_leak': 'lds_status_after_confirming_leak_test',
     'test_lds_status_completed_leak': 'lds_status_completed_leak_test',
+    'test_diagnostics_of_signals_after_initialization': 'diagnostics_of_signals_after_initialization_test',
+    'test_mode_mt_in_journal': 'mode_mt_in_journal_test',
 }
 
 # Regress-тесты режимов СОУ (маркеры из LDSStatusConfig)
 LDS_STATUS_SUITE_LEVEL_MAPPING = {
     'test_lds_status_basic_info': 'lds_status_basic_info_test',
-    'test_lds_status_init_accumulation_data': 'lds_status_init_accumulation_data_test',
-    'test_lds_status_init_cold_start': 'lds_status_init_cold_start_test',
-    'test_lds_status_init_exiting_faulty': 'lds_status_init_exiting_faulty_test',
-    'test_lds_status_init_switching_shut_off': 'lds_status_init_switching_shut_off_test',
-    'test_lds_status_serviceable_after_cold_start': 'lds_status_serviceable_after_cold_start_test',
-    'test_lds_status_serviceable_after_switching_shut_off': 'lds_status_serviceable_after_switching_shut_off_test',
-    'test_lds_status_serviceable_after_deg_absence_min_pressure_sensors': 'lds_status_serviceable_after_deg_absence_min_pressure_sensors_test',  # noqa: E501
-    'test_lds_status_serviceable_after_deg_starting_pumping_out_pumps': 'lds_status_serviceable_after_deg_starting_pumping_out_pumps_test',  # noqa: E501
-    'test_lds_status_serviceable_after_deg_faulty_pressure_sensors_at_pump': 'lds_status_serviceable_after_deg_faulty_pressure_sensors_at_pump_test',  # noqa: E501
-    'test_lds_status_serviceable_after_faulty': 'lds_status_serviceable_after_faulty_test',
-    'test_lds_status_degradation_additive_injectors_operation': 'lds_status_deg_additive_injectors_operation_test',
-    'test_lds_status_degradation_exceeding_distance_between_pressure_sensors': 'lds_status_deg_exceeding_distance_between_pressure_sensors_test',  # noqa: E501
-    'test_lds_status_degradation_absence_min_pressure_sensors': 'lds_status_deg_absence_min_pressure_sensors_test',
-    'test_lds_status_degradation_faulty_pressure_sensors_at_pump_station': 'lds_status_deg_faulty_pressure_sensors_at_pump_station_test',  # noqa: E501
-    'test_lds_status_degradation_gravity_section_pumping': 'lds_status_deg_gravity_section_pumping_test',
-    'test_lds_status_degradation_gravity_section_pumping_in_stopping': 'lds_status_deg_gravity_section_pumping_in_stopping_test',  # noqa: E501
-    'test_lds_status_degradation_pig_sensor_passage': 'lds_status_deg_pig_sensor_passage_test',
-    'test_lds_status_degradation_starting_pumping_out_pumps': 'lds_status_deg_starting_pumping_out_pumps_test',
-    'test_lds_status_degradation_exceeding_distance_between_flow_meters': 'lds_status_deg_exceeding_distance_between_flow_meters_test',  # noqa: E501
-    'test_lds_status_degradation_rejection_temperature_sensor_on_du_2': 'lds_status_deg_rejection_temperature_sensor_on_du_2_test',  # noqa: E501
-    'test_lds_status_degradation_rejection_temperature_sensor_on_du_3': 'lds_status_deg_rejection_temperature_sensor_on_du_3_test',  # noqa: E501
-    'test_lds_status_degradation_rejection_temperature_sensor_on_du_5': 'lds_status_deg_rejection_temperature_sensor_on_du_5_test',  # noqa: E501
-    'test_lds_status_degradation_rejection_density_and_viscosity_on_du_2': 'lds_status_deg_rejection_density_and_viscosity_on_du_2_test',  # noqa: E501
-    'test_lds_status_degradation_rejection_density_and_viscosity_on_du_3': 'lds_status_deg_rejection_density_and_viscosity_on_du_3_test',  # noqa: E501
-    'test_lds_status_degradation_rejection_density_and_viscosity_on_du_5': 'lds_status_deg_rejection_density_and_viscosity_on_du_5_test',  # noqa: E501
-    'test_lds_status_faulty_absence_min_flow_meters': 'lds_status_faulty_absence_min_flow_meters_test',
-    'test_lds_status_faulty_absence_min_pressure_sensors': 'lds_status_faulty_absence_min_pressure_sensors_test',
+    'test_lds_status_init_accumulation_data': 'init_accumulation_data_test',
+    'test_lds_status_init_accumulation_data_in_journal': 'init_accumulation_data_in_journal_test',
+    'test_lds_status_init_cold_start': 'init_cold_start_test',
+    'test_lds_status_init_cold_start_in_journal': 'init_cold_start_in_journal_test',
+    'test_lds_status_init_exiting_faulty': 'init_exiting_faulty_test',
+    'test_lds_status_init_switching_shut_off': 'init_switching_shut_off_test',
+    'test_lds_status_init_switching_shut_off_in_journal': 'init_switching_shut_off_in_journal_test',
+    'test_lds_status_serviceable_after_cold_start': 'serviceable_after_cold_start_test',
+    'test_lds_status_serviceable_after_cold_start_in_journal': 'serviceable_after_cold_start_in_journal_test',
+    'test_lds_status_serviceable_after_switching_shut_off': 'serviceable_after_switching_shut_off_test',
+    'test_lds_status_serviceable_after_switching_shut_off_in_journal': 'serviceable_after_switching_shut_off_in_journal_test',  # noqa: E501
+    'test_lds_status_serviceable_after_deg_absence_min_pressure_sensors': 'serviceable_after_deg_absence_min_pressure_sensors_test',  # noqa: E501
+    'test_lds_status_serviceable_after_deg_starting_pumping_out_pumps': 'serviceable_after_deg_starting_pumping_out_pumps_test',  # noqa: E501
+    'test_lds_status_serviceable_after_deg_faulty_pressure_sensors_at_pump': 'serviceable_after_deg_faulty_pressure_sensors_at_pump_test',  # noqa: E501
+    'test_lds_status_serviceable_after_deg_faulty_pressure_sensors_at_pump_in_journal': 'serviceable_after_deg_faulty_pressure_sensors_at_pump_in_journal_test',  # noqa: E501
+    'test_lds_status_serviceable_after_faulty': 'serviceable_after_faulty_test',
+    'test_lds_status_degradation_additive_injectors_operation': 'deg_additive_injectors_operation_test',
+    'test_lds_status_degradation_exceeding_distance_between_pressure_sensors': 'deg_exceeding_distance_between_pressure_sensors_test',  # noqa: E501
+    'test_lds_status_degradation_exceeding_distance_between_pressure_sensors_in_journal': 'deg_exceeding_distance_between_pressure_sensors_in_journal_test',  # noqa: E501
+    'test_lds_status_degradation_absence_min_pressure_sensors': 'deg_absence_min_pressure_sensors_test',
+    'test_lds_status_degradation_faulty_pressure_sensors_at_pump_station': 'deg_faulty_pressure_sensors_at_pump_station_test',  # noqa: E501
+    'test_lds_status_degradation_faulty_pressure_sensors_at_pump_station_in_journal': 'deg_faulty_pressure_sensors_at_pump_station_in_journal_test',  # noqa: E501
+    'test_lds_status_degradation_gravity_section_pumping': 'deg_gravity_section_pumping_test',
+    'test_lds_status_degradation_gravity_section_pumping_in_stopping': 'deg_gravity_section_pumping_in_stopping_test',
+    'test_lds_status_degradation_gravity_section_pumping_in_stopping_in_journal': 'deg_gravity_section_pumping_in_stopping_in_journal_test',  # noqa: E501
+    'test_lds_status_degradation_pig_sensor_passage': 'deg_pig_sensor_passage_test',
+    'test_lds_status_degradation_starting_pumping_out_pumps': 'deg_starting_pumping_out_pumps_test',
+    'test_lds_status_degradation_exceeding_distance_between_flow_meters': 'deg_exceeding_distance_between_flow_meters_test',  # noqa: E501
+    'test_lds_status_degradation_rejection_temperature_sensor_on_du_2': 'deg_rejection_temperature_sensor_on_du_2_test',
+    'test_lds_status_degradation_rejection_temperature_sensor_on_du_3': 'deg_rejection_temperature_sensor_on_du_3_test',
+    'test_lds_status_degradation_rejection_temperature_sensor_on_du_5': 'deg_rejection_temperature_sensor_on_du_5_test',
+    'test_lds_status_degradation_rejection_density_and_viscosity_on_du_2': 'deg_rejection_density_and_viscosity_on_du_2_test',  # noqa: E501
+    'test_lds_status_degradation_rejection_density_and_viscosity_on_du_3': 'deg_rejection_density_and_viscosity_on_du_3_test',  # noqa: E501
+    'test_lds_status_degradation_rejection_density_and_viscosity_on_du_5': 'deg_rejection_density_and_viscosity_on_du_5_test',  # noqa: E501
+    'test_lds_status_faulty_absence_min_flow_meters': 'faulty_absence_min_flow_meters_test',
+    'test_lds_status_faulty_absence_min_pressure_sensors': 'faulty_absence_min_pressure_sensors_test',
+    'test_lds_status_faulty_absence_min_pressure_sensors_in_journal': 'faulty_absence_min_pressure_sensors_in_journal_test',  # noqa: E501
 }
 
 # Тесты уровня утечки (маркеры из LeakTestConfig - параметр leak)
@@ -188,6 +202,7 @@ LEAK_LEVEL_TEST_MAPPING = {
     'test_completed_leak_info_in_journal': 'completed_leak_info_in_journal_test',
     'test_export_leaks_report': 'export_leaks_report_test',
     'test_export_lds_status_report': 'export_lds_status_report_test',
+    'test_export_mt_mode_report': 'export_mt_mode_report_test',
 }
 
 # Тесты уровня отбраковки (маркеры из RejectionTestCase - параметр rejection_case)
@@ -196,6 +211,11 @@ IS_REJECTED_LEVEL_TEST_MAPPING = {
     'test_rejection_journal': 'rejection_journal_test',
     'test_rejection_main_page': 'rejection_main_page_test',
     'test_rejection_scheme_signals_state': 'rejection_scheme_signals_state_test',
+}
+
+# Suite-level тесты отбраковки (маркеры из IsRejectedConfig - параметр config)
+IS_REJECTED_SUITE_LEVEL_MAPPING = {
+    'test_rejection_report': 'rejection_report_test',
 }
 
 # Мержим все вместе чтобы не переписывать логику коллектора айтемов (тестов)
@@ -227,6 +247,12 @@ def _get_test_markers_config(item, test_name):
         rejection_case = params['rejection_case']
         attr_name = IS_REJECTED_LEVEL_TEST_MAPPING[test_name]
         return getattr(rejection_case, attr_name, None)
+
+    # Suite-level тесты отбраковки (без rejection_case)
+    if 'config' in params and 'rejection_case' not in params and test_name in IS_REJECTED_SUITE_LEVEL_MAPPING:
+        suite_config = params['config']
+        attr_name = IS_REJECTED_SUITE_LEVEL_MAPPING[test_name]
+        return getattr(suite_config, attr_name, None)
 
     # Для suite-level тестов берём из config
     if 'config' in params:
@@ -288,6 +314,7 @@ def pytest_collection_modifyitems(session, config, items):
             test_name in SUITE_LEVEL_TEST_MAPPING
             or test_name in LEAK_LEVEL_TEST_MAPPING
             or test_name in IS_REJECTED_LEVEL_TEST_MAPPING
+            or test_name in IS_REJECTED_SUITE_LEVEL_MAPPING
         ):  # noqa: E501
             # Конфиг теста = None - исключаем тест из прогона
             deselected_items.append(item)
@@ -454,9 +481,7 @@ def pytest_runtest_setup(item):
         imitator_duration = compute_imitator_duration(item, current_test_suite)
 
         suite_config = _find_config_by_suite_name(current_test_suite)
-        measure_conversion_rules = (
-            suite_config.measure_conversion_rules if suite_config is not None else None
-        )
+        measure_conversion_rules = suite_config.measure_conversion_rules if suite_config is not None else None
 
         stand_manager = StandSetupManager(
             duration_m=imitator_duration,
@@ -481,7 +506,7 @@ def pytest_runtest_setup(item):
             pytest.exit(f"[SETUP] [ERROR] ошибка при подготовке стенда: {error}")
 
         try:
-            _update_rejection_sensor_ids(stand_manager)
+            _update_sensor_ids(stand_manager)
         except Exception as error:
             pytest.exit(f"[SETUP] [ERROR] ошибка обновления id датчиков отбраковки из конфигурации: {error}")
 
@@ -524,9 +549,7 @@ def pytest_runtest_teardown(item, nextitem):
             try:
                 stand_manager.restore_signal_unit_conversion_rules()
             except Exception:
-                logger.exception(
-                    "[ERROR] [TEARDOWN] Ошибка при восстановлении signal_unit_conversion_rules.json"
-                )
+                logger.exception("[ERROR] [TEARDOWN] Ошибка при восстановлении signal_unit_conversion_rules.json")
             if not os.environ.get("RUN_WITHOUT_TESTOPS", "False").lower() == "true":
                 # При запуске с TestOps удаляет данные прогона
                 stand_manager.server_test_data_remover()
@@ -631,9 +654,7 @@ def pytest_sessionfinish(session, exitstatus):
             try:
                 stand_manager.restore_signal_unit_conversion_rules()
             except Exception:
-                logger.exception(
-                    "[ERROR] [TEARDOWN] Ошибка при восстановлении signal_unit_conversion_rules.json"
-                )
+                logger.exception("[ERROR] [TEARDOWN] Ошибка при восстановлении signal_unit_conversion_rules.json")
             try:
                 stand_manager.server_test_data_remover()
             except Exception:
@@ -666,3 +687,4 @@ def ws_params(request):
     Передает параметры для websocket в тест
     """
     return request.param
+    

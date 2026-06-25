@@ -304,3 +304,41 @@ def attach_report_file_to_allure(file_path: Path, file_name: str) -> None:
             allure.attach(raw_file.read(), name=file_name, extension="xlsx")
     except OSError:
         pass
+
+
+def read_worksheet_cell_value(
+    file_path: Path,
+    row: int,
+    column: int,
+    *,
+    data_only: bool = True,
+    sheet_index: int = ReportConst.DEFAULT_SHEET_INDEX,
+) -> object:
+    """
+    Читает значение ячейки из xlsx.
+
+    Для формул используем data_only=False, оказалось иначе openpyxl вернёт вычисленное значение.
+    """
+    if not file_path.exists():
+        return None
+    try:
+        workbook = load_workbook(filename=str(file_path), read_only=True, data_only=data_only)
+    except Exception:
+        return None
+    sheet_names = workbook.sheetnames
+    if not sheet_names:
+        return None
+    worksheet = workbook[sheet_names[sheet_index]]
+    return worksheet.cell(row=row, column=column).value
+
+
+def sum_duration_columns_across_rows(
+    section_rows: list,
+    mode_duration_columns: list[str],
+) -> dict[str, int]:
+    """Суммирует длительности по колонкам режимов для всех строк участков."""
+    totals = {column_name: 0 for column_name in mode_duration_columns}
+    for section_row in section_rows:
+        for column_name, duration_seconds in section_row.mode_durations_seconds.items():
+            totals[column_name] += duration_seconds
+    return totals

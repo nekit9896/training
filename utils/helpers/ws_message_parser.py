@@ -12,12 +12,11 @@ from pytest import fail
 
 import models.subscribe_scheme_signals_state_model as signals_state_model
 from constants.architecture_constants import WebSocketClientConstants
+from constants.enums import ExportedDataType, ExportStatus
 from models.acknowledge_leak_model import AcknowledgeLeakReply
 from models.basic_info_model import BasicInfoReply
-from constants.enums import ExportStatus, ExportedDataType
 from models.export_reports_model import ReportDataExportedNotification
 from models.get_exported_files_list_model import GetExportedDataListReply
-from models.upload_exported_file_model import DownloadExportedDataReply
 from models.get_input_signals_model import GetInputSignalsReply
 from models.get_messages_model import GetMessagesReply
 from models.get_output_signals_model import GetOutputSignalsReply
@@ -37,6 +36,7 @@ from models.subscribe_tu_leaks_info_model import SubscribeTuLeaksInfoReply
 from models.unimitate_signal_model import UnimitateSignalReply
 from models.unmask_lds_command_model import UnmaskLdsReply
 from models.unmask_signal_model import UnmaskSignalReply
+from models.upload_exported_file_model import DownloadExportedDataReply
 
 MessageType = TypeVar("MessageType")  # создает типовую переменную для парсинга сообщений
 ContentType = TypeVar("ContentType")
@@ -340,6 +340,7 @@ class WsMessageParser:
         """
         Получает конфиг с правилами обработки полей
         """
+
         # TODO добавить strict=True, после выполнения задачи LDS-8792
         def _to_export_status(value: Any) -> ExportStatus:
             return value if isinstance(value, ExportStatus) else ExportStatus(value)

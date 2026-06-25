@@ -7,7 +7,7 @@ class BaseStrEnum(Enum):
         return f"{self.name} ({self.value})"
 
 
-class BaseStrIntflag(IntFlag):
+class BaseStrIntFlag(IntFlag):
     def __str__(self) -> str:
         raw_value = int(self)
         if raw_value == 0:
@@ -18,6 +18,40 @@ class BaseStrIntflag(IntFlag):
             return f"{', '.join(active_flags)}"
 
         return str(raw_value)
+
+
+class BaseReasonEnum(IntFlag):
+    """
+    .report_text - название на русском языке.
+    Вывод в формате report_text(value)
+    """
+
+    def __new__(cls, value: int, report_text: str):
+        member = int.__new__(cls, value)
+        member._value_ = value
+        member.report_text = report_text
+        return member
+
+    def __str__(self) -> str:
+        raw_value = int(self)
+        if raw_value == 0:
+            return "0"
+
+        active_flags = [
+            f"{flag.report_text} ({flag.value})" for flag in type(self) if flag.value and flag & self == flag
+        ]
+        if active_flags:
+            return f"{', '.join(active_flags)}"
+
+        return str(raw_value)
+
+    @classmethod
+    def report_text_by_value(cls, status_value: int) -> str | None:
+        """Текст по числовому значению статуса"""
+        try:
+            return cls(status_value).report_text
+        except ValueError:
+            return None
 
 
 class TU(Enum):
@@ -77,10 +111,10 @@ class ExportedDataType(IntEnum):
 
 
 _EXPORTED_DATA_TYPE_DOWNLOAD_NAMES = {
-    ExportedDataType.STATIONARY_STATUS_REPORT: "StationaryStatusReport",
+    ExportedDataType.STATIONARY_STATUS_REPORT: "MnStateReport",
     ExportedDataType.LDS_STATUS_REPORT: "LdsStateReport",
     ExportedDataType.LEAKS_REPORT: "LeaksReport",
-    ExportedDataType.REJECTED_REPORT: "RejectedReport",
+    ExportedDataType.REJECTED_REPORT: "RejectedSignalsReport",
 }
 
 
@@ -92,9 +126,23 @@ class ExportStatus(IntEnum):
 
 
 class StationaryStatus(BaseStrEnum):
-    UNSTATIONARY = 1  # Нестационарный режим
-    STATIONARY = 2  # Стационарный режим
-    STOPPED = 3  # Режим остановленной перекачки
+    UNSTATIONARY = (1, 'Нестационарный режим работы МТ')  # Нестационарный режим
+    STATIONARY = (2, 'Стационарный режим работы МТ')  # Стационарный режим
+    STOPPED = (3, 'МТ в режиме остановленной перекачки')  # Режим остановкленной перекачки
+
+    def __new__(cls, value: int, report_text: str) -> "StationaryStatus":
+        member = object.__new__(cls)
+        member._value_ = value
+        member.report_text = report_text
+        return member
+
+    @classmethod
+    def report_text_by_value(cls, status_value: int) -> str | None:
+        """Текст режима СОУ для отчёта по числовому значению статуса"""
+        try:
+            return cls(status_value).report_text
+        except ValueError:
+            return None
 
 
 class LeakStatus(BaseStrEnum):
@@ -204,7 +252,7 @@ class ReservedType(BaseStrEnum):
     CREATED_IN_DECISION_MAKING = 6  # Создано в АПР
 
 
-class MessageType(BaseStrIntflag):
+class MessageType(BaseStrIntFlag):
     AUTHENTICATION = 1  # Вход в систему
     REJECTION = 1 << 2  # Отбраковка сигналов
     LDS_STATUS = 1 << 3  # Режим работы СОУ
@@ -215,7 +263,7 @@ class MessageType(BaseStrIntflag):
     LEAKS = 1 << 10  # Утечка
 
 
-class MessagePriority(BaseStrIntflag):
+class MessagePriority(BaseStrIntFlag):
     LOW = 1  # Прочее
     COMMON = 1 << 1  # Информационное
     MEDIUM = 1 << 2  # Значительное
@@ -223,49 +271,71 @@ class MessagePriority(BaseStrIntflag):
     VERY_HIGH = 1 << 4  # Особой важности
 
 
-class LdsStatusDegradation(BaseStrIntflag):
-    LEAK_ON_ADJACENT_DIAGNOSTIC_AREAS = 1 << 0  # Возникновение утечки на соседнем диагностическом участке
-    ADDITIVE_INJECTORS_OPERATION = 1 << 1  # Наличие ПТП
-    PIG_SENSOR_PASSAGE = 1 << 2  # Наличие СОД
-    TRIGGERING_EMERGENCY_RESET = 1 << 3  # Срабатывание аварийного сброса
-    STARTING_PUMPING_OUT_PUMPS = 1 << 4  # Работа насосов откачки
-    EXCEEDING_DISTANCE_BETWEEN_SERVICEABLE_PRESSURE_SENSORS = 1 << 5  # Расстояние между СИ давления более 50 км
-    FAULTY_PRESSURE_SENSORS_AT_PUMP_STATION_NODES = 1 << 6  # Отказ СИ давления на входе/выходе НПС
-    REJECTION_TEMPERATURE_SENSOR = 1 << 7  # Отказ СИ температуры
-    REJECTION_VISCOSITY_SENSOR = 1 << 8  # Отказ СИ вязкости
-    REJECTION_DENSITY_SENSOR = 1 << 9  # Отказ СИ плотности
-    GRAVITY_SECTION_IN_PUMPING_MODE = 1 << 10  # Наличие самотечного участка/участка с неполным сечением
-    ABSENCE_MIN_PRESSURE_SENSORS_REQUIRED_NUMBER = 1 << 11  # Менее 4 исправных СИ давления на разных КП ЛЧ и НПС
-    EXCEEDING_DISTANCE_BETWEEN_FLOW_METERS = 1 << 12  # Расстояние между СИ расхода на пути перекачки более 200 км
-    GRAVITY_SECTION_IN_STOPPED_PUMPING_MODE = 1 << 13  # Наличие самотечного участка в режиме остановленной перекачки
-
-
-class LdsStatusFaulty(BaseStrIntflag):
-    NO_DATA_SOURCE_CONNECTION = 1 << 0  # Отсутствует связь серверного оборудования СОУ с источником «сырых» данных
-    ABSENCE_MIN_PRESSURE_SENSORS_REQUIRED_NUMBER = 1 << 1  # Менее 4 КП с достоверными СИ давления
-    ABSENCE_MIN_FLOW_METERS_REQUIRED_NUMBER = 1 << 2  # Недостоверность граничного СИ расхода
-
-
-class LdsStatusInitialization(BaseStrIntflag):
-    ACCUMULATION_DATA = 1 << 0  # Накопление данных
-    EXITING_FAULTY_MODE = 1 << 1  # Выход СОУ из режима «Неисправна»
-    COLD_START_OF_SERVERS = 1 << 2  # Одновременный «холодный» запуск нескольких серверов СОУ
-    SWITCHING_SHUT_OFF_IN_STOPPED_PUMPING_MODE = 1 << 3  # Переключение запорной арматуры
-    USER_ACTION = 1 << 4  # По команде пользователя
-
-
-class StationaryReason(BaseStrIntflag):
+class LdsStatusDegradation(BaseReasonEnum):
     """
-    Причины режима работы МТ: Стационар
+    Причины режима работы СОУ: Ухудшение характеристик
+    """
+
+    LEAK_ON_ADJACENT_DIAGNOSTIC_AREAS = (1 << 0, 'Утечка на соседнем диагностическом участке')
+    ADDITIVE_INJECTORS_OPERATION = (1 << 1, 'Наличие ПТП')
+    PIG_SENSOR_PASSAGE = (1 << 2, 'Наличие СОД')
+    TRIGGERING_EMERGENCY_RESET = (1 << 3, 'Срабатывание аварийного сброса или предохранительных клапанов')
+    STARTING_PUMPING_OUT_PUMPS = (1 << 4, 'Работа насосов откачки')
+    EXCEEDING_DISTANCE_BETWEEN_SERVICEABLE_PRESSURE_SENSORS = (
+        1 << 5,
+        'Расстояние между ближайшими исправными СИ давления на пути перекачки более 50 км',
+    )
+    FAULTY_PRESSURE_SENSORS_AT_PUMP_STATION_NODES = (1 << 6, 'Отказ СИ давления на входе/выходе НПС')
+    REJECTION_TEMPERATURE_SENSOR = (1 << 7, 'Отказ СИ температуры')
+    REJECTION_VISCOSITY_SENSOR = (1 << 8, 'Отказ СИ вязкости')
+    REJECTION_DENSITY_SENSOR = (1 << 9, 'Отказ СИ плотности')
+    GRAVITY_SECTION_IN_PUMPING_MODE = (1 << 10, 'Наличие самотечного участка/участка с неполным сечением')
+    ABSENCE_MIN_PRESSURE_SENSORS_REQUIRED_NUMBER = (1 << 11, 'Менее 4 исправных СИ давления на разных КП ЛЧ и НПС')
+    EXCEEDING_DISTANCE_BETWEEN_FLOW_METERS = (
+        1 << 12,
+        'Расстояние между ближайшими исправными СИ расхода на пути перекачки более 200 км',
+    )
+    GRAVITY_SECTION_IN_STOPPED_PUMPING_MODE = (
+        1 << 13,
+        'Наличие самотечного участка/участка с неполным сечением в режиме остановленной перекачки',
+    )
+
+
+class LdsStatusFaulty(BaseReasonEnum):
+    """
+    Причины режима работы СОУ: Неисправность
+    """
+
+    NO_DATA_SOURCE_CONNECTION = (1 << 0, 'Потеря связи СОУ с СДКУ')
+    ABSENCE_MIN_PRESSURE_SENSORS_REQUIRED_NUMBER = (1 << 1, 'Менее 4 КП с достоверными СИ давления')
+    ABSENCE_MIN_FLOW_METERS_REQUIRED_NUMBER = (1 << 2, 'Недостоверность граничного СИ расхода')
+
+
+class LdsStatusInitialization(BaseReasonEnum):
+    """
+    Причины режима работы СОУ: Инициализация
+    """
+
+    ACCUMULATION_DATA = (1 << 0, 'Накопление данных')
+    EXITING_FAULTY_MODE = (1 << 1, 'Выход СОУ из режима «Неисправна»')
+    COLD_START_OF_SERVERS = (1 << 2, 'Одновременный «холодный» запуск нескольких серверов СОУ')
+    SWITCHING_SHUT_OFF_IN_STOPPED_PUMPING_MODE = (
+        1 << 3,
+        'Переключение запорной арматуры в режиме остановленной перекачки',
+    )
+    USER_ACTION = (1 << 4, 'По команде пользователя')
+
+
+class StationaryReason(BaseStrEnum):
+    """
+    Причины режима работы МТ: Стационар для ЭФ Журнал
     """
 
     # Отклонения давления и расхода не превышают допустимых отклонений
-    PRESSURE_AND_FLOW_MOVING_AVERAGES_MEET_CRITERIA = 1 << 0
-    # Окончание периода времени после технологических переключений и отсутствия самотечного участка
-    ABSENCE_GRAVITY_SECTION_AND_TECHNOLOGICAL_SWITCHING = 1 << 1
+    PRESSURE_AND_FLOW_MOVING_AVERAGES_MEET_CRITERIA = "Отклонения давления и расхода не превышают допустимых отклонений"
 
 
-class UnStationaryReason(BaseStrIntflag):
+class UnStationaryReason(BaseStrIntFlag):
     """
     Причины режима работы МТ: Нестационар
     """
@@ -298,7 +368,7 @@ class UnStationaryReason(BaseStrIntflag):
     COLD_START = 1 << 14  # Одновременный «холодный» запуск нескольких серверов СОУ
 
 
-class StoppedPumpingReason(BaseStrIntflag):
+class StoppedPumpingReason(BaseStrIntFlag):
     """
     Причины режима работы МТ: Остановленный
     """
@@ -458,4 +528,3 @@ class GravityPipe(Enum):
 class MeasureConversionRule(Enum):
     MPA_MEASURE = "MPA_MEASURE"
     KG_CM_MEASURE = "KG_CM_MEASURE"
-    

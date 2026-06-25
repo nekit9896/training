@@ -103,6 +103,13 @@ class StepMessageBuilder:
         ]
         return self._build_message(message_parts)
 
+    def is_none_msg(self, act_value: Any) -> str:
+        message_parts = [
+            f"Ожидаемый результат: {self.field_name} пустое",
+            f"Фактический результат: {self.field_name} = {self._format_val(act_value)}",
+        ]
+        return self._build_message(message_parts)
+
     def is_not_empty_msg(self, act_value: Any) -> str:
         item_count = self._item_count(act_value)
         message_parts = [
@@ -172,15 +179,18 @@ class StepMessageBuilder:
 
     def contains_msg(self, container: Any, expected_item: Any) -> str:
         if isinstance(container, str):
-            message_parts = [
-                f"Ожидаемый результат: '{container}' содержит подстроку '{expected_item}'",
-                f"Фактический результат: {self.field_name} = {self._format_val(container)}",
-            ]
+            message_parts = [f"Ожидаемый результат:\n строка: '{container}' содержит подстроку '{expected_item}'"]
         else:
             message_parts = [
-                f"Ожидаемый результат: список {self._format_val(container)} содержит элемент {expected_item}",
-                f"Фактический результат: {self.field_name} = {self._format_val(container)}",
+                f"Ожидаемый результат:\n список: {self._format_val(container)} содержит элемент {expected_item}"
             ]
+        return self._build_message(message_parts)
+
+    def is_true_with_details_msg(self, expected_text: str, actual_text: str) -> str:
+        message_parts = [
+            f"Ожидаемый результат: {expected_text}",
+            f"Фактический результат: {actual_text}",
+        ]
         return self._build_message(message_parts)
 
 
@@ -281,6 +291,16 @@ class StepCheck:
             # Ловушка для исключения сразу после выхода из with - сохраняем traceback и продолжаем
             self._handle_assertion(exc)
 
+    def is_none(self) -> None:
+        """Проверка на отсутствие поля"""
+        msg = self._msg_builder.is_none_msg(self._actual)
+
+        try:
+            with allure.step(msg):
+                assert_that(self._actual).described_as(msg).is_none()
+        except AssertionError as exc:
+            self._handle_assertion(exc)
+
     def is_not_empty(self) -> None:
         """Проверка на не пустое значение"""
         if self._actual is None:
@@ -328,11 +348,24 @@ class StepCheck:
         if self._actual is None:
             raise ValueError("Фактический результат должен быть заполнен при вызове is_less_than()")
 
-        msg = self._msg_builder.is_less_than_msg(self.check_step, self._actual, extra_info)
+        msg = self._msg_builder.is_less_than_msg(threshold, self._actual, extra_info)
 
         try:
             with allure.step(msg):
                 assert_that(self._actual).described_as(msg).is_less_than(threshold)
+        except AssertionError as exc:
+            self._handle_assertion(exc)
+
+    def is_true_with_details(self, expected_text: str, actual_text: str) -> None:
+        """Проверка булева условия с описанием ожидания и факта."""
+        if self._actual is None:
+            raise ValueError("Фактический результат должен быть заполнен при вызове is_true_with_details()")
+
+        msg = self._msg_builder.is_true_with_details_msg(expected_text, actual_text)
+
+        try:
+            with allure.step(msg):
+                assert_that(self._actual).described_as(msg).is_true()
         except AssertionError as exc:
             self._handle_assertion(exc)
 
@@ -393,6 +426,6 @@ class StepCheck:
 
         try:
             with allure.step(msg):
-                assert_that(container).described_as(msg).contains_msg(expected_item)
+                assert_that(container).described_as(msg).contains(expected_item)
         except AssertionError as exc:
             self._handle_assertion(exc)
