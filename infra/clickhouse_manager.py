@@ -194,3 +194,4 @@ class ClickHouseManager:
             # fmt: on
             for i in range(0, len(self._evo_id_pairs), CH_const.EVO_ID_PAIRS_CHUNK_SIZE)
         ]
+        

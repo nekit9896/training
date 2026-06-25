@@ -121,7 +121,7 @@ def report_signal_suffix_by_expected_name(expected_signal_name: str) -> str:
 
 def split_object_column(object_value: str) -> tuple[str, str]:
     """
-    Разбирает колонку «Объект»:
+    Разбирает колонку "Объект":
     - до последней точки - участок трубопровода (имя объекта);
     - после последней точки - название сигнала.
     """

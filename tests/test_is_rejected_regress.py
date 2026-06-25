@@ -111,7 +111,7 @@ class TestIsRejectedScenarios:
         sensor = rejection_case.sensor
         tag = "InputSignals"
         title = (
-            f"[{tag}] Проверка: {rejection_case.expected_event} для {sensor.description} (id={sensor.id}) "
+            f"[{tag}] {rejection_case.expected_event} {sensor.description} (id={sensor.id}) "
             f"({rejection_case.name}). ЭФ: Входные сигналы"
         )
         _apply_allure_markers(
@@ -141,7 +141,7 @@ class TestIsRejectedScenarios:
         sensor = rejection_case.sensor
         tag = "MessagesInfo"
         title = (
-            f"[{tag}] Проверка: {rejection_case.expected_event} для {sensor.description} (id={sensor.id}) "
+            f"[{tag}] {rejection_case.expected_event} {sensor.description} (id={sensor.id}) "
             f"({rejection_case.name}) в журнале. ЭФ: Журнал"
         )
         _apply_allure_markers(
@@ -169,7 +169,7 @@ class TestIsRejectedScenarios:
         """[MainPageSignalsInfo] Проверка счетчика отбраковки на состоянии МТ"""
         tag = "MainPageSignalsInfo"
         title = (
-            f"[{tag}] Проверка: {rejection_case.expected_event} - "
+            f"[{tag}] {rejection_case.expected_event} - "
             f"счетчик отбраковки на состоянии МТ показывает отбраковку"
             f"({rejection_case.name}). ЭФ: Состояние МТ"
         )
@@ -198,7 +198,7 @@ class TestIsRejectedScenarios:
         sensor = rejection_case.sensor
         tag = "SchemeSignalsState"
         title = (
-            f"[{tag}] Проверка: {rejection_case.expected_event} для {sensor.description} (id={sensor.id}) "
+            f"[{tag}] {rejection_case.expected_event} {sensor.description} (id={sensor.id}) "
             f"({rejection_case.name}). ЭФ: Схема"
         )
         _apply_allure_markers(
@@ -231,10 +231,7 @@ class TestIsRejectedReport:
     ) -> None:
         """[ExportReports] Проверка общего отчёта об отбракованных входных данных"""
         tag = "ExportReports"
-        title = (
-            f"[{tag}] Проверка общего отчёта об отбракованных входных данных. "
-            f"ЭФ: Выпадашка отчётов"
-        )
+        title = f"[{tag}] Проверка общего отчёта об отбракованных входных данных. ЭФ: Выпадашка отчётов"
         _apply_allure_markers(
             config.rejection_report_test,
             tag,

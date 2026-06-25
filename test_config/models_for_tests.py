@@ -18,6 +18,7 @@ from constants.enums import (
     TU,
     ConfirmationStatus,
     LdsStatus,
+    MeasureConversionRule,
     RejectionCriteria,
     RejectionSensorTag,
     ReservedType,
@@ -46,6 +47,9 @@ class BaseSuiteConfig:
 
     # ===== Технологический участок =====
     technological_unit: TU = TU.TIKHORETSK_NOVOROSSIYSK_3
+
+    # ===== Правила конвертации единиц измерения давления на стенде =====
+    measure_conversion_rules: Optional[MeasureConversionRule] = None
 
     # ===== Общие константы (можно переопределить) =====
     allowed_distance_diff_meters: int = BaseTN3Constants.ALLOWED_DISTANCE_DIFF_METERS
@@ -102,17 +106,9 @@ class DiagnosticAreaStatusConfig:
     Используется в тесте lds_status_during_leak.
     """
 
-    leak_diagnostic_area_id: int
+    leak_diagnostic_area_name: str
     leak_du_expected_lds_status: Any
-    leak_diagnostic_area_pipe_id: Optional[int] = None
-    # Соседние ДУ и их статусы: словари {diagnostic_area_pipe_id: leak_du_expected_lds_status}
-    # Позволяет указывать 0..N соседей независимо от in/out.
-    #
-    # Пример:
-    #   in_neighbors={1: LdsStatus.DEGRADATION.value}
-    #   out_neighbors={3: LdsStatus.DEGRADATION.value, 4: LdsStatus.DEGRADATION.value}
-    in_neighbors: dict[int, Any] = field(default_factory=dict)
-    out_neighbors: dict[int, Any] = field(default_factory=dict)
+    neighbors_du_expected_lds_status: Any
 
 
 @dataclass
@@ -254,6 +250,9 @@ class SmokeSuiteConfig(BaseSuiteConfig):
         }
     )
 
+    # ===== Ожидаемые переменные для проверок сообщений о режимах =====
+    exp_mode_mt_message: Optional[CaseData] = None
+
     # ----- Ожидаемые статусы для проверки режимов на ЭФ Диагностика сигналов -----
     exp_tixoreczkaya_novovelichkovskaya_reg_lu: Optional[int] = None
     exp_tixoreczkaya_novovelichkovskaya_reg_sou: Optional[int] = None
@@ -288,6 +287,7 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     mask_du_on_mini_scheme_test: Optional[CaseMarkers] = None
     unmask_du_on_mini_scheme_test: Optional[CaseMarkers] = None
     diagnostics_of_signals_after_initialization_test: Optional[CaseMarkers] = None
+    mode_mt_in_journal_test: Optional[CaseMarkers] = None
 
     # ===== Конфигурации утечек =====
     # Для наборов с одной утечкой
@@ -333,60 +333,82 @@ class LDSStatusConfig(BaseSuiteConfig):
     2. Тесты с маркерами
     """
 
+    # ===== Название Магистрального Нефтепровода =====
+    main_pipeline: Optional[str] = None
+
     # ===== Данные для тестов =====
-    lds_status_init_accumulation_data_test_data: Optional[CaseData] = None
-    lds_status_init_cold_start_test_data: Optional[CaseData] = None
-    lds_status_init_exiting_faulty_test_data: Optional[CaseData] = None
-    lds_status_init_switching_shut_off_test_data: Optional[CaseData] = None
-    lds_status_serviceable_all_test_data: Optional[CaseData] = None
-    lds_status_serviceable_after_switching_shut_off_test_data: Optional[CaseData] = None
-    lds_status_serviceable_after_deg_faulty_pressure_sensors_at_pump_test_data: Optional[CaseData] = None
-    lds_status_deg_faulty_pressure_sensors_at_pump_station_test_data: Optional[CaseData] = None
-    lds_status_deg_additive_injectors_operation_test_data: Optional[CaseData] = None
-    lds_status_deg_absence_min_pressure_sensors_test_data: Optional[CaseData] = None
-    lds_status_deg_exceeding_distance_between_pressure_sensors_test_data: Optional[CaseData] = None
-    lds_status_deg_gravity_section_pumping_test_data: Optional[CaseData] = None
-    lds_status_deg_gravity_section_pumping_in_stopping_test_data: Optional[CaseData] = None
-    lds_status_deg_pig_sensor_passage_test_data: Optional[CaseData] = None
-    lds_status_deg_starting_pumping_out_pumps_test_data: Optional[CaseData] = None
-    lds_status_deg_exceeding_distance_between_flow_meters_test_data: Optional[CaseData] = None
-    lds_status_deg_rejection_temperature_sensor_on_du_2_test_data: Optional[CaseData] = None
-    lds_status_deg_rejection_temperature_sensor_on_du_3_test_data: Optional[CaseData] = None
-    lds_status_deg_rejection_temperature_sensor_on_du_5_test_data: Optional[CaseData] = None
-    lds_status_deg_rejection_density_and_viscosity_on_du_2_test_data: Optional[CaseData] = None
-    lds_status_deg_rejection_density_and_viscosity_on_du_3_test_data: Optional[CaseData] = None
-    lds_status_deg_rejection_density_and_viscosity_on_du_5_test_data: Optional[CaseData] = None
-    lds_status_faulty_absence_min_flow_meters_test_data: Optional[CaseData] = None
-    lds_status_faulty_absence_min_pressure_sensors_test_data: Optional[CaseData] = None
+    init_accumulation_data_test_data: Optional[CaseData] = None
+    init_accumulation_data_in_journal_test_data: Optional[CaseData] = None
+    init_cold_start_test_data: Optional[CaseData] = None
+    init_exiting_faulty_test_data: Optional[CaseData] = None
+    init_switching_shut_off_test_data: Optional[CaseData] = None
+    init_switching_shut_off_in_journal_test_data: Optional[CaseData] = None
+    serviceable_all_test_data: Optional[CaseData] = None
+    serviceable_all_in_journal_test_data: Optional[CaseData] = None
+    serviceable_after_switching_shut_off_test_data: Optional[CaseData] = None
+    serviceable_after_switching_shut_off_in_journal_test_data: Optional[CaseData] = None
+    serviceable_after_deg_faulty_pressure_sensors_at_pump_test_data: Optional[CaseData] = None
+    serviceable_after_deg_faulty_pressure_sensors_at_pump_in_journal_test_data: Optional[CaseData] = None
+    deg_faulty_pressure_sensors_at_pump_station_test_data: Optional[CaseData] = None
+    deg_faulty_pressure_sensors_at_pump_station_in_journal_test_data: Optional[CaseData] = None
+    deg_additive_injectors_operation_test_data: Optional[CaseData] = None
+    deg_absence_min_pressure_sensors_test_data: Optional[CaseData] = None
+    deg_exceeding_distance_between_pressure_sensors_test_data: Optional[CaseData] = None
+    deg_exceeding_distance_between_pressure_sensors_in_journal_test_data: Optional[CaseData] = None
+    deg_gravity_section_pumping_test_data: Optional[CaseData] = None
+    deg_gravity_section_pumping_in_stopping_test_data: Optional[CaseData] = None
+    deg_gravity_section_pumping_in_stopping_in_journal_test_data: Optional[CaseData] = None
+    deg_pig_sensor_passage_test_data: Optional[CaseData] = None
+    deg_starting_pumping_out_pumps_test_data: Optional[CaseData] = None
+    deg_exceeding_distance_between_flow_meters_test_data: Optional[CaseData] = None
+    deg_rejection_temperature_sensor_on_du_2_test_data: Optional[CaseData] = None
+    deg_rejection_temperature_sensor_on_du_3_test_data: Optional[CaseData] = None
+    deg_rejection_temperature_sensor_on_du_5_test_data: Optional[CaseData] = None
+    deg_rejection_density_and_viscosity_on_du_2_test_data: Optional[CaseData] = None
+    deg_rejection_density_and_viscosity_on_du_3_test_data: Optional[CaseData] = None
+    deg_rejection_density_and_viscosity_on_du_5_test_data: Optional[CaseData] = None
+    faulty_absence_min_flow_meters_test_data: Optional[CaseData] = None
+    faulty_absence_min_pressure_sensors_test_data: Optional[CaseData] = None
+    faulty_absence_min_pressure_sensors_in_journal_test_data: Optional[CaseData] = None
     # ===== Тесты =====
     lds_status_basic_info_test: Optional[CaseMarkers] = None
-    lds_status_init_accumulation_data_test: Optional[CaseMarkers] = None
-    lds_status_init_cold_start_test: Optional[CaseMarkers] = None
-    lds_status_init_exiting_faulty_test: Optional[CaseMarkers] = None
-    lds_status_init_switching_shut_off_test: Optional[CaseMarkers] = None
-    lds_status_serviceable_after_cold_start_test: Optional[CaseMarkers] = None
-    lds_status_serviceable_after_switching_shut_off_test: Optional[CaseMarkers] = None
-    lds_status_serviceable_after_deg_absence_min_pressure_sensors_test: Optional[CaseMarkers] = None
-    lds_status_serviceable_after_deg_starting_pumping_out_pumps_test: Optional[CaseMarkers] = None
-    lds_status_serviceable_after_deg_faulty_pressure_sensors_at_pump_test: Optional[CaseMarkers] = None
-    lds_status_serviceable_after_faulty_test: Optional[CaseMarkers] = None
-    lds_status_deg_additive_injectors_operation_test: Optional[CaseMarkers] = None
-    lds_status_deg_exceeding_distance_between_pressure_sensors_test: Optional[CaseMarkers] = None
-    lds_status_deg_absence_min_pressure_sensors_test: Optional[CaseMarkers] = None
-    lds_status_deg_faulty_pressure_sensors_at_pump_station_test: Optional[CaseMarkers] = None
-    lds_status_deg_gravity_section_pumping_test: Optional[CaseMarkers] = None
-    lds_status_deg_gravity_section_pumping_in_stopping_test: Optional[CaseMarkers] = None
-    lds_status_deg_pig_sensor_passage_test: Optional[CaseMarkers] = None
-    lds_status_deg_starting_pumping_out_pumps_test: Optional[CaseMarkers] = None
-    lds_status_deg_exceeding_distance_between_flow_meters_test: Optional[CaseMarkers] = None
-    lds_status_deg_rejection_temperature_sensor_on_du_2_test: Optional[CaseMarkers] = None
-    lds_status_deg_rejection_temperature_sensor_on_du_3_test: Optional[CaseMarkers] = None
-    lds_status_deg_rejection_temperature_sensor_on_du_5_test: Optional[CaseMarkers] = None
-    lds_status_deg_rejection_density_and_viscosity_on_du_2_test: Optional[CaseMarkers] = None
-    lds_status_deg_rejection_density_and_viscosity_on_du_3_test: Optional[CaseMarkers] = None
-    lds_status_deg_rejection_density_and_viscosity_on_du_5_test: Optional[CaseMarkers] = None
-    lds_status_faulty_absence_min_flow_meters_test: Optional[CaseMarkers] = None
-    lds_status_faulty_absence_min_pressure_sensors_test: Optional[CaseMarkers] = None
+    init_accumulation_data_test: Optional[CaseMarkers] = None
+    init_accumulation_data_in_journal_test: Optional[CaseMarkers] = None
+    init_cold_start_test: Optional[CaseMarkers] = None
+    init_cold_start_in_journal_test: Optional[CaseMarkers] = None
+    init_exiting_faulty_test: Optional[CaseMarkers] = None
+    init_switching_shut_off_test: Optional[CaseMarkers] = None
+    init_switching_shut_off_in_journal_test: Optional[CaseMarkers] = None
+    serviceable_after_cold_start_test: Optional[CaseMarkers] = None
+    serviceable_after_cold_start_in_journal_test: Optional[CaseMarkers] = None
+    serviceable_after_switching_shut_off_test: Optional[CaseMarkers] = None
+    serviceable_after_switching_shut_off_in_journal_test: Optional[CaseMarkers] = None
+    serviceable_after_deg_absence_min_pressure_sensors_test: Optional[CaseMarkers] = None
+    serviceable_after_deg_starting_pumping_out_pumps_test: Optional[CaseMarkers] = None
+    serviceable_after_deg_faulty_pressure_sensors_at_pump_test: Optional[CaseMarkers] = None
+    serviceable_after_deg_faulty_pressure_sensors_at_pump_in_journal_test: Optional[CaseMarkers] = None
+    serviceable_after_faulty_test: Optional[CaseMarkers] = None
+    deg_additive_injectors_operation_test: Optional[CaseMarkers] = None
+    deg_exceeding_distance_between_pressure_sensors_test: Optional[CaseMarkers] = None
+    deg_exceeding_distance_between_pressure_sensors_in_journal_test: Optional[CaseMarkers] = None
+    deg_absence_min_pressure_sensors_test: Optional[CaseMarkers] = None
+    deg_faulty_pressure_sensors_at_pump_station_test: Optional[CaseMarkers] = None
+    deg_faulty_pressure_sensors_at_pump_station_in_journal_test: Optional[CaseMarkers] = None
+    deg_gravity_section_pumping_test: Optional[CaseMarkers] = None
+    deg_gravity_section_pumping_in_stopping_test: Optional[CaseMarkers] = None
+    deg_gravity_section_pumping_in_stopping_in_journal_test: Optional[CaseMarkers] = None
+    deg_pig_sensor_passage_test: Optional[CaseMarkers] = None
+    deg_starting_pumping_out_pumps_test: Optional[CaseMarkers] = None
+    deg_exceeding_distance_between_flow_meters_test: Optional[CaseMarkers] = None
+    deg_rejection_temperature_sensor_on_du_2_test: Optional[CaseMarkers] = None
+    deg_rejection_temperature_sensor_on_du_3_test: Optional[CaseMarkers] = None
+    deg_rejection_temperature_sensor_on_du_5_test: Optional[CaseMarkers] = None
+    deg_rejection_density_and_viscosity_on_du_2_test: Optional[CaseMarkers] = None
+    deg_rejection_density_and_viscosity_on_du_3_test: Optional[CaseMarkers] = None
+    deg_rejection_density_and_viscosity_on_du_5_test: Optional[CaseMarkers] = None
+    faulty_absence_min_flow_meters_test: Optional[CaseMarkers] = None
+    faulty_absence_min_pressure_sensors_test: Optional[CaseMarkers] = None
+    faulty_absence_min_pressure_sensors_in_journal_test: Optional[CaseMarkers] = None
 
 
 @dataclass
@@ -404,7 +426,8 @@ class RejectionTestCase:
     sensor: RejectionSensorTag = ""
     expected_event: str = ""
     expected_signal_name: str = ""
-    expected_criteria_names: RejectionCriteria = RejectionCriteria(0)
+    expected_criteria_names: Optional[RejectionCriteria] = None
+    expected_is_rejected: bool = True
     time_range_start_s: float = 0
     time_range_end_s: float = 0
     rejection_input_signals_test: Optional[CaseMarkers] = None
@@ -433,7 +456,7 @@ class IsRejectedConfig(BaseSuiteConfig):
 
     Структура:
     1. Название МН
-    2. Список случаев отбраковки (RejectionTestCase) - по 4 теста на каждый
+    2. Список случаев отбраковки (RejectionTestCase)
     """
 
     main_pipeline: str = ""
@@ -472,6 +495,28 @@ class ExportLeaksReportState:
 
 
 @dataclass
+class ExportLdsStatusReportState:
+    """Состояние сценария формирования xlsx-отчёта о режиме работы СОУ."""
+
+    report_test: Optional[CaseMarkers] = None
+    period_start: Optional[datetime] = None
+    period_end: Optional[datetime] = None
+    period_start_naive: Optional[datetime] = None
+    period_end_naive: Optional[datetime] = None
+    time_offset_hours: Optional[int] = None
+    tu_description_lower: str = ""
+    notification: Optional[ReportDataExportedNotification] = None
+    report_item: Optional[ExportedDataItem] = None
+    report_file_name: str = ""
+    download_invocation_id: Optional[str] = None
+    download_reply: Optional[DownloadExportedDataReply] = None
+    file_bytes: Optional[bytes] = None
+    temp_file_path: Optional[Path] = None
+    worksheet: Any = None
+    parsed_report: Any = None
+
+
+@dataclass
 class ExportRejectedReportState:
     """
     Состояние сценария формирования xlsx-отчёта об отбракованных входных данных.
@@ -506,28 +551,6 @@ class ExportRejectedReportState:
     actual_header_period_end: Optional[datetime] = None
     actual_header_contains_expected_title: bool = False
     actual_case_checks: list = field(default_factory=list)
-
-
-@dataclass
-class ExportLdsStatusReportState:
-    """Состояние сценария формирования xlsx-отчёта о режиме работы СОУ."""
-
-    report_test: Optional[CaseMarkers] = None
-    period_start: Optional[datetime] = None
-    period_end: Optional[datetime] = None
-    period_start_naive: Optional[datetime] = None
-    period_end_naive: Optional[datetime] = None
-    time_offset_hours: Optional[int] = None
-    tu_description_lower: str = ""
-    notification: Optional[ReportDataExportedNotification] = None
-    report_item: Optional[ExportedDataItem] = None
-    report_file_name: str = ""
-    download_invocation_id: Optional[str] = None
-    download_reply: Optional[DownloadExportedDataReply] = None
-    file_bytes: Optional[bytes] = None
-    temp_file_path: Optional[Path] = None
-    worksheet: Any = None
-    parsed_report: Any = None
 
 
 @dataclass

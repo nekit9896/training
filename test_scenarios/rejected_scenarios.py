@@ -79,6 +79,7 @@ async def rejection_journal(ws_client, cfg: IsRejectedConfig, rejection_case: Re
     Проверка наличия записи об отбраковке в журнале по GetMessagesRequest.
     """
     sensor = rejection_case.sensor
+    expected_event = rejection_case.expected_event
     with allure.step("Подготовка запроса и ожидаемого диапазона времени"):
         request_body = t_utils.create_journal_req_body(
             pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_REJECT_LIMIT, direction=Direction.FIRST.value),
@@ -112,7 +113,7 @@ async def rejection_journal(ws_client, cfg: IsRejectedConfig, rejection_case: Re
             range_start=range_start,
             range_end=range_end,
             technological_section=cfg.tu_name,
-            expected_event=rejection_case.expected_event,
+            expected_event=expected_event,
         )
 
         allure.attach(
@@ -163,10 +164,10 @@ async def rejection_journal(ws_client, cfg: IsRejectedConfig, rejection_case: Re
                 rejection_case.expected_signal_name
             ).equal_to()
 
-        if rejection_case.expected_event:
+        if expected_event:
             StepCheck("Проверка event", "event", soft_failures).actual(
                 (target_msg.event.rstrip() or "").strip()
-            ).expected(rejection_case.expected_event).equal_to()
+            ).expected(expected_event).equal_to()
 
 
 async def rejection_main_page(ws_client, cfg: IsRejectedConfig):
@@ -249,7 +250,7 @@ async def rejection_scheme_signals_state(ws_client, cfg: IsRejectedConfig, rejec
     with SoftAssertions() as soft_failures:
         StepCheck(f"Проверка isRejected для {sensor.description} (id={sensor.id})", "isRejected", soft_failures).actual(
             target_signal.isRejected
-        ).expected(True).equal_to()
+        ).expected(rejection_case.expected_is_rejected).equal_to()
 
         StepCheck(f"Проверка isMasked для {sensor.description} (id={sensor.id})", "isMasked", soft_failures).actual(
             target_signal.isMasked
@@ -566,9 +567,7 @@ async def export_rejection_report(ws_client, cfg: IsRejectedConfig, imitator_sta
                         RejectedReportConst.COL_DATETIME,
                         soft_failures,
                     ).actual(case_check.datetime_in_window).is_true_with_details(
-                        expected_text=(
-                            f"дата и время в диапазоне {case_check.window_start} — {case_check.window_end}"
-                        ),
+                        expected_text=(f"дата и время в диапазоне {case_check.window_start} — {case_check.window_end}"),
                         actual_text=case_check.datetime_actual_text,
                     )
 
@@ -593,9 +592,7 @@ async def export_rejection_report(ws_client, cfg: IsRejectedConfig, imitator_sta
                         f"'{RejectedReportConst.COL_OBJECT}' указан сигнал '{case_check.expected_signal_suffix}'",
                         RejectedReportConst.COL_OBJECT,
                         soft_failures,
-                    ).actual(case_check.actual_signal_suffix).expected(
-                        case_check.expected_signal_suffix
-                    ).equal_to()
+                    ).actual(case_check.actual_signal_suffix).expected(case_check.expected_signal_suffix).equal_to()
 
     except Exception:
         with allure.step("Прикрепление xlsx отчёта к Allure при падении теста"):

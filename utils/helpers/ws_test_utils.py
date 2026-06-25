@@ -43,6 +43,7 @@ from utils.msgpack_utils.message_filters import is_desired_invocation_id, is_des
 
 ObjectType = TypeVar("ObjectType")  # создает типовую переменную для поиска объектов в списке
 RandomObjectType = TypeVar("RandomObjectType")
+Event = TypeVar("Event")
 
 
 def convert_leak_volume_m3(volume: float) -> float:
@@ -60,7 +61,7 @@ def datetime_minus_seconds(datetime_obj: datetime, delta_s: int) -> datetime:
     return (datetime_obj - timedelta(seconds=delta_s)).replace(microsecond=0)
 
 
-def calculate_leak_start_time(imitator_start_time: datetime, leak_interval_seconds: int) -> datetime:
+def calculate_leak_start_time(imitator_start_time: datetime, leak_interval_seconds: int) -> Optional[datetime]:
     """
     Рассчитывает время начала утечки на основе времени старта имитатора.
 
@@ -69,13 +70,13 @@ def calculate_leak_start_time(imitator_start_time: datetime, leak_interval_secon
     :return: datetime время ожидаемого начала утечки
     """
     if not imitator_start_time:
-        fail("Пришло пустое значение imitator_start_time")
+        return None
     return (imitator_start_time + timedelta(seconds=leak_interval_seconds)).replace(microsecond=0)
 
 
 def calculate_leak_end_time(
     imitator_start_time: datetime, leak_interval_seconds: int, allowed_diff_seconds: int
-) -> datetime:
+) -> Optional[datetime]:
     """
     Рассчитывает крайнее время обнаружения утечки (с учётом допустимой погрешности).
 
@@ -85,7 +86,7 @@ def calculate_leak_end_time(
     :return: datetime крайнее время обнаружения утечки
     """
     if not imitator_start_time:
-        fail("Пришло пустое значение imitator_start_time")
+        return None
     total_seconds = leak_interval_seconds + allowed_diff_seconds
     return (imitator_start_time + timedelta(seconds=total_seconds)).replace(microsecond=0)
 
@@ -210,27 +211,27 @@ def get_random_item(item_list: List[RandomObjectType]) -> RandomObjectType:
     Получает случайный объект из списка
     """
     if not item_list:
-        fail("Пустой список объектов")
+        return None
     try:
         return random.choice(item_list)
     except (TypeError, ValueError):
-        fail(f"Не удалось получить случайный элемент из списка: {item_list}")
+        return None
 
 
-def get_longest_flow_area(flow_areas: List[FlowArea]) -> FlowArea:
+def get_longest_flow_area(flow_areas: List[FlowArea]) -> Optional[FlowArea]:
     """
     Получает самый протяженный участок карты течения по количеству ДУ из списка всех участков
     """
     if not flow_areas:
-        fail("Список flow_areas пустой")
+        return None
     try:
         longest_flow_area = max(flow_areas, key=lambda flow_area: len(flow_area.diagnosticAreas))
         return longest_flow_area
     except (TypeError, ValueError):
-        fail(f"Не найден протяженный участок из списка flow_areas: {flow_areas}.")
+        return None
 
 
-def determine_lds_status_by_priority(lds_status_set: Set[int]) -> int:
+def determine_lds_status_by_priority(lds_status_set: Set[int]) -> Optional[int]:
     """
     Определяет режим работы СОУ по приоритету и наличию режимов работы у ДУ на самом протяженном участки карты течений
     """
@@ -241,43 +242,43 @@ def determine_lds_status_by_priority(lds_status_set: Set[int]) -> int:
         LdsStatus.SERVICEABLE.value,
     ]
     if not lds_status_set:
-        fail("Пустой список режимов СОУ ДУ")
+        return None
     try:
         for status in lds_status_priority:
             if status in lds_status_set:
                 return status
     except (AttributeError, KeyError, RuntimeError, TypeError, ValueError):
-        fail("Не удалось определить режим работу СОУ.")
+        return None
 
 
-def find_signal_type_by_address_suffix(signals_list: list, address_suffix: str) -> int:
+def find_signal_type_by_address_suffix(signals_list: list, address_suffix: str) -> Optional[int]:
     """
     Ищет в списке сигналов тип сигнала по части адреса
     """
     if not signals_list:
-        fail("Пустой список сигналов")
+        return None
     try:
         for sensor_signal in signals_list:
             if sensor_signal.address is not None and str(sensor_signal.address).endswith(address_suffix):
                 return sensor_signal.signalType
-        fail(f"Не найден тип сигнала по части адреса: {address_suffix} из списка: {signals_list}")
+        return None
     except (AttributeError, KeyError, RuntimeError, TypeError, ValueError):
-        fail(f"Не найден тип сигнала по части адреса: {address_suffix} из списка: {signals_list}")
+        return None
 
 
-def find_signal_val_by_signal_type(signals_list: list, signal_type: int) -> str:
+def find_signal_val_by_signal_type(signals_list: list, signal_type: int) -> Optional[str]:
     """
     Ищет в списке сигналов значение сигнала по типу
     """
     if not signals_list:
-        fail("Пустой список сигналов")
+        return None
     try:
         for sensor_signal in signals_list:
             if sensor_signal.signalType is not None and sensor_signal.signalType == signal_type:
                 return sensor_signal.value
-        fail(f"Не найдено значение для типа сигнала: {signal_type} из списка: {signals_list}")
+        return None
     except (AttributeError, KeyError, RuntimeError, TypeError, ValueError):
-        fail(f"Не найдено значение для типа сигнала: {signal_type} из списка: {signals_list}")
+        return None
 
 
 def find_object_by_field(item_list: List[ObjectType], field_name: str, value: Any) -> ObjectType:
@@ -285,11 +286,11 @@ def find_object_by_field(item_list: List[ObjectType], field_name: str, value: An
     Ищет объект в списке объектов по значению одного из полей объекта
     """
     if not item_list:
-        fail("Список объектов пуст")
+        return None
     try:
         return next((item for item in item_list if getattr(item, field_name) == value))
     except Exception:
-        fail(f"Не найдено значение: {value} для поля: {field_name}, в списке: {item_list}.")
+        return None
 
 
 def find_object_by_a_few_fields(item_list: List[ObjectType], fields_dict: dict) -> ObjectType:
@@ -302,6 +303,25 @@ def find_object_by_a_few_fields(item_list: List[ObjectType], fields_dict: dict) 
     return next(
         (item for item in item_list if all(getattr(item, field) == value for field, value in fields_dict.items())), None
     )
+
+
+def parse_event(event_value: str) -> tuple[str | None, str | None]:
+    """
+    Разделяет строку события на имя и причину, вложенную с скобки
+    """
+    if not event_value or not isinstance(event_value, str):
+        return None, None
+
+    # Паттерн для "Состояние режима (Причина)"
+    pattern = r'^([^\(]+?)\s*\(([^\)]+)\)\s*$'
+    match = re.match(pattern, event_value)
+
+    if match:
+        mode_part = match.group(1).strip()
+        reason_part = match.group(2).strip()
+        return (mode_part if mode_part else None, reason_part if reason_part else None)
+    # Если значение события не соответствует паттерну, возвращаю текст, если нет текста, тогда None
+    return event_value, None
 
 
 def get_signal(site_message, signal_type):
@@ -420,10 +440,9 @@ def find_leak_by_coordinate(
 ) -> ObjectType:
     """
     Ищет утечку в списке по координатам с допустимой погрешностью
-    поднимает pytest.fail если список пуст или утечка не найдена
     """
     if not leaks_list:
-        fail("Список утечек пуст")
+        return None
 
     for leak in leaks_list:
         leak_coordinate = getattr(leak, "leakCoordinate")
@@ -431,19 +450,15 @@ def find_leak_by_coordinate(
             continue
         if abs(leak_coordinate - expected_coordinate) <= tolerance:
             return leak
-
-    fail(
-        f"Не найдена утечка с координатой {expected_coordinate} +- {tolerance} м"
-        f"Список полученных утечек: {leaks_list}"
-    )
+    return None
 
 
-def to_moscow_timezone(date_str: str) -> datetime:
+def to_moscow_timezone(date_str: str) -> Optional[datetime]:
     """
     Преобразует строку времени в московское время
     """
     if not date_str or not date_str.strip():
-        fail("Пришло пустое значение для преобразования в московское время")
+        return None
 
     try:
         if date_str.startswith(("'", '"', '')) or date_str.endswith(("'", '"', '')):
@@ -453,13 +468,13 @@ def to_moscow_timezone(date_str: str) -> datetime:
         return date_utc.astimezone(ZoneInfo(TestConst.ZONE_INFO))
 
     except (AttributeError, TypeError, ValueError):
-        fail(f"Не удалось преобразовать время в московское: {date_str}.")
+        return None
 
 
-def create_dict_from_dataclass(cls: Type, **kwargs) -> dict:
+def create_dict_from_dataclass(cls: Type, **kwargs) -> Optional[dict]:
     """Создает словарь из экземпляра dataclass c нужными параметрами"""
     if not is_dataclass(cls):
-        fail(f"{cls} не dataclass")
+        return None
     instance = cls(**kwargs)
     return asdict(instance)
 
@@ -731,10 +746,6 @@ async def poll_for_exported_file(
     return None
 
 
-def _normalize_report_text_for_match(text: str) -> str:
-    return text.lower().replace("ё", "е")
-
-
 def _normalize_report_period_datetime(value: datetime) -> datetime:
     """Приводит datetime периода отчёта к московскому времени без микросекунд."""
     return localize_as_moscow(value).replace(microsecond=0)
@@ -756,6 +767,10 @@ def _exported_item_period_matches(
     return (period_start_norm - delta) <= item_start_norm <= (period_start_norm + delta) and (
         period_end_norm - delta
     ) <= item_end_norm <= (period_end_norm + delta)
+
+
+def _normalize_report_text_for_match(text: str) -> str:
+    return text.lower().replace("ё", "е")
 
 
 def find_matching_exported_item(
