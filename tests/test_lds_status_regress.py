@@ -22,6 +22,7 @@ import pytest
 from clients.websocket_client import WebSocketClient
 from test_config.datasets import ALL_LDS_STATUS_CONFIGS
 from test_config.models_for_tests import CaseMarkers, LDSStatusConfig
+from test_scenarios import lds_configurator_scenarios
 from test_scenarios import scenarios
 
 # ===== ГЕНЕРАЦИЯ ПАРАМЕТРОВ =====
@@ -79,6 +80,18 @@ class TestSuiteScenarios:
 
     @pytest.mark.asyncio
     @pytest.mark.critical_stop
+    async def test_lds_configurator_setup(
+        self, ws_client: WebSocketClient, config: LDSStatusConfig, request: pytest.FixtureRequest
+    ) -> None:
+        """[LdsConfigurator] Настройка и холодный запуск СОУ через Администрирование"""
+        tag = "LdsConfigurator"
+        title = f"[{tag}] Настройка и запуск СОУ. ЭФ: Администрирование"
+        _apply_allure_markers(config.lds_configurator_setup_test, tag, title)
+        await lds_configurator_scenarios.lds_configurator_setup(
+            ws_client, config, request.config.group_state
+        )
+
+    @pytest.mark.asyncio
     async def test_lds_status_basic_info(self, ws_client: WebSocketClient, config: LDSStatusConfig) -> None:
         """[BasicInfo] Проверка базовой информации СОУ: список ТУ"""
         tag = "BasicInfo"

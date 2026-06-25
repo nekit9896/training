@@ -48,6 +48,12 @@ class BaseSuiteConfig:
     # ===== Технологический участок =====
     technological_unit: TU = TU.TIKHORETSK_NOVOROSSIYSK_3
 
+    # ===== LDS Configurator (Администрирование) =====
+    use_lds_configurator: bool = False
+    tu_name: str = ""
+    resolved_tu_id: Optional[int] = None
+    lds_configurator_setup_test: Optional[CaseMarkers] = None
+
     # ===== Правила конвертации единиц измерения давления на стенде =====
     measure_conversion_rules: Optional[MeasureConversionRule] = None
 
@@ -62,15 +68,26 @@ class BaseSuiteConfig:
     unmask_du_event: Optional[str] = None
 
     # ===== Свойства для удобства =====
+    def __post_init__(self) -> None:
+        if not self.tu_name:
+            object.__setattr__(self, "tu_name", self.technological_unit.description)
+
     @property
     def tu_id(self) -> int:
         """ID технологического участка"""
+        if self.use_lds_configurator:
+            if self.resolved_tu_id is None:
+                raise RuntimeError(
+                    "resolved_tu_id не установлен - выполнить lds_configurator_setup перед тестами сценария"
+                )
+            return self.resolved_tu_id
+        # legacy: захардкоженный id из enum TU (имитатор использует тот же id для tn{id}_tags.txt)
         return self.technological_unit.id
 
     @property
-    def tu_name(self) -> str:
-        """Название технологического участка"""
-        return self.technological_unit.description
+    def infra_tu_id(self) -> int:
+        """legacy: id ТУ для инфра-setup (имитатор, tags.txt, file_name)."""
+        return self.technological_unit.id
 
     @property
     def has_multiple_leaks(self) -> bool:

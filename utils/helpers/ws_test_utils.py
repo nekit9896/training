@@ -143,6 +143,11 @@ def report_time_offset_hours(tz_name: str = TestConst.ZONE_INFO) -> Optional[int
     return int(utc_offset.total_seconds() // TestConst.SECONDS_PER_HOUR)
 
 
+def moscow_now() -> datetime:
+    """Текущее время в часовом поясе Europe/Moscow."""
+    return datetime.now(ZoneInfo(TestConst.ZONE_INFO))
+
+
 def localize_as_moscow(input_datetime: datetime) -> None | datetime:
     """
     Присваивает datetime московский часовой пояс без сдвига времени.

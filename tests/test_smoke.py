@@ -25,6 +25,7 @@ from clients.websocket_client import WebSocketClient
 from constants.test_constants import BaseTN3Constants as Base_const
 from test_config.datasets import ALL_SMOKE_CONFIGS
 from test_config.models_for_tests import CaseMarkers, LeakTestConfig, SmokeSuiteConfig
+from test_scenarios import lds_configurator_scenarios
 from test_scenarios import lds_status_scenarios
 from test_scenarios import smoke_scenarios as scenarios
 
@@ -124,6 +125,18 @@ class TestSuiteScenarios:
 
     @pytest.mark.asyncio
     @pytest.mark.critical_stop
+    async def test_lds_configurator_setup(
+        self, ws_client: WebSocketClient, config: SmokeSuiteConfig, request: pytest.FixtureRequest
+    ) -> None:
+        """[LdsConfigurator] Настройка и холодный запуск СОУ через Администрирование"""
+        tag = "LdsConfigurator"
+        title = f"[{tag}] Настройка и холодный запуск СОУ. ЭФ: Администрирование"
+        _apply_allure_markers(config.lds_configurator_setup_test, tag, title)
+        await lds_configurator_scenarios.lds_configurator_setup(
+            ws_client, config, request.config.group_state
+        )
+
+    @pytest.mark.asyncio
     async def test_basic_info(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
         """[BasicInfo] Проверка базовой информации СОУ: список ТУ"""
         tag = "BasicInfo"

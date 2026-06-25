@@ -1,3 +1,4 @@
+import asyncio
 import glob
 import os
 import shutil
@@ -18,6 +19,7 @@ from constants.enums import RejectionSensorTag
 from constants.test_constants import BaseTN3Constants
 from infra.stand_setup_manager import StandSetupManager
 from test_config.datasets import get_config_by_name
+from test_scenarios import lds_configurator_scenarios
 
 
 def pytest_addoption(parser):
@@ -86,6 +88,9 @@ def pytest_configure(config):
         "suite_start_time": None,
         "stand_manager": None,
         "imitator_start_time": None,  # datetime объект времени старта имитатора для расчёта интервалов утечек
+        "use_lds_configurator": True,
+        "resolved_tu_id": None,
+        "tu_name": None,
     }
 
 
@@ -116,6 +121,7 @@ def pytest_runtest_makereport(item, call):
 
 # Smoke-тесты уровня набора (маркеры из SmokeSuiteConfig)
 SMOKE_SUITE_LEVEL_MAPPING = {
+    'test_lds_configurator_setup': 'lds_configurator_setup_test',
     'test_basic_info': 'basic_info_test',
     'test_journal_info': 'journal_info_test',
     'test_imitate_pressure_sensor_signal': 'imitate_pressure_sensor_signal_test',
@@ -139,6 +145,7 @@ SMOKE_SUITE_LEVEL_MAPPING = {
 
 # Regress-тесты режимов СОУ (маркеры из LDSStatusConfig)
 LDS_STATUS_SUITE_LEVEL_MAPPING = {
+    'test_lds_configurator_setup': 'lds_configurator_setup_test',
     'test_lds_status_basic_info': 'lds_status_basic_info_test',
     'test_lds_status_init_accumulation_data': 'init_accumulation_data_test',
     'test_lds_status_init_accumulation_data_in_journal': 'init_accumulation_data_in_journal_test',
@@ -256,6 +263,15 @@ def _get_test_markers_config(item, test_name):
 
     # Для suite-level тестов берём из config
     if 'config' in params:
+        if test_name == 'test_lds_configurator_setup':
+            suite_config = params['config']
+            if not suite_config.use_lds_configurator:
+                return None
+            if not suite_config.tu_name.strip():
+                pytest.fail(
+                    f"Набор '{suite_config.suite_name}': tu_name обязателен к заполнению в датасете набора при use_lds_configurator=True"
+                )
+            return suite_config.lds_configurator_setup_test
         if test_name in SMOKE_SUITE_LEVEL_MAPPING:
             suite_config = params['config']
             attr_name = SMOKE_SUITE_LEVEL_MAPPING[test_name]
@@ -476,6 +492,7 @@ def pytest_runtest_setup(item):
 
         data_id = item.get_closest_marker("test_suite_data_id").args[0]
         test_data_name = item.get_closest_marker("test_data_name").args[0]
+        # legacy: id из enum TU для имитатора (tn{id}_tags.txt), не resolved_tu_id из Администрирования
         tu_id = item.get_closest_marker("tu_id").args[0]
 
         imitator_duration = compute_imitator_duration(item, current_test_suite)
@@ -532,6 +549,35 @@ def pytest_runtest_setup(item):
     yield  # pytest продолжит выполнение теста
 
 
+def _run_lds_configurator_teardown_if_needed(cfg: dict) -> None:
+    """
+    Выполняет WS-teardown СОУ при смене набора или завершении сессии.
+
+    Ошибки не прерывают pytest: логируются и оформляются как ALERT внутри сценария.
+    Состояние group_state сбрасывается в finally.
+    """
+    if not cfg.get("use_lds_configurator") or not cfg.get("resolved_tu_id"):
+        return
+
+    tu_id = cfg["resolved_tu_id"]
+    tu_name = cfg.get("tu_name") or ""
+
+    async def _teardown() -> None:
+        ws_host = get_ws_host()
+        token = get_token()
+        async with WebSocketClient(ws_host, token) as client:
+            await lds_configurator_scenarios.lds_configurator_teardown(client, tu_id, tu_name)
+
+    try:
+        asyncio.run(_teardown())
+    except Exception:
+        logger.exception("[TEARDOWN] [ERROR] Ошибка LDS Configurator teardown для tuId=%s", tu_id)
+    finally:
+        cfg["resolved_tu_id"] = None
+        cfg["use_lds_configurator"] = False
+        cfg["tu_name"] = None
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_teardown(item, nextitem):
     """
@@ -544,6 +590,7 @@ def pytest_runtest_teardown(item, nextitem):
     next_suite = next_marker.args[0] if next_marker else None
 
     if next_suite != cfg["current_suite"]:
+        _run_lds_configurator_teardown_if_needed(cfg)
         if stand_manager := cfg["stand_manager"]:
             stand_manager.stop_imitator_wrapper()
             try:
@@ -643,9 +690,11 @@ def pytest_sessionfinish(session, exitstatus):
     """
     В завершении сессии — отправляем единый Allure‑отчёт в TestOps.
     """
-    # 1) teardown стенда: остановки имитатора и удаление временных папок на сервере
+    # 1) teardown стенда: LDS Configurator + остановка имитатора
     try:
-        stand_manager = getattr(session.config, "group_state", {}).get("stand_manager")
+        group_state = getattr(session.config, "group_state", {})
+        _run_lds_configurator_teardown_if_needed(group_state)
+        stand_manager = group_state.get("stand_manager")
         if stand_manager:
             try:
                 stand_manager.stop_imitator_wrapper()

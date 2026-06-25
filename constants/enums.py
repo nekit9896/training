@@ -55,6 +55,8 @@ class BaseReasonEnum(IntFlag):
 
 
 class TU(Enum):
+    """Технологический участок. id - legacy для имитатора (tn{id}_tags.txt); при use_lds_configurator tu_id берётся из Администрирования."""
+
     YAROSLAVL_MOSCOW = (1, "Ярославль - Москва", "volga.json")
     TIKHORETSK_NOVOROSSIYSK_2 = (2, "Тихорецк-Новороссийск-2", "tn2.json")
     TIKHORETSK_NOVOROSSIYSK_3 = (3, "Тихорецк-Новороссийск-3", "tn3.json")
@@ -123,6 +125,27 @@ class ExportStatus(IntEnum):
 
     NOT_READY = 0
     DONE = 1
+
+
+class SouAdminStatus(BaseStrEnum):
+    """Статус СОУ в разделе Администрирование (GetBasicInfoAdminResponse)."""
+
+    STOPPED = (1, 'СОУ выключена')
+    RUNNING = (2, 'СОУ включена')
+
+    def __new__(cls, value: int, report_text: str) -> "SouAdminStatus":
+        member = object.__new__(cls)
+        member._value_ = value
+        member.report_text = report_text
+        return member
+
+    @classmethod
+    def report_text_by_value(cls, status_value: int) -> str | None:
+        """Текст статуса СОУ в Администрировании по числовому значению."""
+        try:
+            return cls(status_value).report_text
+        except ValueError:
+            return None
 
 
 class StationaryStatus(BaseStrEnum):

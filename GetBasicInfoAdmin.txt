@@ -1,0 +1,19 @@
+[1, {}, '13', 'GetBasicInfoAdminRequest', [[]]]
+
+
+
+[3, {}, '13', 3, {'replyStatus': 200, 'replyErrors': None, 'replyContent':
+{'basicInfo':
+    {'tus':
+        [
+            {
+                'tuId': 231,
+                'tuName': 'Лопатино-Клин',
+                'mnId': 118,
+                'mnName': '',
+                'ostId': 0,
+                'ostName': '',
+                'configurationVersion': 1,
+                'status': 1
+            },
+                {'tuId': 213, 'tuName': 'СИКН', 'mnId': 103, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 236, 'tuName': 'ЛТ-3', 'mnId': 121, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 226, 'tuName': 'ТН-3 ЕГС', 'mnId': 114, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 237, 'tuName': 'ТН-3 тест УВП', 'mnId': 122, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 220, 'tuName': 'сикн', 'mnId': 108, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 3, 'status': 1}, {'tuId': 232, 'tuName': 'Авто ТН-3', 'mnId': 101, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 206, 'tuName': 'ТН2', 'mnId': 97, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 228, 'tuName': 'ТН-3 демо v3', 'mnId': 116, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 215, 'tuName': 'СИКН 3', 'mnId': 105, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 235, 'tuName': 'Конфа-спецверсия-12564', 'mnId': 120, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 227, 'tuName': 'TN-3 девелоп', 'mnId': 115, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 229, 'tuName': 'ТН-3 демо v4', 'mnId': 117, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 214, 'tuName': 'СИКН 2', 'mnId': 104, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 230, 'tuName': 'Тихорецк-Новороссийск-3', 'mnId': 91, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 2}, {'tuId': 233, 'tuName': 'АВТО ТН-3 ОТБРАКОВКА', 'mnId': 119, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 207, 'tuName': 'ТН4', 'mnId': 98, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 2, 'status': 1}, {'tuId': 204, 'tuName': '12906', 'mnId': 96, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 58, 'status': 1}, {'tuId': 146, 'tuName': 'Название ТУ', 'mnId': 73, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 36, 'status': 1}, {'tuId': 221, 'tuName': 'Тихорецк-Новороссийск-4', 'mnId': 109, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 222, 'tuName': 'Т-Н-3', 'mnId': 110, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 219, 'tuName': 'СИКН демо', 'mnId': 106, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 211, 'tuName': 'ТН-3', 'mnId': 101, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 224, 'tuName': 'ТН-3 демо', 'mnId': 112, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 225, 'tuName': 'ТН-3 демо v2', 'mnId': 113, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}, {'tuId': 223, 'tuName': 'ППН', 'mnId': 111, 'mnName': '', 'ostId': 0, 'ostName': '', 'configurationVersion': 1, 'status': 1}], 'appVersion': '1.54.0', 'appUpdatedAt': [Timestamp(seconds=1782345600, nanoseconds=0), 180]}}}]
