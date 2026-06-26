@@ -1,5 +1,8 @@
 """
 Сценарии setup/teardown СОУ через раздел Администрирование (LDS Configurator).
+
+Admin setup выполняется в pytest_runtest_setup до имитатора.
+Verify after core - critical_stop автотест после запуска lds-core.
 """
 
 from __future__ import annotations
@@ -29,25 +32,25 @@ def _save_group_state(group_state: Optional[Dict[str, Any]], cfg: BaseSuiteConfi
     group_state["tu_name"] = cfg.tu_name
 
 
-async def lds_configurator_setup(
+async def lds_configurator_admin_setup(
     ws_client: WebSocketClient,
     cfg: BaseSuiteConfig,
     group_state: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
-    Critical-stop сценарий: подготовка стенда и холодный запуск СОУ на конфигурации из Администрирования.
+    Холодный запуск СОУ через Администрирование до старта имитатора.
 
-    1. Получить tu_id по tu_name из Администрирования.
-    2. Сверить статус с ЭФ Состояние МТ (MainPageInfoContent).
-    3. При необходимости остановить уже запущенную СОУ.
-    4. Выполнить LaunchLdsRequest и дождаться готовности.
-    5. Подтвердить launchedAt после момента запуска.
+    Выполняется пока lds-core ещё не запущен
+
+    1. Получить tu_id по tu_name из GetBasicInfoAdmin.
+    2. При необходимости остановить уже запущенную СОУ.
+    3. LaunchLdsRequest и ожидание status=включена.
+    4. Подтвердить launchedAt в GetTusInformation.
     """
     tu_id: int
     sou_status: SouAdminStatus
-    is_on_main_page: bool
 
-    with allure.step(f"Шаг 1. Получение ТУ '{cfg.tu_name}' из Администрирования"):
+    with allure.step(f"[SETUP] Получение ТУ '{cfg.tu_name}' из Администрирования"):
         admin_reply = await lds_utils.get_basic_info_admin_with_retry(ws_client, parser)
         admin_tu = lds_utils.find_tu_by_name(admin_reply, cfg.tu_name)
         lds_utils.validate_admin_tu(admin_tu)
@@ -63,10 +66,6 @@ async def lds_configurator_setup(
             attachment_type=allure.attachment_type.TEXT,
         )
 
-    with allure.step("Шаг 2. Сверка статуса СОУ между Администрированием и Состоянием МТ"):
-        is_on_main_page = await lds_utils.is_tu_present_on_main_page(ws_client, parser, tu_id)
-        lds_utils.check_sou_status_sync(sou_status, is_on_main_page, tu_id, cfg.tu_name)
-
     launch_checkpoint = t_utils.moscow_now()
     allure.attach(
         t_utils.format_datetime_moscow(launch_checkpoint),
@@ -74,8 +73,8 @@ async def lds_configurator_setup(
         attachment_type=allure.attachment_type.TEXT,
     )
 
-    if sou_status == SouAdminStatus.RUNNING and is_on_main_page:
-        with allure.step("Шаг 3. Остановка СОУ перед перезапуском (уже была запущена)"):
+    if sou_status == SouAdminStatus.RUNNING:
+        with allure.step("[SETUP] Остановка СОУ перед холодным запуском (уже была включена)"):
             await lds_utils.invoke_lds_command(ws_client, parser, LdsCfgConst.STOP_LDS_REQUEST, tu_id)
             with allure.step("Проверка: СОУ выключена в Администрировании"):
                 if not await lds_utils.poll_admin_tu_status(ws_client, parser, tu_id, SouAdminStatus.STOPPED):
@@ -83,17 +82,11 @@ async def lds_configurator_setup(
                         "Не удалось перезапустить СОУ: статус в Администрировании не стал 'выключена' за 2 минуты",
                         pytrace=False,
                     )
-            with allure.step("Проверка: ТУ исчезла из Состояния МТ"):
-                if not await lds_utils.poll_main_page_tu_presence(ws_client, tu_id, expect_present=False):
-                    fail(
-                        "Не удалось перезапустить СОУ: ТУ не исчезла из Состояния МТ за 2 минуты",
-                        pytrace=False,
-                    )
 
-    with allure.step("Шаг 4. Холодный запуск СОУ (LaunchLdsRequest)"):
+    with allure.step("[SETUP] Холодный запуск СОУ (LaunchLdsRequest)"):
         await lds_utils.invoke_lds_command(ws_client, parser, LdsCfgConst.LAUNCH_LDS_REQUEST, tu_id)
 
-    with allure.step("Шаг 5. Ожидание включения СОУ в Администрировании"):
+    with allure.step("[SETUP] Ожидание включения СОУ в Администрировании"):
         with allure.step("Проверка: статус стал 'включена'"):
             if not await lds_utils.poll_admin_tu_status(ws_client, parser, tu_id, SouAdminStatus.RUNNING):
                 fail(
@@ -101,16 +94,45 @@ async def lds_configurator_setup(
                     pytrace=False,
                 )
 
-    with allure.step("Шаг 6. Ожидание появления ТУ в Состоянии МТ"):
-        with allure.step("Проверка: ТУ отображается в Состоянии МТ"):
-            if not await lds_utils.poll_main_page_tu_presence(ws_client, tu_id, expect_present=True):
+    with allure.step("[SETUP] Подтверждение времени запуска (GetTusInformation)"):
+        await lds_utils.verify_launched_at(ws_client, parser, tu_id, launch_checkpoint)
+
+
+async def lds_configurator_verify_after_core(
+    ws_client: WebSocketClient,
+    cfg: BaseSuiteConfig,
+) -> None:
+    """
+    Critical-stop: проверка готовности стенда после запуска lds-core.
+
+    1. Актуальный статус СОУ из Администрирования.
+    2. Сверка с Состоянием МТ (MainPageInfoContent).
+    3. Ожидание появления ТУ в Состоянии МТ при status=включена.
+    """
+    tu_id = cfg.tu_id
+
+    with allure.step(f"Получение актуального статуса СОУ для tuId={tu_id}"):
+        admin_reply = await lds_utils.get_basic_info_admin_with_retry(ws_client, parser)
+        sou_status = lds_utils.get_admin_tu_status(admin_reply, tu_id)
+        with allure.step("Проверка: ТУ найден в Администрировании"):
+            if sou_status is None:
                 fail(
-                    "Не удалось запустить СОУ: ТУ не появилась в Состоянии МТ за 2 минуты",
+                    f"ТУ tuId={tu_id} ('{cfg.tu_name}') не найден в GetBasicInfoAdminResponse",
                     pytrace=False,
                 )
 
-    with allure.step("Шаг 7. Подтверждение времени запуска (GetTusInformation)"):
-        await lds_utils.verify_launched_at(ws_client, parser, tu_id, launch_checkpoint)
+    with allure.step("Сверка статуса СОУ: Администрирование vs Состояние МТ"):
+        is_on_main_page = await lds_utils.is_tu_present_on_main_page(ws_client, parser, tu_id)
+        lds_utils.check_sou_status_sync(sou_status, is_on_main_page, tu_id, cfg.tu_name)
+
+    if sou_status == SouAdminStatus.RUNNING:
+        with allure.step("Ожидание появления ТУ в Состоянии МТ"):
+            with allure.step("Проверка: ТУ отображается в Состоянии МТ"):
+                if not await lds_utils.poll_main_page_tu_presence(ws_client, tu_id, expect_present=True):
+                    fail(
+                        "СОУ не отображается в Состоянии МТ: ТУ не появилась за 2 минуты после запуска core",
+                        pytrace=False,
+                    )
 
 
 async def lds_configurator_teardown(

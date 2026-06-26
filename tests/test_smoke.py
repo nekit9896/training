@@ -125,16 +125,13 @@ class TestSuiteScenarios:
 
     @pytest.mark.asyncio
     @pytest.mark.critical_stop
-    async def test_lds_configurator_setup(
-        self, ws_client: WebSocketClient, config: SmokeSuiteConfig, request: pytest.FixtureRequest
+    async def test_lds_configurator_verify(
+        self, ws_client: WebSocketClient, config: SmokeSuiteConfig
     ) -> None:
-        """[LdsConfigurator] Настройка и холодный запуск СОУ через Администрирование"""
         tag = "LdsConfigurator"
-        title = f"[{tag}] Настройка и холодный запуск СОУ. ЭФ: Администрирование"
-        _apply_allure_markers(config.lds_configurator_setup_test, tag, title)
-        await lds_configurator_scenarios.lds_configurator_setup(
-            ws_client, config, request.config.group_state
-        )
+        title = f"[{tag}] Проверка наличия запускаемого ТУ  на ЭФ Состояние МТ сразу после запуска core"
+        _apply_allure_markers(config.lds_configurator_verify_test, tag, title)
+        await lds_configurator_scenarios.lds_configurator_verify_after_core(ws_client, config)
 
     @pytest.mark.asyncio
     async def test_basic_info(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:

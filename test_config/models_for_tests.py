@@ -33,6 +33,16 @@ from utils.helpers.report_xlsx_utils import LeakReportRow, ReportTitleInfo
 
 
 @dataclass
+class CaseMarkers:
+    """
+    Маркеры тест-кейса для pytest и allure.
+    """
+
+    test_case_id: str
+    offset: float
+
+
+@dataclass
 class BaseSuiteConfig:
     """
     Структура:
@@ -52,7 +62,7 @@ class BaseSuiteConfig:
     use_lds_configurator: bool = False
     tu_name: str = ""
     resolved_tu_id: Optional[int] = None
-    lds_configurator_setup_test: Optional[CaseMarkers] = None
+    lds_configurator_verify_test: Optional[CaseMarkers] = None
 
     # ===== Правила конвертации единиц измерения давления на стенде =====
     measure_conversion_rules: Optional[MeasureConversionRule] = None
@@ -78,7 +88,7 @@ class BaseSuiteConfig:
         if self.use_lds_configurator:
             if self.resolved_tu_id is None:
                 raise RuntimeError(
-                    "resolved_tu_id не установлен - выполнить lds_configurator_setup перед тестами сценария"
+                    "resolved_tu_id не установлен - выполните lds_configurator_admin_setup перед тестами сценария"
                 )
             return self.resolved_tu_id
         # legacy: захардкоженный id из enum TU (имитатор использует тот же id для tn{id}_tags.txt)
@@ -104,16 +114,6 @@ class CaseData:
     params: Optional[Dict[str, Any]] = None
     expected_result: Optional[Any] = None
     description: str = ""
-
-
-@dataclass
-class CaseMarkers:
-    """
-    Маркеры тест-кейса для pytest и allure.
-    """
-
-    test_case_id: str
-    offset: float
 
 
 @dataclass

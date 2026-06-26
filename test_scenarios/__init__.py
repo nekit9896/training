@@ -40,6 +40,7 @@ __all__ = [
     scenarios.export_leaks_report,
     scenarios.export_lds_status_report,
     scenarios.export_mt_mode_report,
-    lds_configurator_scenarios.lds_configurator_setup,
+    lds_configurator_scenarios.lds_configurator_admin_setup,
+    lds_configurator_scenarios.lds_configurator_verify_after_core,
     lds_configurator_scenarios.lds_configurator_teardown,
 ]

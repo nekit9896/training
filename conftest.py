@@ -121,7 +121,7 @@ def pytest_runtest_makereport(item, call):
 
 # Smoke-тесты уровня набора (маркеры из SmokeSuiteConfig)
 SMOKE_SUITE_LEVEL_MAPPING = {
-    'test_lds_configurator_setup': 'lds_configurator_setup_test',
+    'test_lds_configurator_verify': 'lds_configurator_verify_test',
     'test_basic_info': 'basic_info_test',
     'test_journal_info': 'journal_info_test',
     'test_imitate_pressure_sensor_signal': 'imitate_pressure_sensor_signal_test',
@@ -145,7 +145,7 @@ SMOKE_SUITE_LEVEL_MAPPING = {
 
 # Regress-тесты режимов СОУ (маркеры из LDSStatusConfig)
 LDS_STATUS_SUITE_LEVEL_MAPPING = {
-    'test_lds_configurator_setup': 'lds_configurator_setup_test',
+    'test_lds_configurator_verify': 'lds_configurator_verify_test',
     'test_lds_status_basic_info': 'lds_status_basic_info_test',
     'test_lds_status_init_accumulation_data': 'init_accumulation_data_test',
     'test_lds_status_init_accumulation_data_in_journal': 'init_accumulation_data_in_journal_test',
@@ -263,7 +263,7 @@ def _get_test_markers_config(item, test_name):
 
     # Для suite-level тестов берём из config
     if 'config' in params:
-        if test_name == 'test_lds_configurator_setup':
+        if test_name == 'test_lds_configurator_verify':
             suite_config = params['config']
             if not suite_config.use_lds_configurator:
                 return None
@@ -271,7 +271,7 @@ def _get_test_markers_config(item, test_name):
                 pytest.fail(
                     f"Набор '{suite_config.suite_name}': tu_name обязателен к заполнению в датасете набора при use_lds_configurator=True"
                 )
-            return suite_config.lds_configurator_setup_test
+            return suite_config.lds_configurator_verify_test
         if test_name in SMOKE_SUITE_LEVEL_MAPPING:
             suite_config = params['config']
             attr_name = SMOKE_SUITE_LEVEL_MAPPING[test_name]
@@ -527,6 +527,12 @@ def pytest_runtest_setup(item):
         except Exception as error:
             pytest.exit(f"[SETUP] [ERROR] ошибка обновления id датчиков отбраковки из конфигурации: {error}")
 
+        if suite_config is not None and suite_config.use_lds_configurator:
+            try:
+                _run_lds_admin_setup(suite_config, cfg)
+            except Exception as error:
+                pytest.exit(f"[SETUP] [ERROR] LDS Configurator admin setup: {error}")
+
         imitator_thread = threading.Thread(
             target=stand_manager.start_imitator, name=f"imitator->{current_test_suite}", daemon=True
         )
@@ -547,6 +553,21 @@ def pytest_runtest_setup(item):
         cfg["imitator_start_time"] = stand_manager.start_time
 
     yield  # pytest продолжит выполнение теста
+
+
+def _run_lds_admin_setup(suite_config, group_state: dict) -> None:
+    """
+    WS-setup СОУ через Администрирование до старта имитатора.
+    """
+    async def _admin_setup() -> None:
+        ws_host = get_ws_host()
+        token = get_token()
+        async with WebSocketClient(ws_host, token) as client:
+            await lds_configurator_scenarios.lds_configurator_admin_setup(
+                client, suite_config, group_state
+            )
+
+    asyncio.run(_admin_setup())
 
 
 def _run_lds_configurator_teardown_if_needed(cfg: dict) -> None:
