@@ -121,7 +121,7 @@ class TestIsRejectedScenarios:
             (
                 f"Проверка отбраковки сигнала {sensor.description} (id={sensor.id}), "
                 f"на наборе данных {config.suite_name},\n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {rejection_case.rejection_input_signals_test.offset} мин.\n"
                 f"Тип отбраковки: {rejection_case.name}\n"
                 "Подписка: SubscribeInputSignalsRequest"
@@ -151,7 +151,7 @@ class TestIsRejectedScenarios:
             (
                 f"Проверка записи в журнале об отбраковке сигнала {sensor.description} (id={sensor.id}), "
                 f"на наборе данных {config.suite_name},\n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {rejection_case.rejection_journal_test.offset} мин.\n"
                 f"Тип отбраковки: {rejection_case.name}\n"
                 "Синхронный запрос типа: GetMessagesRequest с фильтром messageTypes=REJECTION"
@@ -180,7 +180,7 @@ class TestIsRejectedScenarios:
             (
                 f"Проверка количества отбракованных сигналов > 0 при отбраковке {rejection_case.name}, "
                 f"на наборе данных {config.suite_name},\n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {rejection_case.rejection_main_page_test.offset} мин.\n"
                 "Подписка: subscribeMainPageSignalsInfoRequest"
             ),
@@ -208,7 +208,7 @@ class TestIsRejectedScenarios:
             (
                 f"Проверка отбраковки сигнала {sensor.description} (id={sensor.id}), "
                 f"на наборе данных {config.suite_name},\n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {rejection_case.rejection_scheme_signals_state_test.offset} мин.\n"
                 f"Тип отбраковки: {rejection_case.name}\n"
                 f"Ожидаемый criteriaNames: {rejection_case.expected_criteria_names}\n"
@@ -239,7 +239,7 @@ class TestIsRejectedReport:
             (
                 f"Проверка формирования и содержимого xlsx-отчёта об отбракованных входных данных "
                 f"на наборе данных {config.suite_name},\n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Период отчёта: от старта имитатора до старта + "
                 f"{config.rejection_report_test.offset} мин.\n"
                 "Этапы сценария:\n"

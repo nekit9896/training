@@ -104,8 +104,8 @@ async def lds_configurator_verify_after_core(
     3. Ожидание согласованного состояния ТУ на Состоянии МТ в MainPageInfoContent, до 120 с.
     4. Сверка статуса СОУ: Администрирование vs Состояние МТ.
     """
-    tu_id = cfg.configurator_tu_id
-    tu_name = cfg.admin_tu_name
+    tu_id = cfg.tu_id
+    tu_name = cfg.tu_name
 
     logger.info("[SETUP] Получение актуального статуса СОУ для tuId=%s", tu_id)
     admin_reply = await lds_utils.get_basic_info_admin_with_retry(ws_client, parser)

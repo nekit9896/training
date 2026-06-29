@@ -16,6 +16,7 @@ from typing import Any, Dict, Optional
 
 from constants.enums import (
     TU,
+    AdminTU,
     ConfirmationStatus,
     LdsStatus,
     MeasureConversionRule,
@@ -42,8 +43,76 @@ class CaseMarkers:
     offset: float
 
 
+class SuiteTuIdentityMixin:
+    """
+    Идентификация ТУ для WS-тестов и legacy-стенда.
+
+    Вынесено из @dataclass: иначе Pyright/PyCharm видят property как () -> T.
+    Поля technological_unit, use_lds_configurator, admin_tu, resolved_tu_id
+    объявляются в BaseSuiteConfig.
+    """
+
+    technological_unit: TU
+    use_lds_configurator: bool
+    admin_tu: Optional[AdminTU]
+    resolved_tu_id: Optional[int]
+
+    @property
+    def admin_tu_name(self) -> str:
+        """tuName для поиска ТУ в Администрировании."""
+        if self.admin_tu is None:
+            return ""
+        return self.admin_tu.admin_name
+
+    @property
+    def legacy_tu_id(self) -> int:
+        """Legacy id ТУ для имитатора, tags.txt и конфигурации стенда."""
+        return self.technological_unit.id
+
+    @property
+    def legacy_tu_name(self) -> str:
+        """Legacy имя ТУ из enum TU."""
+        return self.technological_unit.description
+
+    @property
+    def tu_name(self) -> str:
+        """Имя ТУ для WS-тестов и отчётов: admin при configurator, иначе legacy."""
+        if self.use_lds_configurator:
+            if self.admin_tu is None:
+                return ""
+            return self.admin_tu.admin_name
+        return self.technological_unit.description
+
+    @property
+    def tu_id(self) -> int:
+        """ID ТУ для WS-тестов: resolved из Администрирования при configurator, иначе legacy."""
+        if self.use_lds_configurator:
+            if self.resolved_tu_id is None:
+                raise RuntimeError(
+                    "resolved_tu_id не установлен - выполнить lds_configurator_admin_setup "
+                    "перед операциями Администрирования"
+                )
+            return self.resolved_tu_id
+        return self.technological_unit.id
+
+    @property
+    def configurator_tu_id(self) -> int:
+        """tuId из Администрирования после infra setup (LaunchLds/StopLds)."""
+        if self.resolved_tu_id is None:
+            raise RuntimeError(
+                "resolved_tu_id не установлен - выполнить lds_configurator_admin_setup "
+                "перед операциями Администрирования"
+            )
+        return self.resolved_tu_id
+
+    @property
+    def infra_tu_id(self) -> int:
+        """Алиас legacy_tu_id (обратная совместимость)."""
+        return self.technological_unit.id
+
+
 @dataclass
-class BaseSuiteConfig:
+class BaseSuiteConfig(SuiteTuIdentityMixin):
     """
     Структура:
     1. Метаданные набора (имя, id, архив)
@@ -60,7 +129,7 @@ class BaseSuiteConfig:
 
     # ===== LDS Configurator (Администрирование) =====
     use_lds_configurator: bool = False
-    admin_tu_name: str = ""
+    admin_tu: Optional[AdminTU] = None
     resolved_tu_id: Optional[int] = None
 
     # ===== Правила конвертации единиц измерения давления на стенде =====
@@ -76,30 +145,22 @@ class BaseSuiteConfig:
     mask_du_event: Optional[str] = None
     unmask_du_event: Optional[str] = None
 
-    # ===== Свойства для удобства =====
-    @property
-    def tu_name(self) -> str:
-        """Имя ТУ для бизнес-тестов (журнал, BasicInfo) — из enum TU."""
-        return self.technological_unit.description
+    def __post_init__(self) -> None:
+        self.validate_lds_configurator_config()
 
-    @property
-    def tu_id(self) -> int:
-        """ID технологического участка из enum TU (имитатор, WS-тесты)."""
-        return self.technological_unit.id
-
-    @property
-    def configurator_tu_id(self) -> int:
-        """tuId из Администрирования после infra setup (LaunchLds/StopLds)."""
-        if self.resolved_tu_id is None:
-            raise RuntimeError(
-                "resolved_tu_id не установлен — выполните lds_configurator_admin_setup перед операциями Администрирования"
+    def validate_lds_configurator_config(self) -> None:
+        """Проверяет согласованность полей LDS Configurator в датасете."""
+        if not self.use_lds_configurator:
+            return
+        if self.admin_tu is None:
+            raise ValueError(
+                f"Набор '{self.suite_name}': admin_tu обязателен при use_lds_configurator=True"
             )
-        return self.resolved_tu_id
-
-    @property
-    def infra_tu_id(self) -> int:
-        """legacy: id ТУ для инфра-setup (имитатор, tags.txt, file_name)."""
-        return self.technological_unit.id
+        if self.admin_tu.legacy_tu != self.technological_unit:
+            raise ValueError(
+                f"Набор '{self.suite_name}': admin_tu.legacy_tu ({self.admin_tu.legacy_tu}) "
+                f"не совпадает с technological_unit ({self.technological_unit})"
+            )
 
     @property
     def has_multiple_leaks(self) -> bool:

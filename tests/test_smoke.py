@@ -155,7 +155,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка режима работы СОУ на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки : {config.lds_status_initialization_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
                 "Ожидаемый режим работы СОУ: Инициализация"
@@ -176,7 +176,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка состояния СОУ и перекачки на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки : {config.diagnostics_of_signals_after_initialization_test.offset} мин.\n"
             ),
         )
@@ -191,7 +191,7 @@ class TestSuiteScenarios:
         title = f"[{tag}] Проверка записи в журнале: СОУ в Инициализации. ЭФ: Журнал. Реальное время"
         description = (
             f"Проверка записи в журнале о входе СОУ в Инициализацию на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
+            f"на технологическом участке {config.tu_name}\n"
             f"Время проведения проверки: {config.lds_status_init_in_journal_test.offset} мин.\n"
             "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
         )
@@ -209,7 +209,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка установки режима работы МТ: стационарный на данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {config.main_page_info_test.offset} мин.\n"
                 "Подписка на сообщения типа: MainPageInfo\n"
                 "Ожидаемый режим работы МТ: Стационарный"
@@ -228,7 +228,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка счетчиков состояния сигналов на данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {config.main_page_info_signals_test.offset} мин.\n"
                 "Подписка на сообщения типа: MainPageSignalsInfo\n"
             ),
@@ -247,7 +247,7 @@ class TestSuiteScenarios:
             (
                 "Проверка работы имитации и снятия имитации c расходомера "
                 f"на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {config.imitate_flowmeter_signal_test.offset} мин.\n"
                 "Синхронные запросы типа: ImitateSignalRequest, UnImitateSignalRequest\n"
                 "Подписка на сообщения типа: InputSignalsContent\n"
@@ -276,7 +276,7 @@ class TestSuiteScenarios:
             (
                 "Проверка работы имитации и снятия имитации c датчика давления "
                 f"на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {config.imitate_pressure_sensor_signal_test.offset} мин.\n"
                 "Синхронные запросы типа: ImitateSignalRequest, UnImitateSignalRequest\n"
                 "Подписка на сообщения типа: InputSignalsContent\n"
@@ -304,7 +304,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка работы маскирования и снятия маскирования  на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {config.mask_signal_test.offset} мин.\n"
                 "Синхронные запросы типа: MaskSignalRequest, UnmaskSignalRequest\n"
                 "Подписка на сообщения типа: InputSignalsContent\n"
@@ -329,7 +329,7 @@ class TestSuiteScenarios:
         title = f"[{tag}] Проверка записей журнала о маскировании и размаскировании. ЭФ: Журнал.Реальное время"
         description = (
             f"Проверка записей журнала о маскировании и размаскировании на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
+            f"на технологическом участке {config.tu_name}\n"
             f"Время проведения проверки: {config.mask_info_in_journal_test.offset} мин.\n"
             "Синхронный запрос типа: MessagesInfo\n"
             "Проверки: структура, фильтрация по времени, совпадение тегов между маскированием и снятием.\n"
@@ -345,7 +345,7 @@ class TestSuiteScenarios:
         title = f"[{tag}] проверка маскирования линейного участка. ЭФ: Схема"
         description = (
             f"Проверка маскирования линейного участка, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
+            f"на технологическом участке {config.tu_name}\n"
             f"Время проведения проверки: {config.mask_signal_test.offset} мин.\n"
             "Синхронные запросы типа: MaskLdsCommandRequest\n"
             "Проверки:\n"
@@ -364,7 +364,7 @@ class TestSuiteScenarios:
         title = f"[{tag}] проверка снятия маскирования линейному участку. ЭФ: Схема"
         description = (
             f"Проверка снятия маскирования линейному участку, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
+            f"на технологическом участке {config.tu_name}\n"
             f"Время проведения проверки: {config.unmask_du_on_mini_scheme_test.offset} мин.\n"
             "Синхронные запросы типа: UnmaskDuOnMiniScheme\n"
             "Проверки:\n"
@@ -386,7 +386,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка выхода СОУ из Инициализации на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {config.lds_status_initialization_out_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
                 "Ожидаемый режим работы СОУ: не Инициализация"
@@ -403,7 +403,7 @@ class TestSuiteScenarios:
         title = f"[{tag}] Проверка записи в журнале: выход СОУ из Инициализации. ЭФ: Журнал. Реальное время"
         description = (
             f"Проверка записи в журнале о выходе СОУ из Инициализации на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
+            f"на технологическом участке {config.tu_name}\n"
             f"Время проведения проверки: {config.lds_status_init_out_in_journal_test.offset} мин.\n"
             "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
         )
@@ -423,7 +423,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка установки режима работы МТ: нестационарный на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {config.main_page_info_unstationary_test.offset} мин.\n"
                 "Подписка на сообщения типа: MainPageInfo\n"
                 "Ожидаемый режим работы МТ: Нестационарный"
@@ -480,7 +480,7 @@ class TestLeakScenarios:
             title,
             (
                 f"Проверка пуш-сообщения об утечке на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {leak.all_leaks_info_test.offset} мин.\n"
                 "Подписка на сообщения типа: AllLeaksInfo\n"
                 f"Допустимое время обнаружения {leak.allowed_time_diff_minutes} мин. с момента начала утечки, "
@@ -536,7 +536,7 @@ class TestLeakScenarios:
             title,
             (
                 f"Проверка сообщения об утечке в таблице КГ на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {leak.leaks_content_test.offset} мин.\n"
                 "Подписка на сообщения типа: LeaksContent\n"
                 f"Допустимое время обнаружения {leak.allowed_time_diff_minutes} мин. с момента начала утечки, "
@@ -567,7 +567,7 @@ class TestLeakScenarios:
             title,
             (
                 f"Проверка сообщения об утечке в журнале на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {leak.leak_info_in_journal.offset} мин.\n"
                 "Синхронный запрос типа: MessagesInfo\n"
                 f"Допустимое время обнаружения {leak.allowed_time_diff_minutes} мин. с момента начала утечки, "
@@ -594,7 +594,7 @@ class TestLeakScenarios:
         title = f"[{tag}] Проверка сообщения о завершенной утечке в журнале. ЭФ: Журнал.Реальное время"
         description = (
             f"Проверка сообщения о завершенной утечке в журнале на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
+            f"на технологическом участке {config.tu_name}\n"
             f"Время проведения проверки: {leak.completed_leak_info_in_journal_test.offset} мин.\n"
             "Синхронный запрос типа: MessagesInfo\n"
         )
@@ -622,7 +622,7 @@ class TestLeakScenarios:
         title = f"[{tag}] Проверка сообщения 'Возможна утечка' в журнале. ЭФ: Журнал. Реальное время"
         description = (
             f"Проверка наличия сообщения 'Возможна утечка' в журнале на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
+            f"на технологическом участке {config.tu_name}\n"
             f"Время проведения проверки: {leak.possible_leak_in_journal_test.offset} мин.\n"
             "Синхронный запрос типа: MessagesInfo"
         )
@@ -678,7 +678,7 @@ class TestLeakScenarios:
             title,
             (
                 f"Проверка режима работы СОУ во время утечки на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {leak.lds_status_during_leak_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
                 "Примечание: проверка режимов СОУ во время утечки должна выполняться раньше теста на квитирование\n"
@@ -702,7 +702,7 @@ class TestLeakScenarios:
             title,
             (
                 "Проверка квитирования утечки на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {leak.acknowledge_leak_test.offset} мин.\n"
                 "Синхронный запрос типа: AcknowledgeLeak\n"
                 "Подписка на сообщения типа: TuLeaksInfo, AllLeaksInfo\n"
@@ -729,7 +729,7 @@ class TestLeakScenarios:
         title = f"[{tag}] Проверка записи в журнале о квитировании утечки. ЭФ: Журнал. Реальное время"
         description = (
             f"Проверка записи о квитировании утечки в журнале на наборе данных {config.suite_name}, \n"
-            f"на технологическом участке {config.technological_unit.description}\n"
+            f"на технологическом участке {config.tu_name}\n"
             f"Время проведения проверки: {leak.acknowledge_leak_in_journal_test.offset} мин.\n"
             "Синхронный запрос типа: MessagesInfo с фильтром userActions=LEAK_ACK\n"
         )
@@ -759,7 +759,7 @@ class TestLeakScenarios:
             title,
             (
                 f"Проверка наличия данных об утечке в выходных сигналах на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {leak.output_signals_test.offset} мин.\n"
                 "Синхронный запрос типа: GetOutputSignals\n"
                 "Подписка на сообщения типа: SubscribeOutputSignals\n"
@@ -794,7 +794,7 @@ class TestLeakScenarios:
             title,
             (
                 f"Проверка сообщения 'подозрение на утечку' в таблице КГ, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: "
                 f"{leak.balance_algorithm_leak_waiting_test.offset} - "
                 f"{leak.balance_algorithm_leak_waiting_test.offset + Base_const.BALANCE_ALGORITHM_TOTAL_WAIT / 60} "
@@ -824,7 +824,7 @@ class TestLeakScenarios:
             title,
             (
                 f"Проверка наличия утечки (isLeakDetected) в графическом представлении КГ, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {leak.balance_algorithm_leak_detected_test.offset} мин.\n"
                 "Подписка на сообщения типа: BalanceAlgorithmResultsContent\n"
             ),
@@ -855,7 +855,7 @@ class TestLeakScenarios:
             title,
             (
                 f"Проверка отсутствия утечки (isLeakDetected) в графическом представлении КГ, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {leak.balance_algorithm_leak_detected_test.offset} мин.\n"
                 "Подписка на сообщения типа: BalanceAlgorithmResultsContent\n"
             ),
@@ -881,7 +881,7 @@ class TestLeakScenarios:
             title,
             (
                 f"Проверка режима работы СОУ на выбранном ДУ, на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 "Время проведения проверки : "
                 f"{leak.lds_status_after_confirming_leak_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
@@ -915,7 +915,7 @@ class TestLeakScenarios:
             title,
             (
                 f"Проверка режима работы СОУ на выбранном ДУ, на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 "Время проведения проверки : "
                 f"{leak.lds_status_completed_leak_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
@@ -945,7 +945,7 @@ class TestLeakScenarios:
             title,
             (
                 f"Проверка отсутствия утечки на ЭФ Состояние МТ\n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {leak.leak_is_complete_on_main_page_test.offset} мин.\n"
             ),
         )
@@ -970,7 +970,7 @@ class TestLeakScenarios:
             title,
             (
                 f"Проверка наличия утечки на ЭФ Состояние МТ \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {leak.leak_is_confirm_on_main_page_test.offset} мин.\n"
             ),
         )
@@ -995,7 +995,7 @@ class TestLeakScenarios:
             title,
             (
                 f"Проверка ЭФ КГ табличное представление, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {leak.the_leak_is_complete_on_kg_test.offset} мин.\n"
             ),
         )
@@ -1020,7 +1020,7 @@ class TestLeakScenarios:
             title,
             (
                 f"Проверка ЭФ Выходные сигналы \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {leak.leak_is_complete_in_output_signals_test.offset} мин.\n"
             ),
         )
@@ -1045,7 +1045,7 @@ class TestLeakScenarios:
             title,
             (
                 f"Проверка ЭФ  Схема, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {leak.complete_tu_leaks_info_content_test.offset} мин.\n"
             ),
         )
@@ -1071,7 +1071,7 @@ class TestLeakScenarios:
             (
                 f"Проверка формирования и содержимого xlsx-отчёта об утечках на наборе данных "
                 f"{config.suite_name},\n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Период отчёта: от старта имитатора до старта + сдвиг теста"
                 f"{leak.export_leaks_report_test.offset} мин.\n"
                 "Этапы сценария:\n"
@@ -1112,7 +1112,7 @@ class TestLeakScenarios:
             (
                 f"Проверка формирования и содержимого xlsx-отчёта о режиме работы СОУ на наборе данных "
                 f"{config.suite_name},\n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Период отчёта: от старта имитатора до старта + сдвиг теста "
                 f"{leak.export_lds_status_report_test.offset} мин.\n"
                 "Этапы сценария:\n"
@@ -1149,7 +1149,7 @@ class TestLeakScenarios:
             (
                 f"Проверка формирования и содержимого xlsx-отчёта о режиме работы МТ на наборе данных "
                 f"{config.suite_name},\n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Период отчёта: от старта имитатора до старта + сдвиг теста "
                 f"{leak.export_mt_mode_report_test.offset} мин.\n"
                 "Этапы сценария:\n"

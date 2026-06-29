@@ -509,9 +509,9 @@ def pytest_runtest_setup(item):
         measure_conversion_rules = suite_config.measure_conversion_rules if suite_config is not None else None
 
         if suite_config is not None and suite_config.use_lds_configurator:
-            if not suite_config.admin_tu_name.strip():
+            if suite_config.admin_tu is None:
                 pytest.exit(
-                    f"[SETUP] [ERROR] Набор '{suite_config.suite_name}': admin_tu_name обязателен "
+                    f"[SETUP] [ERROR] Набор '{suite_config.suite_name}': admin_tu обязателен "
                     "при use_lds_configurator=True"
                 )
 

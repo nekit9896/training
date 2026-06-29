@@ -55,7 +55,7 @@ class BaseReasonEnum(IntFlag):
 
 
 class TU(Enum):
-    """Технологический участок. id - для имитатора (tn{id}_tags.txt) и WS-тестов."""
+    """Legacy-идентификация ТУ: имитатор (tn{id}_tags.txt), tags и конфигурация стенда."""
 
     YAROSLAVL_MOSCOW = (1, "Ярославль - Москва", "volga.json")
     TIKHORETSK_NOVOROSSIYSK_2 = (2, "Тихорецк-Новороссийск-2", "tn2.json")
@@ -77,6 +77,19 @@ class TU(Enum):
             if item.id == target_id:
                 return item.file_name
         raise ValueError(f"ТУ с id = {target_id} не найден")
+
+
+class AdminTU(Enum):
+    """ТУ в Администрировании и WS-подписках (не legacy имитатор)."""
+
+    TIKHORETSK_NOVOROSSIYSK_3_AUTOTEST = (
+        "Тихорецк-Новороссийск-3-Автотест",
+        TU.TIKHORETSK_NOVOROSSIYSK_3,
+    )
+
+    def __init__(self, admin_name: str, legacy_tu: TU) -> None:
+        self.admin_name = admin_name
+        self.legacy_tu = legacy_tu
 
 
 class ReplyStatus(Enum):

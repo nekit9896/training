@@ -2775,7 +2775,7 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
         actual_report_state.expected_lds_status_text = LdsStatus.report_text_by_value(
             leak.expected_lds_status_in_leaks_report
         )
-        actual_report_state.tu_description_lower = cfg.technological_unit.description.lower()
+        actual_report_state.tu_description_lower = cfg.tu_name.lower()
         time_offset_hours = t_utils.report_time_offset_hours()
         StepCheck(
             f"Смещение timeOffset для запросов отчёта (часовой пояс {TestConst.ZONE_INFO})",
@@ -2838,7 +2838,7 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
             list_limit=ReportConst.EXPORTED_DATA_LIST_LIMIT,
             expected_data_type=ExportedDataType.LEAKS_REPORT,
             name_substring=ReportConst.LEAKS_REPORT_NAME_PART,
-            tu_name_substring=cfg.technological_unit.description,
+            tu_name_substring=cfg.tu_name,
             period_start=actual_report_state.period_start,
             period_end=actual_report_state.period_end,
             total_wait_seconds=ReportConst.LIST_POLL_TOTAL_WAIT_SECONDS,
@@ -2857,7 +2857,7 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
                 attachment_type=allure.attachment_type.TEXT,
             )
         actual_report_state.report_file_name = report_utils.build_export_report_file_name(
-            cfg.technological_unit.description,
+            cfg.tu_name,
             actual_report_state.period_start,
             actual_report_state.period_end,
         )
@@ -2973,7 +2973,7 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
         with allure.step("Этап 10. Извлечение строк данных из отчёта"):
             actual_report_state.data_rows = report_utils.iter_report_data_rows(actual_report_state.worksheet)
             actual_report_state.target_row = report_utils.find_row_with_object(
-                actual_report_state.data_rows, cfg.technological_unit.description
+                actual_report_state.data_rows, cfg.tu_name
             )
             allure.attach(
                 "\n".join(f"row#{row.row_index}: {row.cells}" for row in actual_report_state.data_rows),
@@ -3005,7 +3005,7 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
                 actual_report_state.data_rows
             ).is_not_empty()
             StepCheck(
-                f"Строка с объектом, содержащим '{cfg.technological_unit.description}'",
+                f"Строка с объектом, содержащим '{cfg.tu_name}'",
                 ReportConst.COL_OBJECT,
             ).actual(actual_report_state.target_row).is_not_none()
 
@@ -3017,7 +3017,7 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
                 ).actual(leak_datetime_value).is_between(period_start_lo, period_end_hi)
 
                 StepCheck(
-                    f"Колонка '{ReportConst.COL_OBJECT}' содержит '{cfg.technological_unit.description}'",
+                    f"Колонка '{ReportConst.COL_OBJECT}' содержит '{cfg.tu_name}'",
                     ReportConst.COL_OBJECT,
                     soft_failures,
                 ).contains(object_value_lower, actual_report_state.tu_description_lower)
@@ -3073,7 +3073,7 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
                 f"Имя файла содержит '{ReportConst.LEAKS_REPORT_NAME_PART}'", "file_name", soft_failures
             ).contains(report_file_name_lower, leaks_report_name_part_lower)
             StepCheck(
-                f"Имя файла содержит описание ТУ '{cfg.technological_unit.description}'", "file_name", soft_failures
+                f"Имя файла содержит описание ТУ '{cfg.tu_name}'", "file_name", soft_failures
             ).contains(report_file_name_lower, actual_report_state.tu_description_lower)
             StepCheck(
                 "Дата начала периода в имени файла совпадает с фильтром запроса (+-1 мин)",
@@ -3151,7 +3151,7 @@ async def export_lds_status_report(
         )
         report_state.period_start_naive = report_utils.normalize_report_period_naive(report_state.period_start)
         report_state.period_end_naive = report_utils.normalize_report_period_naive(report_state.period_end)
-        report_state.tu_description_lower = cfg.technological_unit.description.lower()
+        report_state.tu_description_lower = cfg.tu_name.lower()
         time_offset_hours = t_utils.report_time_offset_hours()
         StepCheck(
             f"Смещение timeOffset для запросов отчёта (часовой пояс {TestConst.ZONE_INFO})",
@@ -3201,7 +3201,7 @@ async def export_lds_status_report(
             list_limit=ReportConst.EXPORTED_DATA_LIST_LIMIT,
             expected_data_type=ExportedDataType.LDS_STATUS_REPORT,
             name_substring=LdsReportConst.LDS_STATUS_REPORT_NAME_PART,
-            tu_name_substring=cfg.technological_unit.description,
+            tu_name_substring=cfg.tu_name,
             period_start=report_state.period_start,
             period_end=report_state.period_end,
             total_wait_seconds=ReportConst.LIST_POLL_TOTAL_WAIT_SECONDS,
@@ -3220,7 +3220,7 @@ async def export_lds_status_report(
                 attachment_type=allure.attachment_type.TEXT,
             )
         report_state.report_file_name = report_utils.build_export_report_file_name(
-            cfg.technological_unit.description,
+            cfg.tu_name,
             report_state.period_start,
             report_state.period_end,
             LdsReportConst.LDS_STATUS_REPORT_NAME_PART,
@@ -3429,7 +3429,7 @@ async def export_lds_status_report(
                     soft_failures,
                 ).contains(report_file_name_lower, lds_report_name_part_lower)
                 StepCheck(
-                    f"Имя файла содержит описание ТУ '{cfg.technological_unit.description}'",
+                    f"Имя файла содержит описание ТУ '{cfg.tu_name}'",
                     "file_name",
                     soft_failures,
                 ).contains(report_file_name_lower, report_state.tu_description_lower)
@@ -3619,13 +3619,13 @@ async def export_mt_mode_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTest
         report_state.expected_period_end_naive = report_utils.normalize_report_period_naive(
             report_state.expected_period_end
         )
-        report_state.expected_tu_description_lower = cfg.technological_unit.description.lower()
+        report_state.expected_tu_description_lower = cfg.tu_name.lower()
         report_state.expected_section_names = list(MtReportConst.SECTION_NAMES)
         report_state.expected_dominant_mode_column = MtReportConst.STATIONARY_STATUS_TO_COLUMN.get(
             leak.expected_report_stationary_status
         )
         report_state.expected_file_name = report_utils.build_export_report_file_name(
-            cfg.technological_unit.description,
+            cfg.tu_name,
             report_state.expected_period_start,
             report_state.expected_period_end,
             MtReportConst.MT_MODE_REPORT_NAME_PART,
@@ -3687,7 +3687,7 @@ async def export_mt_mode_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTest
             list_limit=ReportConst.EXPORTED_DATA_LIST_LIMIT,
             expected_data_type=ExportedDataType.STATIONARY_STATUS_REPORT,
             name_substring=MtReportConst.MT_MODE_REPORT_NAME_PART,
-            tu_name_substring=cfg.technological_unit.description,
+            tu_name_substring=cfg.tu_name,
             period_start=report_state.expected_period_start,
             period_end=report_state.expected_period_end,
             total_wait_seconds=ReportConst.LIST_POLL_TOTAL_WAIT_SECONDS,
@@ -3975,7 +3975,7 @@ async def export_mt_mode_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTest
                     soft_failures,
                 ).contains(report_file_name_lower, mt_report_name_part_lower)
                 StepCheck(
-                    f"Имя файла содержит описание ТУ '{cfg.technological_unit.description}'",
+                    f"Имя файла содержит описание ТУ '{cfg.tu_name}'",
                     "file_name",
                     soft_failures,
                 ).contains(report_file_name_lower, report_state.expected_tu_description_lower)

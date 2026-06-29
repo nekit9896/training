@@ -100,7 +100,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка режима работы СОУ на базовых ДУ, на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки : {config.lds_status_init_cold_start_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
                 "Ожидаемый режим работы СОУ: Инициализация\n Ожидаемая причина режима работы СОУ: Холодный пуск"
@@ -126,7 +126,7 @@ class TestSuiteScenarios:
             (
                 "Проверка выхода СОУ из повторной Инициализации, после Неисправности, на показательных ДУ,"
                 f" на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки: {config.lds_status_serviceable_after_faulty_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
                 "Ожидаемый режим работы СОУ: Исправна"
@@ -155,7 +155,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка режима работы СОУ на выбранном ДУ, на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 "Время проведения проверки : "
                 f"{config.lds_status_deg_exceeding_distance_between_pressure_sensors_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
@@ -186,7 +186,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка режима работы СОУ на выбранном ДУ, на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 "Время проведения проверки : "
                 f"{config.lds_status_deg_not_enough_pressure_sensors_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
@@ -215,7 +215,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка режима работы СОУ на выбранном ДУ, на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки : {config.lds_status_deg_pig_sensor_passage_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
                 "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
@@ -244,7 +244,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка режима работы СОУ на выбранном ДУ, на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 f"Время проведения проверки : {config.lds_status_deg_gravity_section_pumping_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
                 "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
@@ -271,7 +271,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка режимов работы СОУ и МТ на выбранном ДУ, на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 "Время проведения проверки : "
                 f"{config.lds_status_deg_starting_pumping_out_pumps_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
@@ -304,7 +304,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка режима работы СОУ на выбранном ДУ, на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 "Время проведения проверки : "
                 f"{config.lds_status_deg_exceeding_distance_between_flow_meters_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
@@ -335,7 +335,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка режима работы СОУ на выбранном ДУ, на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 "Время проведения проверки : "
                 f"{config.lds_status_faulty_absence_min_flow_meters_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
@@ -370,7 +370,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка режима работы СОУ на ДУ 2, на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 "Время проведения проверки : "
                 f"{config.lds_status_deg_rejection_temperature_sensor_on_du_2_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
@@ -401,7 +401,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка режима работы СОУ на ДУ 3, на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 "Время проведения проверки : "
                 f"{config.lds_status_deg_rejection_temperature_sensor_on_du_3_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
@@ -432,7 +432,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка режима работы СОУ на ДУ 5, на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 "Время проведения проверки : "
                 f"{config.lds_status_deg_rejection_temperature_sensor_on_du_5_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
@@ -463,7 +463,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка режима работы СОУ на ДУ 2, на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 "Время проведения проверки : "
                 f"{config.lds_status_deg_rejection_density_and_viscosity_on_du_2_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
@@ -495,7 +495,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка режима работы СОУ на ДУ 3, на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 "Время проведения проверки : "
                 f"{config.lds_status_deg_rejection_density_and_viscosity_on_du_3_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
@@ -527,7 +527,7 @@ class TestSuiteScenarios:
             title,
             (
                 f"Проверка режима работы СОУ на ДУ 5, на наборе данных {config.suite_name}, \n"
-                f"на технологическом участке {config.technological_unit.description}\n"
+                f"на технологическом участке {config.tu_name}\n"
                 "Время проведения проверки : "
                 f"{config.lds_status_deg_rejection_density_and_viscosity_on_du_5_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
