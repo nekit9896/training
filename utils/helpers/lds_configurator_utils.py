@@ -180,7 +180,7 @@ def check_sou_status_sync(
         with allure.step("Проверка: статусы Администрирования и Состояния МТ согласованы"):
             if is_on_main_page == expected_on_page:
                 return
-            admin_text = SouAdminStatus.report_text_by_value(int(sou_status))
+            admin_text = SouAdminStatus.report_text_by_value(sou_status.value)
             page_text = "СОУ запущена" if is_on_main_page else "СОУ не запущена"
             fail(
                 f"Рассинхронизация для ТУ '{tu_name}' (tuId={tu_id}): "
@@ -228,7 +228,7 @@ async def poll_admin_tu_status(
     """
     Long-poll GetBasicInfoAdmin до смены статуса ТУ в Администрировании.
     """
-    status_label = SouAdminStatus.report_text_by_value(int(expected_status))
+    status_label = SouAdminStatus.report_text_by_value(expected_status.value)
     with allure.step(
         f"Ожидание статуса '{status_label}' в Администрировании "
         f"(tuId={tu_id}, таймаут {int(total_wait_seconds)} с)"
@@ -238,7 +238,7 @@ async def poll_admin_tu_status(
             admin_reply = await get_basic_info_admin(ws_client, parser)
             tus = admin_reply.replyContent.basicInfo.tus if admin_reply.replyContent else []
             tu = next((item for item in tus if item.tuId == tu_id), None)
-            if tu and tu.status == int(expected_status):
+            if tu and tu.status == expected_status.value:
                 return True
             await asyncio.sleep(poll_interval_seconds)
         return False
