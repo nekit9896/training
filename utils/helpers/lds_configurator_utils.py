@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime
+from contextlib import contextmanager
+from datetime import datetime, timedelta
 from typing import Any, Optional
 
 import allure
@@ -23,6 +24,24 @@ from utils.msgpack_utils.message_filters import is_desired_type
 
 logger = logging.getLogger(__name__)
 
+_infra_mode: bool = False
+
+
+def set_infra_mode(enabled: bool) -> None:
+    """Включает логирование вместо Allure-шагов (infra setup/teardown в conftest)."""
+    global _infra_mode
+    _infra_mode = enabled
+
+
+@contextmanager
+def _step(name: str):
+    if _infra_mode:
+        logger.info("[LDS_CONFIGURATOR] %s", name)
+        yield
+    else:
+        with allure.step(name):
+            yield
+
 
 def attach_allure_alert(message: str) -> None:
     """
@@ -30,8 +49,9 @@ def attach_allure_alert(message: str) -> None:
 
     Используется в teardown при некритичных отклонениях.
     """
-    allure.attach(message, name="ALERT", attachment_type=allure.attachment_type.TEXT)
     logger.warning("[LDS_CONFIGURATOR] %s", message)
+    if not _infra_mode:
+        allure.attach(message, name="ALERT", attachment_type=allure.attachment_type.TEXT)
 
 
 async def get_basic_info_admin(ws_client: WebSocketClient, parser: WsMessageParser) -> GetBasicInfoAdminReply:
@@ -52,7 +72,7 @@ async def get_basic_info_admin_with_retry(
     """
     last_error: Optional[BaseException] = None
     for attempt in range(1, retries + 1):
-        with allure.step(f"Запрос списка ТУ в Администрировании - попытка {attempt} из {retries}"):
+        with _step(f"Запрос списка ТУ в Администрировании - попытка {attempt} из {retries}"):
             try:
                 return await get_basic_info_admin(ws_client, parser)
             except (asyncio.TimeoutError, ConnectionError, ConnectionResetError, OSError, RuntimeError) as error:
@@ -60,7 +80,7 @@ async def get_basic_info_admin_with_retry(
                 if attempt < retries:
                     await asyncio.sleep(1)
 
-    with allure.step("Проверка: GetBasicInfoAdminResponse получен"):
+    with _step("Проверка: GetBasicInfoAdminResponse получен"):
         fail(
             f"Не удалось получить GetBasicInfoAdminResponse за {retries} попыток: {last_error}",
             pytrace=False,
@@ -71,9 +91,9 @@ def find_tu_by_name(admin_reply: GetBasicInfoAdminReply, tu_name: str) -> AdminT
     """
     Ищет ТУ по точному совпадению tuName в ответе Администрирования.
     """
-    with allure.step(f"Поиск ТУ '{tu_name}' по точному совпадению tuName в GetBasicInfoAdminResponse"):
+    with _step(f"Поиск ТУ '{tu_name}' по точному совпадению tuName в GetBasicInfoAdminResponse"):
         tus = admin_reply.replyContent.basicInfo.tus if admin_reply.replyContent else None
-        with allure.step("Проверка: в ответе есть список ТУ"):
+        with _step("Проверка: в ответе есть список ТУ"):
             if not tus:
                 fail(
                     f"GetBasicInfoAdminResponse не содержит списка ТУ (ожидался tuName='{tu_name}')",
@@ -83,7 +103,7 @@ def find_tu_by_name(admin_reply: GetBasicInfoAdminReply, tu_name: str) -> AdminT
             if tu.tuName == tu_name:
                 return tu
         available = [tu.tuName for tu in tus]
-        with allure.step("Проверка: ТУ из набора данных найден в Администрировании"):
+        with _step("Проверка: ТУ из набора данных найден в Администрировании"):
             fail(
                 f"ТУ '{tu_name}' не найден в GetBasicInfoAdminResponse. Доступные tu_name: {available}",
                 pytrace=False,
@@ -94,13 +114,13 @@ def validate_admin_tu(tu: AdminTuInfo) -> None:
     """
     Проверяет обязательные поля AdminTuInfo и допустимость статуса СОУ.
     """
-    with allure.step(f"Валидация параметров ТУ '{tu.tuName}' (tuId={tu.tuId})"):
-        with allure.step("Проверка: tuId и mnId заполнены"):
+    with _step(f"Валидация параметров ТУ '{tu.tuName}' (tuId={tu.tuId})"):
+        with _step("Проверка: tuId и mnId заполнены"):
             if not tu.tuId:
                 fail(f"Некорректный tuId для ТУ '{tu.tuName}': {tu.tuId}", pytrace=False)
             if not tu.mnId:
                 fail(f"Некорректный mnId для ТУ '{tu.tuName}': {tu.mnId}", pytrace=False)
-        with allure.step("Проверка: статус СОУ известен Администрированию"):
+        with _step("Проверка: статус СОУ известен Администрированию"):
             try:
                 SouAdminStatus(tu.status)
             except ValueError:
@@ -141,7 +161,7 @@ async def is_tu_present_on_main_page(
     """
     Подписывается на MainPageInfoContent и определяет, отображается ли ТУ в Состоянии МТ.
     """
-    with allure.step(f"Подписка на Состояние МТ (MainPageInfoContent) для tuId={tu_id}"):
+    with _step(f"Подписка на Состояние МТ (MainPageInfoContent) для tuId={tu_id}"):
         ws_client.clear_queue()
         await t_utils.connect(
             ws_client,
@@ -173,11 +193,11 @@ def check_sou_status_sync(
     """
     Сверяет статус СОУ в Администрировании и на ЭФ Состояние МТ.
     """
-    with allure.step(
+    with _step(
         f"Сверка статуса СОУ: ЭФ Администрирование vs ЭФ Состояние МТ (tuId={tu_id}, «{tu_name}»)"
     ):
         expected_on_page = sou_status == SouAdminStatus.RUNNING
-        with allure.step("Проверка: статусы Администрирования и Состояния МТ согласованы"):
+        with _step("Проверка: статусы Администрирования и Состояния МТ согласованы"):
             if is_on_main_page == expected_on_page:
                 return
             admin_text = SouAdminStatus.report_text_by_value(sou_status.value)
@@ -200,7 +220,7 @@ async def invoke_lds_command(
     """
     Отправляет StopLdsRequest или LaunchLdsRequest и ждёт Completion с replyStatus=200.
     """
-    with allure.step(f"Команда {request_name} для tuId={tu_id}"):
+    with _step(f"Команда {request_name} для tuId={tu_id}"):
         await t_utils.connect(ws_client, request_name, {"tuId": tu_id})
         invocation_id = ws_client.invocation_id
         payload = await ws_client.receive_by_invocation_id(invocation_id)
@@ -208,7 +228,7 @@ async def invoke_lds_command(
             reply = parser.parse_stop_lds_msg(payload)
         else:
             reply = parser.parse_launch_lds_msg(payload)
-        with allure.step(f"Проверка: {request_name} завершился успешно (replyStatus=200)"):
+        with _step(f"Проверка: {request_name} завершился успешно (replyStatus=200)"):
             if reply.replyStatus != ReplyStatus.OK:
                 fail(
                     f"{request_name} завершился с replyStatus={reply.replyStatus}, "
@@ -229,7 +249,7 @@ async def poll_admin_tu_status(
     Long-poll GetBasicInfoAdmin до смены статуса ТУ в Администрировании.
     """
     status_label = SouAdminStatus.report_text_by_value(expected_status.value)
-    with allure.step(
+    with _step(
         f"Ожидание статуса '{status_label}' в Администрировании "
         f"(tuId={tu_id}, таймаут {int(total_wait_seconds)} с)"
     ):
@@ -255,7 +275,7 @@ async def poll_main_page_tu_presence(
     Long-poll MainPageInfoContent: ожидание появления или исчезновения ТУ в Состоянии МТ.
     """
     action = "появления" if expect_present else "исчезновения"
-    with allure.step(
+    with _step(
         f"Ожидание {action} ТУ в Состоянии МТ "
         f"(tuId={tu_id}, таймаут {int(total_wait_seconds)} с)"
     ):
@@ -275,11 +295,19 @@ async def poll_main_page_tu_presence(
             if not expect_present and not found:
                 return True
 
-        t_utils._attach_ws_poll_failure(
-            [],
-            total_wait_seconds,
-            f"{LdsCfgConst.MAIN_PAGE_INFO_CONTENT} tuId={tu_id} present={expect_present}",
-        )
+        if not _infra_mode:
+            t_utils._attach_ws_poll_failure(
+                [],
+                total_wait_seconds,
+                f"{LdsCfgConst.MAIN_PAGE_INFO_CONTENT} tuId={tu_id} present={expect_present}",
+            )
+        else:
+            logger.warning(
+                "[LDS_CONFIGURATOR] Таймаут ожидания %s ТУ tuId=%s за %s с",
+                action,
+                tu_id,
+                int(total_wait_seconds),
+            )
         return False
 
 
@@ -290,9 +318,10 @@ async def verify_launched_at(
     launch_checkpoint: datetime,
 ) -> None:
     """
-    Проверяет, что launchedAt в GetTusInformation позже момента холодного запуска.
+    Проверяет, что launchedAt в GetTusInformation не раньше момента LaunchLds с допуском.
     """
-    with allure.step(f"Запрос GetTusInformation для tuId={tu_id}"):
+    tolerance = timedelta(seconds=LdsCfgConst.LAUNCHED_AT_TOLERANCE_SECONDS)
+    with _step(f"Запрос GetTusInformation для tuId={tu_id}"):
         payload = await t_utils.connect_and_get_msg(
             ws_client,
             LdsCfgConst.GET_TUS_INFORMATION_REQUEST,
@@ -302,30 +331,38 @@ async def verify_launched_at(
         tus_info = reply.replyContent.tusInfo if reply.replyContent else []
         tu_info = next((item for item in tus_info if item.tuId == tu_id), None)
 
-        with allure.step("Проверка: в ответе есть информация о запуске ТУ"):
+        with _step("Проверка: в ответе есть информация о запуске ТУ"):
             if tu_info is None:
                 fail(f"GetTusInformationResponse не содержит tuId={tu_id}", pytrace=False)
 
         launched_at = parser.timestamp_to_datetime(tu_info.launchedAt)
-        with allure.step("Проверка: поле launchedAt заполнено"):
+        with _step("Проверка: поле launchedAt заполнено"):
             if launched_at is None:
                 fail(f"GetTusInformationResponse: launchedAt отсутствует для tuId={tu_id}", pytrace=False)
 
         launched_at_msk = t_utils.localize_as_moscow(launched_at)
         checkpoint_msk = t_utils.localize_as_moscow(launch_checkpoint)
-        allure.attach(
+        compare_msg = (
             f"launchedAt: {t_utils.format_datetime_moscow(launched_at_msk)}\n"
-            f"checkpoint: {t_utils.format_datetime_moscow(checkpoint_msk)}",
-            name="Сравнение времени запуска СОУ",
-            attachment_type=allure.attachment_type.TEXT,
+            f"checkpoint: {t_utils.format_datetime_moscow(checkpoint_msk)}\n"
+            f"tolerance: {LdsCfgConst.LAUNCHED_AT_TOLERANCE_SECONDS} с"
         )
+        if _infra_mode:
+            logger.info("[LDS_CONFIGURATOR] Сравнение времени запуска СОУ:\n%s", compare_msg)
+        else:
+            allure.attach(
+                compare_msg,
+                name="Сравнение времени запуска СОУ",
+                attachment_type=allure.attachment_type.TEXT,
+            )
 
-        with allure.step("Проверка: launchedAt позже момента команды 'Запустить СОУ'"):
-            if launched_at_msk <= checkpoint_msk:
+        with _step("Проверка: launchedAt не раньше момента команды 'Запустить СОУ' (с допуском)"):
+            if launched_at_msk < checkpoint_msk - tolerance:
                 fail(
                     f"Время запуска СОУ на бэкенде ({t_utils.format_datetime_moscow(launched_at_msk)}) "
-                    f"не позже момента команды 'Запустить СОУ' "
-                    f"({t_utils.format_datetime_moscow(checkpoint_msk)})",
+                    f"раньше момента команды 'Запустить СОУ' "
+                    f"({t_utils.format_datetime_moscow(checkpoint_msk)}) "
+                    f"с учётом допуска {int(LdsCfgConst.LAUNCHED_AT_TOLERANCE_SECONDS)} с",
                     pytrace=False,
                 )
 

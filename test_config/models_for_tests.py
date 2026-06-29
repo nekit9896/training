@@ -60,9 +60,8 @@ class BaseSuiteConfig:
 
     # ===== LDS Configurator (Администрирование) =====
     use_lds_configurator: bool = False
-    tu_name: str = ""
+    admin_tu_name: str = ""
     resolved_tu_id: Optional[int] = None
-    lds_configurator_verify_test: Optional[CaseMarkers] = None
 
     # ===== Правила конвертации единиц измерения давления на стенде =====
     measure_conversion_rules: Optional[MeasureConversionRule] = None
@@ -78,21 +77,24 @@ class BaseSuiteConfig:
     unmask_du_event: Optional[str] = None
 
     # ===== Свойства для удобства =====
-    def __post_init__(self) -> None:
-        if not self.tu_name:
-            object.__setattr__(self, "tu_name", self.technological_unit.description)
+    @property
+    def tu_name(self) -> str:
+        """Имя ТУ для бизнес-тестов (журнал, BasicInfo) — из enum TU."""
+        return self.technological_unit.description
 
     @property
     def tu_id(self) -> int:
-        """ID технологического участка"""
-        if self.use_lds_configurator:
-            if self.resolved_tu_id is None:
-                raise RuntimeError(
-                    "resolved_tu_id не установлен - выполните lds_configurator_admin_setup перед тестами сценария"
-                )
-            return self.resolved_tu_id
-        # legacy: захардкоженный id из enum TU (имитатор использует тот же id для tn{id}_tags.txt)
+        """ID технологического участка из enum TU (имитатор, WS-тесты)."""
         return self.technological_unit.id
+
+    @property
+    def configurator_tu_id(self) -> int:
+        """tuId из Администрирования после infra setup (LaunchLds/StopLds)."""
+        if self.resolved_tu_id is None:
+            raise RuntimeError(
+                "resolved_tu_id не установлен — выполните lds_configurator_admin_setup перед операциями Администрирования"
+            )
+        return self.resolved_tu_id
 
     @property
     def infra_tu_id(self) -> int:

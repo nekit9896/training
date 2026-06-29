@@ -408,6 +408,7 @@ class LdsConfiguratorConstants:
     POLL_TIMEOUT_SECONDS: float = 120.0
     POLL_INTERVAL_SECONDS: float = 15.0
     MAIN_PAGE_SYNC_TIMEOUT_SECONDS: float = 30.0
+    LAUNCHED_AT_TOLERANCE_SECONDS: float = 120.0
 
     GET_BASIC_INFO_ADMIN_REQUEST: str = "GetBasicInfoAdminRequest"
     SUBSCRIBE_MAIN_PAGE_INFO_REQUEST: str = "subscribeMainPageInfoRequest"

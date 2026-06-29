@@ -56,8 +56,7 @@ SELECT_6_CONFIG = SmokeSuiteConfig(
     main_pipeline=MAIN_PIPELINE,
     # ===== LDS Configurator =====
     use_lds_configurator=True,
-    tu_name=TECHNOLOGICAL_UNIT.description,
-    lds_configurator_verify_test=CaseMarkers(test_case_id="", offset=0),
+    admin_tu_name="Тихорецк-Новороссийск-3-Автотест",
     # ----- Ожидаемые статусы для проверки режимов на ЭФ Диагностика сигналов -----
     exp_tixoreczkaya_novovelichkovskaya_reg_lu=StationaryStatus.STATIONARY.value,
     exp_tixoreczkaya_novovelichkovskaya_reg_sou=LdsStatus.SERVICEABLE.value,

@@ -55,7 +55,7 @@ class BaseReasonEnum(IntFlag):
 
 
 class TU(Enum):
-    """Технологический участок. id - legacy для имитатора (tn{id}_tags.txt); при use_lds_configurator tu_id берётся из Администрирования."""
+    """Технологический участок. id - для имитатора (tn{id}_tags.txt) и WS-тестов."""
 
     YAROSLAVL_MOSCOW = (1, "Ярославль - Москва", "volga.json")
     TIKHORETSK_NOVOROSSIYSK_2 = (2, "Тихорецк-Новороссийск-2", "tn2.json")
