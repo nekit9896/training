@@ -100,31 +100,64 @@ async def lds_configurator_verify_after_core(
     Проверка готовности стенда после запуска lds-core.
 
     1. Актуальный статус СОУ из Администрирования.
-    2. Сверка с Состоянием МТ (MainPageInfoContent).
-    3. Ожидание появления ТУ в Состоянии МТ при status=включена.
+    2. Ожидание согласованного состояния ТУ на Состоянии МТ в BasicInfo, до 120 с.
+    3. Ожидание согласованного состояния ТУ на Состоянии МТ в MainPageInfoContent, до 120 с.
+    4. Сверка статуса СОУ: Администрирование vs Состояние МТ.
     """
     tu_id = cfg.configurator_tu_id
+    tu_name = cfg.admin_tu_name
 
     logger.info("[SETUP] Получение актуального статуса СОУ для tuId=%s", tu_id)
     admin_reply = await lds_utils.get_basic_info_admin_with_retry(ws_client, parser)
     sou_status = lds_utils.get_admin_tu_status(admin_reply, tu_id)
     if sou_status is None:
         fail(
-            f"ТУ tuId={tu_id} ('{cfg.admin_tu_name}') не найден в GetBasicInfoAdminResponse",
+            f"ТУ tuId={tu_id} ('{tu_name}') не найден в GetBasicInfoAdminResponse",
             pytrace=False,
         )
 
-    logger.info("[SETUP] Сверка статуса СОУ: Администрирование vs Состояние МТ")
-    is_on_main_page = await lds_utils.is_tu_present_on_main_page(ws_client, parser, tu_id)
-    lds_utils.check_sou_status_sync(sou_status, is_on_main_page, tu_id, cfg.admin_tu_name)
+    expect_enabled = sou_status == SouAdminStatus.RUNNING
+    action = "появления" if expect_enabled else "отсутствия"
+    logger.info(
+        "[SETUP] Ожидание %s ТУ в BasicInfo (таймаут %s с)",
+        action,
+        int(LdsCfgConst.POLL_TIMEOUT_SECONDS),
+    )
+    basic_info_poll_ok = await lds_utils.poll_basic_info_tu_presence(
+        ws_client, parser, tu_id, tu_name, expect_present=expect_enabled
+    )
+    if not basic_info_poll_ok:
+        if expect_enabled:
+            fail(
+                "СОУ не отображается на Состоянии МТ в BasicInfo: ТУ не появилась за 2 минуты после запуска core",
+                pytrace=False,
+            )
+        fail(
+            "СОУ отображается на Состоянии МТ в BasicInfo при статусе 'выключена' в Администрировании",
+            pytrace=False,
+        )
 
-    if sou_status == SouAdminStatus.RUNNING:
-        logger.info("[SETUP] Ожидание появления ТУ в Состоянии МТ")
-        if not await lds_utils.poll_main_page_tu_presence(ws_client, tu_id, expect_present=True):
+    logger.info(
+        "[SETUP] Ожидание %s ТУ в Состоянии МТ (таймаут %s с)",
+        action,
+        int(LdsCfgConst.POLL_TIMEOUT_SECONDS),
+    )
+    main_page_poll_ok = await lds_utils.poll_main_page_tu_presence(
+        ws_client, tu_id, expect_present=expect_enabled
+    )
+    if not main_page_poll_ok:
+        if expect_enabled:
             fail(
                 "СОУ не отображается в Состоянии МТ: ТУ не появилась за 2 минуты после запуска core",
                 pytrace=False,
             )
+        fail(
+            "СОУ отображается в Состоянии МТ при статусе 'выключена' в Администрировании",
+            pytrace=False,
+        )
+
+    logger.info("[SETUP] Сверка статуса СОУ: Администрирование vs BasicInfo vs Состояние МТ")
+    lds_utils.check_sou_status_sync(sou_status, expect_enabled, expect_enabled, tu_id, tu_name)
 
 
 async def lds_configurator_teardown(

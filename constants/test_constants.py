@@ -411,6 +411,7 @@ class LdsConfiguratorConstants:
     LAUNCHED_AT_TOLERANCE_SECONDS: float = 120.0
 
     GET_BASIC_INFO_ADMIN_REQUEST: str = "GetBasicInfoAdminRequest"
+    GET_BASIC_INFO_REQUEST: str = "getBasicInfoRequest"
     SUBSCRIBE_MAIN_PAGE_INFO_REQUEST: str = "subscribeMainPageInfoRequest"
     MAIN_PAGE_INFO_CONTENT: str = "MainPageInfoContent"
     STOP_LDS_REQUEST: str = "StopLdsRequest"

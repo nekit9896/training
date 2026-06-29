@@ -16,6 +16,7 @@ from pytest import fail
 from clients.websocket_client import WebSocketClient
 from constants.enums import ReplyStatus, SouAdminStatus
 from constants.test_constants import LdsConfiguratorConstants as LdsCfgConst
+from models.basic_info_model import BasicInfoReply, BasicTUInfo
 from models.get_basic_info_admin_model import AdminTuInfo, GetBasicInfoAdminReply
 from models.get_tus_information_model import GetTusInformationReply
 from utils.helpers import ws_test_utils as t_utils
@@ -52,6 +53,19 @@ def attach_allure_alert(message: str) -> None:
     logger.warning("[LDS_CONFIGURATOR] %s", message)
     if not _infra_mode:
         allure.attach(message, name="ALERT", attachment_type=allure.attachment_type.TEXT)
+
+
+async def get_basic_info(ws_client: WebSocketClient, parser: WsMessageParser) -> BasicInfoReply:
+    """
+    Выполняет getBasicInfoRequest и парсит ответ BasicInfoContent.
+    """
+    payload = await t_utils.connect_and_get_msg(ws_client, LdsCfgConst.GET_BASIC_INFO_REQUEST, [])
+    return parser.parse_basic_info_msg(payload)
+
+
+def is_tu_in_basic_info(tus: Optional[list[BasicTUInfo]], tu_id: int, tu_name: str) -> bool:
+    """True, если в basicInfo.tus есть запись с указанными tuId и tuName."""
+    return any(tu.tuId == tu_id and tu.tuName == tu_name for tu in (tus or []))
 
 
 async def get_basic_info_admin(ws_client: WebSocketClient, parser: WsMessageParser) -> GetBasicInfoAdminReply:
@@ -186,26 +200,30 @@ async def is_tu_present_on_main_page(
 
 def check_sou_status_sync(
     sou_status: SouAdminStatus,
+    is_in_basic_info: bool,
     is_on_main_page: bool,
     tu_id: int,
     tu_name: str,
 ) -> None:
     """
-    Сверяет статус СОУ в Администрировании и на ЭФ Состояние МТ.
+    Сверяет статус СОУ в Администрировании и на ЭФ Состояние МТ по двум DTO BasicInfo и MainPageInfoContent.
     """
     with _step(
-        f"Сверка статуса СОУ: ЭФ Администрирование vs ЭФ Состояние МТ (tuId={tu_id}, «{tu_name}»)"
+        f"Сверка статуса СОУ: Администрирование vs Состояние МТ "
+        f"(tuId={tu_id}, '{tu_name}')"
     ):
-        expected_on_page = sou_status == SouAdminStatus.RUNNING
-        with _step("Проверка: статусы Администрирования и Состояния МТ согласованы"):
-            if is_on_main_page == expected_on_page:
+        expected_enabled = sou_status == SouAdminStatus.RUNNING
+        with _step("Проверка согласованности статусов Администрирования и Состояния МТ"):
+            if is_in_basic_info == expected_enabled and is_on_main_page == expected_enabled:
                 return
             admin_text = SouAdminStatus.report_text_by_value(sou_status.value)
+            basic_text = "СОУ запущена" if is_in_basic_info else "СОУ не запущена"
             page_text = "СОУ запущена" if is_on_main_page else "СОУ не запущена"
             fail(
                 f"Рассинхронизация для ТУ '{tu_name}' (tuId={tu_id}): "
                 f"Администрирование - {admin_text} ({sou_status.value}); "
-                f"Главная страница - {page_text}. "
+                f"Состояние МТ в BasicInfo - {basic_text}; "
+                f"Состояние МТ в MainPageInfoContent - {page_text}. "
                 f"Статусы в разных подписках не совпадают.",
                 pytrace=False,
             )
@@ -261,6 +279,44 @@ async def poll_admin_tu_status(
             if tu and tu.status == expected_status.value:
                 return True
             await asyncio.sleep(poll_interval_seconds)
+        return False
+
+
+async def poll_basic_info_tu_presence(
+    ws_client: WebSocketClient,
+    parser: WsMessageParser,
+    tu_id: int,
+    tu_name: str,
+    expect_present: bool,
+    total_wait_seconds: float = LdsCfgConst.POLL_TIMEOUT_SECONDS,
+    poll_interval_seconds: float = LdsCfgConst.POLL_INTERVAL_SECONDS,
+) -> bool:
+    """
+    Long-poll getBasicInfoRequest: ожидание появления или исчезновения ТУ в basicInfo.tus.
+    """
+    action = "появления" if expect_present else "исчезновения"
+    with _step(
+        f"Ожидание {action} ТУ в BasicInfo "
+        f"(tuId={tu_id}, tuName='{tu_name}', таймаут {int(total_wait_seconds)} с)"
+    ):
+        deadline = asyncio.get_running_loop().time() + total_wait_seconds
+        while asyncio.get_running_loop().time() < deadline:
+            reply = await get_basic_info(ws_client, parser)
+            tus = reply.replyContent.basicInfo.tus if reply.replyContent else None
+            found = is_tu_in_basic_info(tus, tu_id, tu_name)
+            if expect_present and found:
+                return True
+            if not expect_present and not found:
+                return True
+            await asyncio.sleep(poll_interval_seconds)
+
+        if _infra_mode:
+            logger.warning(
+                "[LDS_CONFIGURATOR] Таймаут ожидания %s ТУ tuId=%s в BasicInfo за %s с",
+                action,
+                tu_id,
+                int(total_wait_seconds),
+            )
         return False
 
 
