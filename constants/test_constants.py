@@ -405,6 +405,7 @@ class LdsConfiguratorConstants:
     """Константы для setup/teardown через раздел Администрирование."""
 
     GET_BASIC_INFO_ADMIN_RETRIES: int = 3
+    CONFIGURATOR_GET_BASIC_INFO_ADMIN_TIMEOUT_SECONDS: float = 30.0
     POLL_TIMEOUT_SECONDS: float = 120.0
     POLL_INTERVAL_SECONDS: float = 15.0
     MAIN_PAGE_SYNC_TIMEOUT_SECONDS: float = 30.0

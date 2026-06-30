@@ -950,13 +950,22 @@ def parse_stationary_status_reasons(
     return flags
 
 
+def _is_configurator_flow_active() -> bool:
+    from utils.helpers import lds_configurator_utils as lds_cfg
+
+    return lds_cfg.is_configurator_flow_active()
+
+
 async def connect(ws_client: WebSocketClient, ws_invoke_type: str, ws_invoke_params: Any = None) -> None:
     """
     Подключение к заданной подписке
     """
     try:
-        with allure.step(f"Вызов {ws_invoke_type} c параметрами {ws_invoke_params}"):
+        if _is_configurator_flow_active():
             await ws_client.invoke(ws_invoke_type, ws_invoke_params)
+        else:
+            with allure.step(f"Вызов {ws_invoke_type} c параметрами {ws_invoke_params}"):
+                await ws_client.invoke(ws_invoke_type, ws_invoke_params)
     except (asyncio.TimeoutError, ConnectionError, ConnectionResetError, OSError) as error:
         fail(f"Не удалось отправить сообщение типа: {ws_invoke_type} c параметрами {ws_invoke_params}. Ошибка: {error}")
 
@@ -1087,18 +1096,29 @@ async def connect_and_get_parsed_msg_by_tu_id(
         fail(f"Не удалось получить сообщение allLeaksInfo для ТУ {tu_id}. Ошибка: {error}")
 
 
-async def connect_and_get_msg(ws_client: WebSocketClient, ws_invoke_type: str, ws_invoke_params: Any = None) -> list:
+async def connect_and_get_msg(
+    ws_client: WebSocketClient,
+    ws_invoke_type: str,
+    ws_invoke_params: Any = None,
+    receive_timeout: Optional[float] = None,
+) -> list:
     """
     Подключение типа get к заданной подписке и получение сообщения с заданным типом контента
     """
     await connect(ws_client, ws_invoke_type, ws_invoke_params)
     invocation_id = ws_client.invocation_id
+    timeout = receive_timeout if receive_timeout is not None else WS_Const.FILTERING_TIMEOUT
 
     try:
-        with allure.step(f"Получение входящего сообщения c invocation_id: {invocation_id}"):
-            payload = await ws_client.receive_by_invocation_id(invocation_id)
+        if _is_configurator_flow_active():
+            payload = await ws_client.receive_by_invocation_id(invocation_id, timeout=timeout)
+        else:
+            with allure.step(f"Получение входящего сообщения c invocation_id: {invocation_id}"):
+                payload = await ws_client.receive_by_invocation_id(invocation_id, timeout=timeout)
         return payload
     except (asyncio.TimeoutError, ConnectionError, ConnectionResetError, OSError) as error:
+        if _is_configurator_flow_active():
+            raise
         fail(f"Не удалось получить сообщение типа: {ws_invoke_type}. Ошибка: {error}")
 
 

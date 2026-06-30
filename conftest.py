@@ -578,13 +578,13 @@ def pytest_runtest_setup(item):
     yield  # pytest продолжит выполнение теста
 
 
-def _run_lds_infra(coro_factory) -> None:
-    """Запускает async infra-сценарий с логированием вместо Allure."""
-    lds_cfg_utils.set_infra_mode(True)
+def _run_lds_configurator_ws(coro_factory) -> None:
+    """Запускает async WS-сценарий lds-configurator"""
+    lds_cfg_utils.set_configurator_flow_active(True)
     try:
         asyncio.run(coro_factory())
     finally:
-        lds_cfg_utils.set_infra_mode(False)
+        lds_cfg_utils.set_configurator_flow_active(False)
 
 
 def _run_lds_admin_setup(suite_config, group_state: dict) -> None:
@@ -595,11 +595,12 @@ def _run_lds_admin_setup(suite_config, group_state: dict) -> None:
         ws_host = get_ws_host()
         token = get_token()
         async with WebSocketClient(ws_host, token) as client:
+            client.suppress_recv_logging = True
             await lds_configurator_scenarios.lds_configurator_admin_setup(
                 client, suite_config, group_state
             )
 
-    _run_lds_infra(_admin_setup)
+    _run_lds_configurator_ws(_admin_setup)
 
 
 def _run_lds_verify_after_core(suite_config) -> None:
@@ -610,9 +611,10 @@ def _run_lds_verify_after_core(suite_config) -> None:
         ws_host = get_ws_host()
         token = get_token()
         async with WebSocketClient(ws_host, token) as client:
+            client.suppress_recv_logging = True
             await lds_configurator_scenarios.lds_configurator_verify_after_core(client, suite_config)
 
-    _run_lds_infra(_verify)
+    _run_lds_configurator_ws(_verify)
 
 
 def _run_lds_configurator_teardown_if_needed(cfg: dict) -> None:
@@ -632,12 +634,17 @@ def _run_lds_configurator_teardown_if_needed(cfg: dict) -> None:
         ws_host = get_ws_host()
         token = get_token()
         async with WebSocketClient(ws_host, token) as client:
+            client.suppress_recv_logging = True
             await lds_configurator_scenarios.lds_configurator_teardown(client, tu_id, admin_tu_name)
 
     try:
-        _run_lds_infra(_teardown)
-    except Exception:
-        logger.exception("[TEARDOWN] [ERROR] Ошибка LDS Configurator teardown для tuId=%s", tu_id)
+        _run_lds_configurator_ws(_teardown)
+    except BaseException as error:
+        logger.warning(
+            "[TEARDOWN] [ALERT] LDS Configurator teardown завершился с ошибкой для tuId=%s: %s",
+            tu_id,
+            error,
+        )
     finally:
         cfg["resolved_tu_id"] = None
         cfg["use_lds_configurator"] = False

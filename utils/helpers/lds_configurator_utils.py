@@ -25,18 +25,23 @@ from utils.msgpack_utils.message_filters import is_desired_type
 
 logger = logging.getLogger(__name__)
 
-_infra_mode: bool = False
+_configurator_flow_active: bool = False
 
 
-def set_infra_mode(enabled: bool) -> None:
-    """Включает логирование вместо Allure-шагов (infra setup/teardown в conftest)."""
-    global _infra_mode
-    _infra_mode = enabled
+def set_configurator_flow_active(enabled: bool) -> None:
+    """Включает логирование вместо Allure-шагов (setup/teardown через lds-configurator в conftest)."""
+    global _configurator_flow_active
+    _configurator_flow_active = enabled
+
+
+def is_configurator_flow_active() -> bool:
+    """True во время setup/teardown/verify СОУ через Администрирование (lds-configurator) вне теста."""
+    return _configurator_flow_active
 
 
 @contextmanager
 def _step(name: str):
-    if _infra_mode:
+    if _configurator_flow_active:
         logger.info("[LDS_CONFIGURATOR] %s", name)
         yield
     else:
@@ -51,7 +56,7 @@ def attach_allure_alert(message: str) -> None:
     Используется в teardown при некритичных отклонениях.
     """
     logger.warning("[LDS_CONFIGURATOR] %s", message)
-    if not _infra_mode:
+    if not _configurator_flow_active:
         allure.attach(message, name="ALERT", attachment_type=allure.attachment_type.TEXT)
 
 
@@ -68,11 +73,22 @@ def is_tu_in_basic_info(tus: Optional[list[BasicTUInfo]], tu_id: int, tu_name: s
     return any(tu.tuId == tu_id and tu.tuName == tu_name for tu in (tus or []))
 
 
-async def get_basic_info_admin(ws_client: WebSocketClient, parser: WsMessageParser) -> GetBasicInfoAdminReply:
+async def get_basic_info_admin(
+    ws_client: WebSocketClient,
+    parser: WsMessageParser,
+    receive_timeout: Optional[float] = None,
+) -> GetBasicInfoAdminReply:
     """
     Выполняет GetBasicInfoAdminRequest и парсит ответ.
     """
-    payload = await t_utils.connect_and_get_msg(ws_client, LdsCfgConst.GET_BASIC_INFO_ADMIN_REQUEST, [])
+    if receive_timeout is None and _configurator_flow_active:
+        receive_timeout = LdsCfgConst.CONFIGURATOR_GET_BASIC_INFO_ADMIN_TIMEOUT_SECONDS
+    payload = await t_utils.connect_and_get_msg(
+        ws_client,
+        LdsCfgConst.GET_BASIC_INFO_ADMIN_REQUEST,
+        [],
+        receive_timeout=receive_timeout,
+    )
     return parser.parse_get_basic_info_admin_msg(payload)
 
 
@@ -89,7 +105,14 @@ async def get_basic_info_admin_with_retry(
         with _step(f"Запрос списка ТУ в Администрировании - попытка {attempt} из {retries}"):
             try:
                 return await get_basic_info_admin(ws_client, parser)
-            except (asyncio.TimeoutError, ConnectionError, ConnectionResetError, OSError, RuntimeError) as error:
+            except (
+                asyncio.TimeoutError,
+                ConnectionError,
+                ConnectionResetError,
+                OSError,
+                RuntimeError,
+                fail.Exception,
+            ) as error:
                 last_error = error
                 if attempt < retries:
                     await asyncio.sleep(1)
@@ -310,7 +333,7 @@ async def poll_basic_info_tu_presence(
                 return True
             await asyncio.sleep(poll_interval_seconds)
 
-        if _infra_mode:
+        if _configurator_flow_active:
             logger.warning(
                 "[LDS_CONFIGURATOR] Таймаут ожидания %s ТУ tuId=%s в BasicInfo за %s с",
                 action,
@@ -351,7 +374,7 @@ async def poll_main_page_tu_presence(
             if not expect_present and not found:
                 return True
 
-        if not _infra_mode:
+        if not _configurator_flow_active:
             t_utils._attach_ws_poll_failure(
                 [],
                 total_wait_seconds,
@@ -403,7 +426,7 @@ async def verify_launched_at(
             f"checkpoint: {t_utils.format_datetime_moscow(checkpoint_msk)}\n"
             f"tolerance: {LdsCfgConst.LAUNCHED_AT_TOLERANCE_SECONDS} с"
         )
-        if _infra_mode:
+        if _configurator_flow_active:
             logger.info("[LDS_CONFIGURATOR] Сравнение времени запуска СОУ:\n%s", compare_msg)
         else:
             allure.attach(

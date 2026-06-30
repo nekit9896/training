@@ -167,39 +167,38 @@ async def lds_configurator_teardown(
 ) -> None:
     """
     Teardown набора: остановка СОУ после прогона.
-
     Некритичные отклонения логируются без падения прогона.
     """
-    logger.info("[TEARDOWN] Проверка статуса СОУ (tuId=%s, «%s»)", tu_id, admin_tu_name)
     try:
-        admin_reply = await lds_utils.get_basic_info_admin(ws_client, parser)
-    except Exception as error:
-        lds_utils.attach_allure_alert(
-            f"Не удалось получить статус СОУ при teardown: {error}. "
-            f"tuId={tu_id}, adminTuName={admin_tu_name!r}"
-        )
-        return
+        logger.info("[TEARDOWN] Проверка статуса СОУ (tuId=%s, «%s»)", tu_id, admin_tu_name)
+        ws_client.clear_queue()
+        admin_reply = await lds_utils.get_basic_info_admin_with_retry(ws_client, parser)
 
-    sou_status = lds_utils.get_admin_tu_status(admin_reply, tu_id)
-    if sou_status != SouAdminStatus.RUNNING:
-        lds_utils.attach_allure_alert(
-            f"СОУ не в статусе 'включена' при teardown (status={sou_status}), остановка пропущена. "
-            f"tuId={tu_id}, adminTuName='{admin_tu_name}'"
-        )
-        return
+        sou_status = lds_utils.get_admin_tu_status(admin_reply, tu_id)
+        if sou_status != SouAdminStatus.RUNNING:
+            lds_utils.attach_allure_alert(
+                f"СОУ не в статусе 'включена' при teardown (status={sou_status}), остановка пропущена. "
+                f"tuId={tu_id}, adminTuName='{admin_tu_name}'"
+            )
+            return
 
-    logger.info("[TEARDOWN] Остановка СОУ (StopLdsRequest) для tuId=%s", tu_id)
-    try:
+        logger.info(f"[TEARDOWN] Остановка СОУ (StopLdsRequest) для tuId={tu_id}")
         await lds_utils.invoke_lds_command(ws_client, parser, LdsCfgConst.STOP_LDS_REQUEST, tu_id)
-    except Exception as error:
-        lds_utils.attach_allure_alert(
-            f"Ошибка при StopLdsRequest: {error}. tuId={tu_id}, adminTuName={admin_tu_name!r}"
-        )
-        return
 
-    logger.info("[TEARDOWN] Ожидание выключения СОУ в Администрировании")
-    if not await lds_utils.poll_admin_tu_status(ws_client, parser, tu_id, SouAdminStatus.STOPPED):
+        logger.info("[TEARDOWN] Ожидание выключения СОУ в Администрировании")
+        if not await lds_utils.poll_admin_tu_status(ws_client, parser, tu_id, SouAdminStatus.STOPPED):
+            lds_utils.attach_allure_alert(
+                f"СОУ не выключилась за 2 минуты после StopLdsRequest. "
+                f"tuId={tu_id}, adminTuName={admin_tu_name!r}. Проверить вручную."
+            )
+    except BaseException as error:
+        logger.warning(
+            "[TEARDOWN] [ALERT] LDS Configurator teardown: %s. tuId=%s, adminTuName=%r",
+            error,
+            tu_id,
+            admin_tu_name,
+        )
         lds_utils.attach_allure_alert(
-            f"СОУ не выключилась за 2 минуты после StopLdsRequest. "
-            f"tuId={tu_id}, adminTuName={admin_tu_name!r}. Проверить вручную."
+            f"Ошибка LDS Configurator teardown: {error}. "
+            f"tuId={tu_id}, adminTuName={admin_tu_name!r}"
         )

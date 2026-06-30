@@ -16,4 +16,6 @@ def is_desired_invocation_id(msg: List[Any], invocation_id: str) -> bool:
     Проверяем, что msg — список нужной длины
     и msg[INVOCATION_ID_INDEX]] совпадает с искомым invocation_id.
     """
-    return len(msg) > WS_Const.INVOCATION_ID_INDEX and msg[WS_Const.INVOCATION_ID_INDEX] == invocation_id
+    return len(msg) > WS_Const.INVOCATION_ID_INDEX and str(msg[WS_Const.INVOCATION_ID_INDEX]) == str(
+        invocation_id
+    )

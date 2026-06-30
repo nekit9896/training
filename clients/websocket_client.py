@@ -155,15 +155,29 @@ class WebSocketClient:
                 return
 
             result_message = parse_message(chunk)
+            await self.recv_queue.put(result_message)
+            if self._should_suppress_recv_attach():
+                continue
+
             str_message = str(result_message)
-            if not self.suppress_recv_logging:
-                logger.info(f"Обработанное сообщение от api-gateway: {str_message[:500]} полное сообщение в attach")
+            logger.info(
+                f"Обработанное сообщение от api-gateway: {str_message[:200]}... полное сообщение в attach",
+            )
+            try:
                 attach(
                     str_message,
                     name=f"Распакованное сообщение от api-gateway {datetime.now(ZoneInfo(WS_Const.ZONE_INFO))}",
                     attachment_type=attachment_type.TEXT,
                 )
-            await self.recv_queue.put(result_message)
+            except (KeyError, RuntimeError) as error:
+                logger.debug("Allure attach пропущен: %s", error)
+
+    def _should_suppress_recv_attach(self) -> bool:
+        if self.suppress_recv_logging:
+            return True
+        from utils.helpers import lds_configurator_utils as lds_cfg
+
+        return lds_cfg.is_configurator_flow_active()
 
     async def invoke(self, target: str, args: list) -> None:
         """

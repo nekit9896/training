@@ -97,7 +97,7 @@ class SuiteTuIdentityMixin:
 
     @property
     def configurator_tu_id(self) -> int:
-        """tuId из Администрирования после infra setup (LaunchLds/StopLds)."""
+        """tuId из Администрирования после configurator setup (LaunchLds/StopLds)."""
         if self.resolved_tu_id is None:
             raise RuntimeError(
                 "resolved_tu_id не установлен - выполнить lds_configurator_admin_setup "
