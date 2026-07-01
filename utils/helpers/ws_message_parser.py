@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Type, TypeVar
 from uuid import UUID
@@ -41,6 +42,8 @@ from models.unimitate_signal_model import UnimitateSignalReply
 from models.unmask_lds_command_model import UnmaskLdsReply
 from models.unmask_signal_model import UnmaskSignalReply
 from models.upload_exported_file_model import DownloadExportedDataReply
+
+logger = logging.getLogger(__name__)
 
 MessageType = TypeVar("MessageType")  # создает типовую переменную для парсинга сообщений
 ContentType = TypeVar("ContentType")
@@ -317,11 +320,14 @@ class WsMessageParser:
                 data_class=data_class, data=data, config=config or self._dacite_config  # type: ignore[arg-type]
             )
             if not self.suppress_recv_logging:
-                attach(
-                    str(message) + f" {datetime.now(ZoneInfo(WebSocketClientConstants.ZONE_INFO))}",
-                    name=data_class_name,
-                    attachment_type=attachment_type.TEXT,
-                )
+                try:
+                    attach(
+                        str(message) + f" {datetime.now(ZoneInfo(WebSocketClientConstants.ZONE_INFO))}",
+                        name=data_class_name,
+                        attachment_type=attachment_type.TEXT,
+                    )
+                except (KeyError, RuntimeError) as error:
+                    logger.debug("Allure attach пропущен: %s", error)
 
             return message
         except DaciteError as error:

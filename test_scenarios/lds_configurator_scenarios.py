@@ -193,12 +193,13 @@ async def lds_configurator_teardown(
             )
     except BaseException as error:
         logger.warning(
-            "[TEARDOWN] [ALERT] LDS Configurator teardown: %s. tuId=%s, adminTuName=%r",
+            "[TEARDOWN] [ALERT] LDS Configurator teardown: %s: %r. tuId=%s, adminTuName=%r",
+            type(error).__name__,
             error,
             tu_id,
             admin_tu_name,
         )
         lds_utils.attach_allure_alert(
-            f"Ошибка LDS Configurator teardown: {error}. "
+            f"Ошибка LDS Configurator teardown: {type(error).__name__}: {error!r}. "
             f"tuId={tu_id}, adminTuName={admin_tu_name!r}"
         )

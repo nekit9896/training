@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import Any, Optional
 
 import allure
+from _pytest.outcomes import Failed
 from pytest import fail
 
 from clients.websocket_client import WebSocketClient
@@ -37,6 +38,13 @@ def set_configurator_flow_active(enabled: bool) -> None:
 def is_configurator_flow_active() -> bool:
     """True во время setup/teardown/verify СОУ через Администрирование (lds-configurator) вне теста."""
     return _configurator_flow_active
+
+
+def _fail_or_raise(message: str) -> None:
+    """В configurator flow — RuntimeError для retry/teardown; иначе pytest.fail."""
+    if _configurator_flow_active:
+        raise RuntimeError(message)
+    fail(message, pytrace=False)
 
 
 @contextmanager
@@ -111,16 +119,23 @@ async def get_basic_info_admin_with_retry(
                 ConnectionResetError,
                 OSError,
                 RuntimeError,
-                fail.Exception,
+                KeyError,
+                Failed,
             ) as error:
                 last_error = error
+                logger.warning(
+                    "[LDS_CONFIGURATOR] GetBasicInfoAdmin попытка %s/%s: %s: %r",
+                    attempt,
+                    retries,
+                    type(error).__name__,
+                    error,
+                )
                 if attempt < retries:
                     await asyncio.sleep(1)
 
     with _step("Проверка: GetBasicInfoAdminResponse получен"):
-        fail(
+        _fail_or_raise(
             f"Не удалось получить GetBasicInfoAdminResponse за {retries} попыток: {last_error}",
-            pytrace=False,
         )
 
 

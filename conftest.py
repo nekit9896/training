@@ -21,6 +21,7 @@ from infra.stand_setup_manager import StandSetupManager
 from test_config.datasets import get_config_by_name
 from test_scenarios import lds_configurator_scenarios
 from utils.helpers import lds_configurator_utils as lds_cfg_utils
+from utils.helpers.ws_message_parser import ws_message_parser as lds_ws_parser
 
 
 def pytest_addoption(parser):
@@ -581,9 +582,11 @@ def pytest_runtest_setup(item):
 def _run_lds_configurator_ws(coro_factory) -> None:
     """Запускает async WS-сценарий lds-configurator"""
     lds_cfg_utils.set_configurator_flow_active(True)
+    lds_ws_parser.suppress_recv_logging = True
     try:
         asyncio.run(coro_factory())
     finally:
+        lds_ws_parser.suppress_recv_logging = False
         lds_cfg_utils.set_configurator_flow_active(False)
 
 

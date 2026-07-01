@@ -967,6 +967,8 @@ async def connect(ws_client: WebSocketClient, ws_invoke_type: str, ws_invoke_par
             with allure.step(f"Вызов {ws_invoke_type} c параметрами {ws_invoke_params}"):
                 await ws_client.invoke(ws_invoke_type, ws_invoke_params)
     except (asyncio.TimeoutError, ConnectionError, ConnectionResetError, OSError) as error:
+        if _is_configurator_flow_active():
+            raise
         fail(f"Не удалось отправить сообщение типа: {ws_invoke_type} c параметрами {ws_invoke_params}. Ошибка: {error}")
 
 
