@@ -7,7 +7,7 @@
   diagnosticInfo, constantSignal, range
 """
 
-from constants.enums import TU, RejectionCriteria, RejectionSensorTag
+from constants.enums import TU, MeasureConversionRule, RejectionCriteria, RejectionSensorTag
 from test_config.models_for_tests import CaseMarkers, IsRejectedConfig, RejectionTestCase
 
 # ===== Константы набора =====
@@ -37,6 +37,7 @@ IS_REJECTED_REGRESS_CONFIG = IsRejectedConfig(
     suite_data_id=SUITE_DATA_ID,
     archive_name=ARCHIVE_NAME,
     technological_unit=TECHNOLOGICAL_UNIT,
+    measure_conversion_rules=MeasureConversionRule.KG_CM_MEASURE,
     main_pipeline=MAIN_PIPELINE,
     rejection_report_test=CaseMarkers(test_case_id="210", offset=70),
     rejection_cases=[

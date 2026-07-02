@@ -82,7 +82,10 @@ class StandSetupManager:
             if self._signal_unit_conversion_manager is not None:
                 self._signal_unit_conversion_manager.setup_signal_unit_conversion_rules()
             else:
-                logger.info("[SETUP] [SKIP] measure_conversion_rules не задан для набора данных")
+                logger.info(
+                    "[SETUP] [SKIP] measure_conversion_rules не задан в конфигурации набора данных - "
+                    "проверка и настройка единиц измерения (signal_unit_conversion_rules.json) не выполняется"
+                )
             self.clean_redis_and_clickhouse()
             self.start_containers_without_core()
         except Exception as error:
@@ -94,6 +97,8 @@ class StandSetupManager:
         """
         Возвращает оригинальный signal_unit_conversion_rules.json на стенд.
         """
+        if self._signal_unit_conversion_manager is None:
+            return
         self._signal_unit_conversion_manager.restore_signal_unit_conversion_rules()
 
     def clean_redis_and_clickhouse(self):
@@ -269,9 +274,12 @@ class StandSetupManager:
                 self._stand_client, self._infra_client, self._configuration_file_name
             )
             self._configuration_manager = ConfigurationManager(self._configuration_file_name)
-            self._signal_unit_conversion_manager = SignalUnitConversionManager(
-                self._stand_client, self._measure_conversion_rules
-            )
+            if self._measure_conversion_rules is not None:
+                self._signal_unit_conversion_manager = SignalUnitConversionManager(
+                    self._stand_client, self._measure_conversion_rules
+                )
+            else:
+                self._signal_unit_conversion_manager = None
             self._docker_manager = DockerContainerManager(self._stand_client)
             self._redis_cleaner = RedisCleaner(self._infra_client, self._stand_name)
         except Exception as error:
