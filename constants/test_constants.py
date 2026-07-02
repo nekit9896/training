@@ -128,6 +128,7 @@ class BaseTN3Constants:
 
     # ===== Прочие константы =====
     BASIC_MESSAGE_TIMEOUT = 10.0  # Таймаут ожидания сообщений в секундах
+    SUBSCRIBE_MESSAGE_POLL_ATTEMPTS = 3  # Число чтений из потока подписки до отказа
     MASK_MESSAGE_TIMEOUT = 180.0  # Таймаут ожидания сообщений в секундах
     PRECISION = 3  # Точность округления для координат
     DIGITS_WITH_DOT_PATTERN = r'\d+(?:\.\d+)?'  # Регулярное выражение для поиска чисел с точкой

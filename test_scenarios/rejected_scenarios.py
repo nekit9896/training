@@ -41,7 +41,7 @@ async def rejection_input_signals(ws_client, cfg: IsRejectedConfig, rejection_ca
     with allure.step(
         f"Подключение по ws, получение данных InputSignalsContent для датчика {sensor.description} (id={sensor.id})"
     ):
-        payload = await t_utils.connect_and_subscribe_msg(
+        _parsed_payload, target_signal = await t_utils.connect_and_poll_subscribed_signal(
             ws_client,
             "InputSignalsContent",
             "SubscribeInputSignalsRequest",
@@ -50,10 +50,11 @@ async def rejection_input_signals(ws_client, cfg: IsRejectedConfig, rejection_ca
                 'tuId': cfg.tu_id,
                 'additionalProperties': None,
             },
+            sensor.id,
+            sensor.description,
+            parser.parse_input_signals_info_msg,
+            lambda parsed: parsed.replyContent.inputSignals,
         )
-        parsed_payload = parser.parse_input_signals_info_msg(payload)
-        sensor_data = parsed_payload.replyContent.inputSignals
-        target_signal = t_utils.find_object_by_field(sensor_data, "id", sensor.id)
 
     with SoftAssertions() as soft_failures:
         StepCheck(
@@ -209,43 +210,25 @@ async def rejection_scheme_signals_state(ws_client, cfg: IsRejectedConfig, rejec
             f"Подключение по ws, получение данных SchemeSignalsStateContent "
             f"для датчика {sensor.description} (id={sensor.id})"
         ):
-            payload = await t_utils.connect_and_subscribe_msg(
+            _parsed_payload, target_signal = await t_utils.connect_and_poll_subscribed_signal(
                 ws_client,
                 "SchemeSignalsStateContent",
                 "SubscribeSchemeSignalsStateRequest",
                 {'tuId': cfg.tu_id},
-            )
-            parsed_payload = parser.parse_scheme_signals_state_msg(payload)
-            signals = parsed_payload.replyContent.signalsStates
-
-            target_signal = next(
-                (signal for signal in signals if signal.id == sensor.id),
-                None,
+                sensor.id,
+                sensor.description,
+                parser.parse_scheme_signals_state_msg,
+                lambda parsed: parsed.replyContent.signalsStates,
             )
 
             allure.attach(
-                f"Всего сигналов получено: {len(signals)}\n"
-                f"Поиск сигнала с id={sensor.id} ({sensor.description}): "
-                f"{'Найден' if target_signal else 'Не найден'}",
-                name="Результат поиска сигнала в SchemeSignalsState",
+                str(target_signal),
+                name=f"Тестируемый фрагмент ответа с бэка: сигнал id={sensor.id} ({sensor.description})",
                 attachment_type=allure.attachment_type.TEXT,
             )
-
-            if target_signal is not None:
-                allure.attach(
-                    str(target_signal),
-                    name=f"Тестируемый фрагмент ответа с бэка: сигнал id={sensor.id} ({sensor.description})",
-                    attachment_type=allure.attachment_type.TEXT,
-                )
     finally:
         ws_client.suppress_recv_logging = False
         parser.suppress_recv_logging = False
-
-    with allure.step(f"Проверка: найден ли сигнал с id={sensor.id} ({sensor.description})"):
-        if target_signal is None:
-            pytest.fail(
-                f"Сигнал с id={sensor.id} ({sensor.description}) " f"не найден среди {len(signals)} полученных сигналов"
-            )
 
     with SoftAssertions() as soft_failures:
         StepCheck(f"Проверка isRejected для {sensor.description} (id={sensor.id})", "isRejected", soft_failures).actual(
