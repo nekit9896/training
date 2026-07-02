@@ -225,13 +225,32 @@ class WsMessageParser:
         signalsStates приходят как [[signal_type, data_dict], ...] - конвертируем кортежи в словари.
         """
         payload = self.find_reply_status_in_ws_msg(data)
-        reply_content = payload.get('replyContent', {})
-        reply_content['signalsStates'] = [
-            item[_SIGNAL_DATA_POSITION]
-            for item in reply_content.get('signalsStates', [])
-            if self._is_valid_signal_tuple(item)
-        ]
-        return self._parse_message(data_class=signals_state_model.SchemeSignalsStateReply, data=payload)
+        reply_content = payload.get('replyContent') or {}
+
+        raw_signals = reply_content.get('signalsStates')
+        if raw_signals is None:
+            raw_signals = payload.get('signalsStates') or []
+
+        raw_to_states = reply_content.get('toStates')
+        if raw_to_states is None:
+            raw_to_states = payload.get('toStates') or []
+
+        tu_id = reply_content.get('tuId')
+        if tu_id is None:
+            tu_id = payload.get('tuId', 0)
+
+        parsed_payload = signals_state_model.SchemeSignalsStateReply(
+            replyStatus=payload.get('replyStatus', 0),
+            replyErrors=payload.get('replyErrors'),
+            replyContent=signals_state_model.SchemeSignalsStateContent(
+                tuId=tu_id,
+                signalsStates=self._parse_scheme_signal_states(raw_signals),
+                toStates=self._parse_scheme_to_states(raw_to_states),
+            ),
+        )
+        if parsed_payload.replyErrors:
+            fail(f"Ошибка в сообщении типа SchemeSignalsStateContent: {parsed_payload.replyErrors}")
+        return parsed_payload
 
     def parse_unimitate_signal_msg(self, data: list) -> UnimitateSignalReply:
         """
@@ -306,6 +325,28 @@ class WsMessageParser:
             return message
         except DaciteError as error:
             fail(f"Ошибка парсинга сообщения типа: {data_class_name} текст ошибки: {error}")
+
+    def _parse_scheme_signal_states(self, raw_signals: list) -> list[signals_state_model.SignalState]:
+        """Разворачивает signalsStates: поддерживает формат [type, dict] и уже готовые dict."""
+        signals_states = []
+        for item in raw_signals:
+            if self._is_valid_signal_tuple(item):
+                signals_states.append(
+                    self._parse_message(signals_state_model.SignalState, item[_SIGNAL_DATA_POSITION])
+                )
+            elif isinstance(item, dict):
+                signals_states.append(self._parse_message(signals_state_model.SignalState, item))
+        return signals_states
+
+    def _parse_scheme_to_states(self, raw_to_states: list) -> list[signals_state_model.ToState]:
+        """Разворачивает toStates: поддерживает формат [type, dict] и уже готовые dict."""
+        to_states = []
+        for item in raw_to_states:
+            if self._is_valid_signal_tuple(item):
+                to_states.append(self._parse_message(signals_state_model.ToState, item[_SIGNAL_DATA_POSITION]))
+            elif isinstance(item, dict):
+                to_states.append(self._parse_message(signals_state_model.ToState, item))
+        return to_states
 
     @staticmethod
     def _is_valid_signal_tuple(item: Any) -> bool:
