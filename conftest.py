@@ -93,6 +93,7 @@ def pytest_configure(config):
         "use_lds_configurator": True,
         "resolved_tu_id": None,
         "admin_tu_name": None,
+        "pre_run_running_tus": None,
         "suite_infra_ready": False,
     }
 
@@ -632,13 +633,16 @@ def _run_lds_configurator_teardown_if_needed(cfg: dict) -> None:
 
     tu_id = cfg["resolved_tu_id"]
     admin_tu_name = cfg.get("admin_tu_name") or ""
+    pre_run_running_tus = cfg.get("pre_run_running_tus") or []
 
     async def _teardown() -> None:
         ws_host = get_ws_host()
         token = get_token()
         async with WebSocketClient(ws_host, token) as client:
             client.suppress_recv_logging = True
-            await lds_configurator_scenarios.lds_configurator_teardown(client, tu_id, admin_tu_name)
+            await lds_configurator_scenarios.lds_configurator_teardown(
+                client, tu_id, admin_tu_name, pre_run_running_tus
+            )
 
     try:
         _run_lds_configurator_ws(_teardown)
@@ -652,6 +656,7 @@ def _run_lds_configurator_teardown_if_needed(cfg: dict) -> None:
         cfg["resolved_tu_id"] = None
         cfg["use_lds_configurator"] = False
         cfg["admin_tu_name"] = None
+        cfg["pre_run_running_tus"] = None
 
 
 @pytest.hookimpl(hookwrapper=True)

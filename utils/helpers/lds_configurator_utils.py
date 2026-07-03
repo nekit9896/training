@@ -179,6 +179,17 @@ def validate_admin_tu(tu: AdminTuInfo) -> None:
                 fail(f"Неизвестный статус СОУ для ТУ '{tu.tuName}': {tu.status}", pytrace=False)
 
 
+def extract_running_tus(admin_reply: GetBasicInfoAdminReply) -> list[AdminTuInfo]:
+    """Возвращает все ТУ со статусом RUNNING из GetBasicInfoAdminResponse."""
+    tus = admin_reply.replyContent.basicInfo.tus if admin_reply.replyContent else []
+    return [tu for tu in tus if tu.status == SouAdminStatus.RUNNING.value]
+
+
+def running_tus_to_snapshot(tus: list[AdminTuInfo]) -> list[dict[str, Any]]:
+    """Сериализует список ТУ для хранения в group_state."""
+    return [{"tuId": tu.tuId, "tuName": tu.tuName} for tu in tus]
+
+
 def _tu_id_in_main_page_message(msg: Any, tu_id: int) -> bool:
     """True, если WS-сообщение MainPageInfoContent содержит указанный tuId."""
     if not isinstance(msg, list) or not is_desired_type(msg, LdsCfgConst.MAIN_PAGE_INFO_CONTENT):
@@ -318,6 +329,87 @@ async def poll_admin_tu_status(
                 return True
             await asyncio.sleep(poll_interval_seconds)
         return False
+
+
+async def stop_tu_and_wait(
+    ws_client: WebSocketClient,
+    parser: WsMessageParser,
+    tu_id: int,
+    tu_name: Optional[str] = None,
+) -> None:
+    """
+    Останавливает СОУ и ждёт статус STOPPED в Администрировании.
+    При таймауте - pytest.fail (блокирующая ошибка setup).
+    """
+    label = f"tuId={tu_id}, tuName={tu_name!r}" if tu_name else f"tuId={tu_id}"
+    with _step(f"Остановка СОУ ({label})"):
+        await invoke_lds_command(ws_client, parser, LdsCfgConst.STOP_LDS_REQUEST, tu_id)
+        if not await poll_admin_tu_status(ws_client, parser, tu_id, SouAdminStatus.STOPPED):
+            fail(
+                f"СОУ не выключилась за {int(LdsCfgConst.POLL_TIMEOUT_SECONDS)} с: {label}",
+                pytrace=False,
+            )
+
+
+async def launch_tu_and_wait(
+    ws_client: WebSocketClient,
+    parser: WsMessageParser,
+    tu_id: int,
+) -> bool:
+    """
+    Запускает СОУ и ждёт статус RUNNING в Администрировании.
+    Возвращает True при успехе (для soft teardown).
+    """
+    with _step(f"Запуск СОУ (tuId={tu_id})"):
+        await invoke_lds_command(ws_client, parser, LdsCfgConst.LAUNCH_LDS_REQUEST, tu_id)
+        return await poll_admin_tu_status(ws_client, parser, tu_id, SouAdminStatus.RUNNING)
+
+
+async def stop_all_running_tus(
+    ws_client: WebSocketClient,
+    parser: WsMessageParser,
+    tus: list[AdminTuInfo],
+) -> None:
+    """Последовательно останавливает все включённые ТУ на стенде."""
+    if not tus:
+        return
+    logger.info("[SETUP] Остановка всех включённых ТУ на стенде: %s шт.", len(tus))
+    for tu in tus:
+        logger.info("[SETUP] Остановка ТУ на стенде: tuId=%s, tuName=%r", tu.tuId, tu.tuName)
+        await stop_tu_and_wait(ws_client, parser, tu.tuId, tu.tuName)
+
+
+async def restore_pre_run_tus(
+    ws_client: WebSocketClient,
+    parser: WsMessageParser,
+    snapshot: list[dict[str, Any]],
+    exclude_tu_id: int,
+) -> None:
+    """
+    Включает обратно ТУ из снимка, кроме ТУ автотестов.
+    Ошибки по отдельным ТУ оформляются как ALERT без падения прогона.
+    """
+    to_restore = [entry for entry in snapshot if entry.get("tuId") != exclude_tu_id]
+    if not to_restore:
+        return
+    logger.info(
+        "[TEARDOWN] Восстановление ТУ стенда: %s шт. (исключена ТУ автотестов tuId=%s)",
+        len(to_restore),
+        exclude_tu_id,
+    )
+    for entry in to_restore:
+        restore_tu_id = entry["tuId"]
+        restore_tu_name = entry.get("tuName", "")
+        logger.info(
+            "[TEARDOWN] Запуск ТУ из снимка: tuId=%s, tuName=%r",
+            restore_tu_id,
+            restore_tu_name,
+        )
+        if not await launch_tu_and_wait(ws_client, parser, restore_tu_id):
+            attach_allure_alert(
+                f"Не удалось восстановить ТУ из снимка: tuId={restore_tu_id}, "
+                f"tuName={restore_tu_name!r}. Проверить вручную."
+            )
 
 
 async def poll_basic_info_tu_presence(
