@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 import msgpack
 import websockets
+from websockets.exceptions import InvalidStatus
 from allure import attach, attachment_type
 
 from constants.architecture_constants import WebSocketClientConstants as WS_Const
@@ -91,9 +92,15 @@ class WebSocketClient:
 
     async def _connect_loop(self) -> None:
         """
-        Цикл подключения с повторными попытками до наступления stop_event.
+        Цикл подключения с повторными попытками до наступления stop_event
+        или истечения WS_CONNECT_TIMEOUT_SECONDS.
         """
+        deadline = time.monotonic() + WS_Const.WS_CONNECT_TIMEOUT_SECONDS
+        attempt = 0
+        transient_errors = (ConnectionError, OSError, asyncio.TimeoutError, InvalidStatus)
+
         while not self._stop_event.is_set():
+            attempt += 1
             try:
                 self.ws_request = f"{self._ws_url}/?access_token={self._access_token}"
                 logger.info(f"Попытка подключения по wss: {self._ws_url}/?access_token=...")
@@ -109,9 +116,26 @@ class WebSocketClient:
                 self._recv_task = asyncio.create_task(self._recv_loop())
                 logger.info("Websocket connected")
                 return
-            except ConnectionError:
-                logger.exception(
-                    f"Websocket подключение не установлено, повтор подключения через: {self._reconnect_interval}"
+            except transient_errors as exc:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError(
+                        f"WSS hub не готов за {WS_Const.WS_CONNECT_TIMEOUT_SECONDS} с "
+                        f"(попыток: {attempt}): {exc}"
+                    ) from exc
+                status_info = ""
+                if isinstance(exc, InvalidStatus):
+                    response = getattr(exc, "response", None)
+                    if response is not None:
+                        status_info = f", HTTP {response.status_code}"
+                logger.warning(
+                    "WSS подключение не установлено (попытка %s%s): %s. "
+                    "Повтор через %s с, осталось %.0f с",
+                    attempt,
+                    status_info,
+                    exc,
+                    self._reconnect_interval,
+                    remaining,
                 )
                 await asyncio.sleep(self._reconnect_interval)
 
@@ -131,15 +155,29 @@ class WebSocketClient:
                 return
 
             result_message = parse_message(chunk)
+            await self.recv_queue.put(result_message)
+            if self._should_suppress_recv_attach():
+                continue
+
             str_message = str(result_message)
-            if not self.suppress_recv_logging:
-                logger.info(f"Обработанное сообщение от api-gateway: {str_message[:500]} полное сообщение в attach")
+            logger.info(
+                f"Обработанное сообщение от api-gateway: {str_message[:200]}... полное сообщение в attach",
+            )
+            try:
                 attach(
                     str_message,
                     name=f"Распакованное сообщение от api-gateway {datetime.now(ZoneInfo(WS_Const.ZONE_INFO))}",
                     attachment_type=attachment_type.TEXT,
                 )
-            await self.recv_queue.put(result_message)
+            except (KeyError, RuntimeError) as error:
+                logger.debug("Allure attach пропущен: %s", error)
+
+    def _should_suppress_recv_attach(self) -> bool:
+        if self.suppress_recv_logging:
+            return True
+        from utils.helpers import lds_configurator_utils as lds_cfg
+
+        return lds_cfg.is_configurator_flow_active()
 
     async def invoke(self, target: str, args: list) -> None:
         """

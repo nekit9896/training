@@ -126,6 +126,7 @@ class WebSocketClientConstants:
     WS_HUBS: str = "/hubs/ldsClientHub"
     START_INVOCATION_ID: str = 1
     DEFAULT_RECONNECT_INTERVAL: float | int = 5.0
+    WS_CONNECT_TIMEOUT_SECONDS: float = 120.0
     PING_INTERVAL: int = 3
     PING_TIMEOUT: int = 5
     CLOSE_TIMEOUT: int = 30

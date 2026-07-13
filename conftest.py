@@ -1,3 +1,4 @@
+import asyncio
 import glob
 import os
 import shutil
@@ -18,6 +19,9 @@ from constants.enums import RejectionSensorTag
 from constants.test_constants import BaseTN3Constants
 from infra.stand_setup_manager import StandSetupManager
 from test_config.datasets import get_config_by_name
+from test_scenarios import lds_configurator_scenarios
+from utils.helpers import lds_configurator_utils as lds_cfg_utils
+from utils.helpers.ws_message_parser import ws_message_parser as lds_ws_parser
 
 
 def pytest_addoption(parser):
@@ -86,6 +90,11 @@ def pytest_configure(config):
         "suite_start_time": None,
         "stand_manager": None,
         "imitator_start_time": None,  # datetime объект времени старта имитатора для расчёта интервалов утечек
+        "use_lds_configurator": True,
+        "resolved_tu_id": None,
+        "admin_tu_name": None,
+        "pre_run_running_tus": None,
+        "suite_infra_ready": False,
     }
 
 
@@ -443,6 +452,21 @@ def compute_imitator_duration(item, current_test_suite: str) -> float:
         )
 
 
+@pytest.fixture(autouse=True)
+def require_suite_infra(request):
+    """
+    Блокирует тесты набора, если infra-setup не завершился успешно.
+    """
+    if not request.node.get_closest_marker("test_suite_name"):
+        return
+    cfg = request.config.group_state
+    if cfg.get("current_suite") and not cfg.get("suite_infra_ready"):
+        pytest.exit(
+            "[SETUP] [ERROR] Инфраструктура набора не готова (suite_infra_ready=False). "
+            "Тесты не запускаются."
+        )
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_setup(item):
     """
@@ -457,6 +481,7 @@ def pytest_runtest_setup(item):
 
     if current_test_suite != cfg["current_suite"]:
         # stop old
+        _run_lds_configurator_teardown_if_needed(cfg)
         if stand_manager := cfg["stand_manager"]:
             stand_manager.stop_imitator_wrapper()
             try:
@@ -473,15 +498,24 @@ def pytest_runtest_setup(item):
         # start new
         cfg["current_suite"] = current_test_suite
         cfg["suite_start_time"] = None
+        cfg["suite_infra_ready"] = False
 
         data_id = item.get_closest_marker("test_suite_data_id").args[0]
         test_data_name = item.get_closest_marker("test_data_name").args[0]
+        # legacy: id из enum TU для имитатора (tn{id}_tags.txt), не resolved_tu_id из Администрирования
         tu_id = item.get_closest_marker("tu_id").args[0]
 
         imitator_duration = compute_imitator_duration(item, current_test_suite)
 
         suite_config = _find_config_by_suite_name(current_test_suite)
         measure_conversion_rules = suite_config.measure_conversion_rules if suite_config is not None else None
+
+        if suite_config is not None and suite_config.use_lds_configurator:
+            if suite_config.admin_tu is None:
+                pytest.exit(
+                    f"[SETUP] [ERROR] Набор '{suite_config.suite_name}': admin_tu обязателен "
+                    "при use_lds_configurator=True"
+                )
 
         stand_manager = StandSetupManager(
             duration_m=imitator_duration,
@@ -510,6 +544,12 @@ def pytest_runtest_setup(item):
         except Exception as error:
             pytest.exit(f"[SETUP] [ERROR] ошибка обновления id датчиков отбраковки из конфигурации: {error}")
 
+        if suite_config is not None and suite_config.use_lds_configurator:
+            try:
+                _run_lds_admin_setup(suite_config, cfg)
+            except BaseException as error:
+                pytest.exit(f"[SETUP] [ERROR] LDS Configurator admin setup: {error}")
+
         imitator_thread = threading.Thread(
             target=stand_manager.start_imitator, name=f"imitator->{current_test_suite}", daemon=True
         )
@@ -529,7 +569,95 @@ def pytest_runtest_setup(item):
         # Сохраняем время старта имитатора для расчёта интервалов утечек в тестах
         cfg["imitator_start_time"] = stand_manager.start_time
 
+        if suite_config is not None and suite_config.use_lds_configurator:
+            try:
+                _run_lds_verify_after_core(suite_config)
+            except BaseException as error:
+                pytest.exit(f"[SETUP] [ERROR] LDS Configurator проверка после запуска ядра: {error}")
+
+        cfg["suite_infra_ready"] = True
+
     yield  # pytest продолжит выполнение теста
+
+
+def _run_lds_configurator_ws(coro_factory) -> None:
+    """Запускает async WS-сценарий lds-configurator"""
+    lds_cfg_utils.set_configurator_flow_active(True)
+    lds_ws_parser.suppress_recv_logging = True
+    try:
+        asyncio.run(coro_factory())
+    finally:
+        lds_ws_parser.suppress_recv_logging = False
+        lds_cfg_utils.set_configurator_flow_active(False)
+
+
+def _run_lds_admin_setup(suite_config, group_state: dict) -> None:
+    """
+    WS-setup СОУ через Администрирование до старта имитатора.
+    """
+    async def _admin_setup() -> None:
+        ws_host = get_ws_host()
+        token = get_token()
+        async with WebSocketClient(ws_host, token) as client:
+            client.suppress_recv_logging = True
+            await lds_configurator_scenarios.lds_configurator_admin_setup(
+                client, suite_config, group_state
+            )
+
+    _run_lds_configurator_ws(_admin_setup)
+
+
+def _run_lds_verify_after_core(suite_config) -> None:
+    """
+    WS-проверка готовности стенда после запуска lds-core.
+    """
+    async def _verify() -> None:
+        ws_host = get_ws_host()
+        token = get_token()
+        async with WebSocketClient(ws_host, token) as client:
+            client.suppress_recv_logging = True
+            await lds_configurator_scenarios.lds_configurator_verify_after_core(client, suite_config)
+
+    _run_lds_configurator_ws(_verify)
+
+
+def _run_lds_configurator_teardown_if_needed(cfg: dict) -> None:
+    """
+    Выполняет WS-teardown СОУ при смене набора или завершении сессии.
+
+    Ошибки не прерывают pytest: логируются и оформляются как ALERT внутри сценария.
+    Состояние group_state сбрасывается в finally.
+    """
+    if not cfg.get("use_lds_configurator") or not cfg.get("resolved_tu_id"):
+        return
+
+    tu_id = cfg["resolved_tu_id"]
+    admin_tu_name = cfg.get("admin_tu_name") or ""
+    pre_run_running_tus = cfg.get("pre_run_running_tus") or []
+
+    async def _teardown() -> None:
+        ws_host = get_ws_host()
+        token = get_token()
+        async with WebSocketClient(ws_host, token) as client:
+            client.suppress_recv_logging = True
+            await lds_configurator_scenarios.lds_configurator_teardown(
+                client, tu_id, admin_tu_name, pre_run_running_tus
+            )
+
+    try:
+        # setup/verify/teardown вне теста: asyncio.run + сброс флагов в _run_lds_configurator_ws
+        _run_lds_configurator_ws(_teardown)
+    except BaseException as error:
+        logger.warning(
+            "[TEARDOWN] [ALERT] LDS Configurator teardown завершился с ошибкой для tuId=%s: %s",
+            tu_id,
+            error,
+        )
+    finally:
+        cfg["resolved_tu_id"] = None
+        cfg["use_lds_configurator"] = False
+        cfg["admin_tu_name"] = None
+        cfg["pre_run_running_tus"] = None
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -557,6 +685,7 @@ def pytest_runtest_teardown(item, nextitem):
         cfg["current_suite"] = None
         cfg["suite_start_time"] = None
         cfg["imitator_start_time"] = None
+        cfg["suite_infra_ready"] = False
 
         # опционально дождаться завершения потока (если не daemon) — безопасный join
         imitator_thread = cfg.get("imitator_thread")
@@ -641,11 +770,14 @@ def imitator_start_time(request):
 
 def pytest_sessionfinish(session, exitstatus):
     """
-    В завершении сессии — отправляем единый Allure‑отчёт в TestOps.
+    Завершение сессии pytest: teardown стенда и выгрузка Allure в TestOps.
     """
-    # 1) teardown стенда: остановки имитатора и удаление временных папок на сервере
+    # 1) teardown стенда: LDS Configurator + остановка имитатора
     try:
-        stand_manager = getattr(session.config, "group_state", {}).get("stand_manager")
+        group_state = getattr(session.config, "group_state", {})
+        # Выключить ТУ автотестов и восстановить "чужие" ТУ из слепка
+        _run_lds_configurator_teardown_if_needed(group_state)
+        stand_manager = group_state.get("stand_manager")
         if stand_manager:
             try:
                 stand_manager.stop_imitator_wrapper()

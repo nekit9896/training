@@ -4,6 +4,7 @@ import asyncio
 import pprint
 import random
 import re
+from contextlib import contextmanager
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum, IntFlag
@@ -143,6 +144,11 @@ def report_time_offset_hours(tz_name: str = TestConst.ZONE_INFO) -> Optional[int
     if utc_offset is None:
         return None
     return int(utc_offset.total_seconds() // TestConst.SECONDS_PER_HOUR)
+
+
+def moscow_now() -> datetime:
+    """Текущее время в часовом поясе Europe/Moscow."""
+    return datetime.now(ZoneInfo(TestConst.ZONE_INFO))
 
 
 def localize_as_moscow(input_datetime: datetime) -> None | datetime:
@@ -947,14 +953,32 @@ def parse_stationary_status_reasons(
     return flags
 
 
+def _is_configurator_flow_active() -> bool:
+    from utils.helpers import lds_configurator_utils as lds_cfg
+
+    return lds_cfg.is_configurator_flow_active()
+
+
+@contextmanager
+def _ws_step(name: str):
+    """Allure-шаг в тестах; без обёртки в setup/teardown configurator (conftest)."""
+    if _is_configurator_flow_active():
+        yield
+    else:
+        with allure.step(name):
+            yield
+
+
 async def connect(ws_client: WebSocketClient, ws_invoke_type: str, ws_invoke_params: Any = None) -> None:
     """
     Подключение к заданной подписке
     """
     try:
-        with allure.step(f"Вызов {ws_invoke_type} c параметрами {ws_invoke_params}"):
+        with _ws_step(f"Вызов {ws_invoke_type} c параметрами {ws_invoke_params}"):
             await ws_client.invoke(ws_invoke_type, ws_invoke_params)
     except (asyncio.TimeoutError, ConnectionError, ConnectionResetError, OSError) as error:
+        if _is_configurator_flow_active():
+            raise
         fail(f"Не удалось отправить сообщение типа: {ws_invoke_type} c параметрами {ws_invoke_params}. Ошибка: {error}")
 
 
@@ -1084,18 +1108,26 @@ async def connect_and_get_parsed_msg_by_tu_id(
         fail(f"Не удалось получить сообщение allLeaksInfo для ТУ {tu_id}. Ошибка: {error}")
 
 
-async def connect_and_get_msg(ws_client: WebSocketClient, ws_invoke_type: str, ws_invoke_params: Any = None) -> list:
+async def connect_and_get_msg(
+    ws_client: WebSocketClient,
+    ws_invoke_type: str,
+    ws_invoke_params: Any = None,
+    receive_timeout: Optional[float] = None,
+) -> list:
     """
     Подключение типа get к заданной подписке и получение сообщения с заданным типом контента
     """
     await connect(ws_client, ws_invoke_type, ws_invoke_params)
     invocation_id = ws_client.invocation_id
+    timeout = receive_timeout if receive_timeout is not None else WS_Const.FILTERING_TIMEOUT
 
     try:
-        with allure.step(f"Получение входящего сообщения c invocation_id: {invocation_id}"):
-            payload = await ws_client.receive_by_invocation_id(invocation_id)
+        with _ws_step(f"Получение входящего сообщения c invocation_id: {invocation_id}"):
+            payload = await ws_client.receive_by_invocation_id(invocation_id, timeout=timeout)
         return payload
     except (asyncio.TimeoutError, ConnectionError, ConnectionResetError, OSError) as error:
+        if _is_configurator_flow_active():
+            raise
         fail(f"Не удалось получить сообщение типа: {ws_invoke_type}. Ошибка: {error}")
 
 

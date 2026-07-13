@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Type, TypeVar
 from uuid import UUID
@@ -12,18 +13,22 @@ from pytest import fail
 
 import models.subscribe_scheme_signals_state_model as signals_state_model
 from constants.architecture_constants import WebSocketClientConstants
-from constants.enums import ExportedDataType, ExportStatus
+from constants.enums import ExportedDataType, ExportStatus, ReplyStatus
 from models.acknowledge_leak_model import AcknowledgeLeakReply
 from models.basic_info_model import BasicInfoReply
 from models.export_reports_model import ReportDataExportedNotification
+from models.get_basic_info_admin_model import GetBasicInfoAdminReply
 from models.get_exported_files_list_model import GetExportedDataListReply
+from models.get_tus_information_model import GetTusInformationReply
 from models.get_input_signals_model import GetInputSignalsReply
 from models.get_messages_model import GetMessagesReply
 from models.get_output_signals_model import GetOutputSignalsReply
 from models.imitate_signal_model import ImitateSignalReply
+from models.launch_lds_model import LaunchLdsReply
 from models.launch_pig_model import LaunchPigReply
 from models.mask_lds_command_model import MaskLdsReply
 from models.mask_signal_model import MaskSignalReply
+from models.stop_lds_model import StopLdsReply
 from models.subscribe_all_leaks_info_model import SubscribeAllLeaksInfoReply
 from models.subscribe_balance_algorithm_results_model import SubscribeBalanceAlgorithmResultsReply
 from models.subscribe_common_scheme_model import SubscribeCommonSchemeReply
@@ -37,6 +42,8 @@ from models.unimitate_signal_model import UnimitateSignalReply
 from models.unmask_lds_command_model import UnmaskLdsReply
 from models.unmask_signal_model import UnmaskSignalReply
 from models.upload_exported_file_model import DownloadExportedDataReply
+
+logger = logging.getLogger(__name__)
 
 MessageType = TypeVar("MessageType")  # создает типовую переменную для парсинга сообщений
 ContentType = TypeVar("ContentType")
@@ -282,6 +289,22 @@ class WsMessageParser:
         """
         return self._find_and_parse_message(data_class=DownloadExportedDataReply, data=data)
 
+    def parse_get_basic_info_admin_msg(self, data: list) -> GetBasicInfoAdminReply:
+        """Парсит ответ GetBasicInfoAdminRequest."""
+        return self._find_and_parse_message(data_class=GetBasicInfoAdminReply, data=data)
+
+    def parse_launch_lds_msg(self, data: list) -> LaunchLdsReply:
+        """Парсит Completion-ответ LaunchLdsRequest."""
+        return self._find_and_parse_message(data_class=LaunchLdsReply, data=data)
+
+    def parse_stop_lds_msg(self, data: list) -> StopLdsReply:
+        """Парсит Completion-ответ StopLdsRequest."""
+        return self._find_and_parse_message(data_class=StopLdsReply, data=data)
+
+    def parse_get_tus_information_msg(self, data: list) -> GetTusInformationReply:
+        """Парсит ответ GetTusInformationRequest."""
+        return self._find_and_parse_message(data_class=GetTusInformationReply, data=data)
+
     def _find_and_parse_message(
         self,
         data_class: Type[ContentType],
@@ -316,11 +339,14 @@ class WsMessageParser:
                 data_class=data_class, data=data, config=config or self._dacite_config  # type: ignore[arg-type]
             )
             if not self.suppress_recv_logging:
-                attach(
-                    str(message) + f" {datetime.now(ZoneInfo(WebSocketClientConstants.ZONE_INFO))}",
-                    name=data_class_name,
-                    attachment_type=attachment_type.TEXT,
-                )
+                try:
+                    attach(
+                        str(message) + f" {datetime.now(ZoneInfo(WebSocketClientConstants.ZONE_INFO))}",
+                        name=data_class_name,
+                        attachment_type=attachment_type.TEXT,
+                    )
+                except (KeyError, RuntimeError) as error:
+                    logger.debug("Allure attach пропущен: %s", error)
 
             return message
         except DaciteError as error:
@@ -389,12 +415,16 @@ class WsMessageParser:
         def _to_exported_data_type(value: Any) -> ExportedDataType:
             return value if isinstance(value, ExportedDataType) else ExportedDataType(value)
 
+        def _to_reply_status(value: Any) -> ReplyStatus:
+            return value if isinstance(value, ReplyStatus) else ReplyStatus(value)
+
         return Config(
             type_hooks={
                 UUID: self.convert_to_uuid,
                 datetime: self.timestamp_to_datetime,
                 ExportStatus: _to_export_status,
                 ExportedDataType: _to_exported_data_type,
+                ReplyStatus: _to_reply_status,
             }
         )
 

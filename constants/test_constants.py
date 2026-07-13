@@ -400,3 +400,22 @@ class ExportMtModeReportConstants:
         r'(?P<period_end>\d{2}\.\d{2}\.\d{4} \d{2}_\d{2}_\d{2})'
         r'\.xlsx$'
     )
+
+
+class LdsConfiguratorConstants:
+    """Константы для setup/teardown через раздел Администрирование."""
+
+    GET_BASIC_INFO_ADMIN_RETRIES: int = 3
+    CONFIGURATOR_GET_BASIC_INFO_ADMIN_TIMEOUT_SECONDS: float = 30.0
+    POLL_TIMEOUT_SECONDS: float = 120.0
+    POLL_INTERVAL_SECONDS: float = 15.0
+    MAIN_PAGE_SYNC_TIMEOUT_SECONDS: float = 30.0
+    LAUNCHED_AT_TOLERANCE_SECONDS: float = 120.0
+
+    GET_BASIC_INFO_ADMIN_REQUEST: str = "GetBasicInfoAdminRequest"
+    GET_BASIC_INFO_REQUEST: str = "getBasicInfoRequest"
+    SUBSCRIBE_MAIN_PAGE_INFO_REQUEST: str = "subscribeMainPageInfoRequest"
+    MAIN_PAGE_INFO_CONTENT: str = "MainPageInfoContent"
+    STOP_LDS_REQUEST: str = "StopLdsRequest"
+    LAUNCH_LDS_REQUEST: str = "LaunchLdsRequest"
+    GET_TUS_INFORMATION_REQUEST: str = "GetTusInformationRequest"

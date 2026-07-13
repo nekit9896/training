@@ -7,7 +7,7 @@
 """
 
 import test_scenarios.smoke_scenarios as scenarios
-from test_scenarios import lds_status_scenarios, rejected_scenarios
+from test_scenarios import lds_configurator_scenarios, lds_status_scenarios, rejected_scenarios
 
 __all__ = [
     scenarios.basic_info,
@@ -40,4 +40,7 @@ __all__ = [
     scenarios.export_leaks_report,
     scenarios.export_lds_status_report,
     scenarios.export_mt_mode_report,
+    lds_configurator_scenarios.lds_configurator_admin_setup,
+    lds_configurator_scenarios.lds_configurator_verify_after_core,
+    lds_configurator_scenarios.lds_configurator_teardown,
 ]

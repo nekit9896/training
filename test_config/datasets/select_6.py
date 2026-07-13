@@ -7,7 +7,7 @@
 - Объём утечки 113.6 м³
 """
 
-from constants.enums import TU, LdsStatus, LdsStatusInitialization, StationaryStatus
+from constants.enums import TU, AdminTU, LdsStatus, LdsStatusInitialization, StationaryStatus
 from test_config.models_for_tests import (
     CaseData,
     CaseMarkers,
@@ -54,6 +54,9 @@ SELECT_6_CONFIG = SmokeSuiteConfig(
     archive_name=ARCHIVE_NAME,
     technological_unit=TECHNOLOGICAL_UNIT,
     main_pipeline=MAIN_PIPELINE,
+    # ===== LDS Configurator =====
+    use_lds_configurator=True,
+    admin_tu=AdminTU.TIKHORETSK_NOVOROSSIYSK_3_AUTOTEST,
     # ----- Ожидаемые статусы для проверки режимов на ЭФ Диагностика сигналов -----
     exp_tixoreczkaya_novovelichkovskaya_reg_lu=StationaryStatus.STATIONARY.value,
     exp_tixoreczkaya_novovelichkovskaya_reg_sou=LdsStatus.SERVICEABLE.value,
