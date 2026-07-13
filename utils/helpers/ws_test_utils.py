@@ -4,6 +4,7 @@ import asyncio
 import pprint
 import random
 import re
+from contextlib import contextmanager
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum, IntFlag
@@ -956,16 +957,23 @@ def _is_configurator_flow_active() -> bool:
     return lds_cfg.is_configurator_flow_active()
 
 
+@contextmanager
+def _ws_step(name: str):
+    """Allure-шаг в тестах; без обёртки в setup/teardown configurator (conftest)."""
+    if _is_configurator_flow_active():
+        yield
+    else:
+        with allure.step(name):
+            yield
+
+
 async def connect(ws_client: WebSocketClient, ws_invoke_type: str, ws_invoke_params: Any = None) -> None:
     """
     Подключение к заданной подписке
     """
     try:
-        if _is_configurator_flow_active():
+        with _ws_step(f"Вызов {ws_invoke_type} c параметрами {ws_invoke_params}"):
             await ws_client.invoke(ws_invoke_type, ws_invoke_params)
-        else:
-            with allure.step(f"Вызов {ws_invoke_type} c параметрами {ws_invoke_params}"):
-                await ws_client.invoke(ws_invoke_type, ws_invoke_params)
     except (asyncio.TimeoutError, ConnectionError, ConnectionResetError, OSError) as error:
         if _is_configurator_flow_active():
             raise
@@ -1112,11 +1120,8 @@ async def connect_and_get_msg(
     timeout = receive_timeout if receive_timeout is not None else WS_Const.FILTERING_TIMEOUT
 
     try:
-        if _is_configurator_flow_active():
+        with _ws_step(f"Получение входящего сообщения c invocation_id: {invocation_id}"):
             payload = await ws_client.receive_by_invocation_id(invocation_id, timeout=timeout)
-        else:
-            with allure.step(f"Получение входящего сообщения c invocation_id: {invocation_id}"):
-                payload = await ws_client.receive_by_invocation_id(invocation_id, timeout=timeout)
         return payload
     except (asyncio.TimeoutError, ConnectionError, ConnectionResetError, OSError) as error:
         if _is_configurator_flow_active():

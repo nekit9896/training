@@ -645,6 +645,7 @@ def _run_lds_configurator_teardown_if_needed(cfg: dict) -> None:
             )
 
     try:
+        # setup/verify/teardown вне теста: asyncio.run + сброс флагов в _run_lds_configurator_ws
         _run_lds_configurator_ws(_teardown)
     except BaseException as error:
         logger.warning(
@@ -769,11 +770,12 @@ def imitator_start_time(request):
 
 def pytest_sessionfinish(session, exitstatus):
     """
-    В завершении сессии — отправляем единый Allure‑отчёт в TestOps.
+    Завершение сессии pytest: teardown стенда и выгрузка Allure в TestOps.
     """
     # 1) teardown стенда: LDS Configurator + остановка имитатора
     try:
         group_state = getattr(session.config, "group_state", {})
+        # Выключить ТУ автотестов и восстановить "чужие" ТУ из слепка
         _run_lds_configurator_teardown_if_needed(group_state)
         stand_manager = group_state.get("stand_manager")
         if stand_manager:

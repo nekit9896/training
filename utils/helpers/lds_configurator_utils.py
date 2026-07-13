@@ -179,10 +179,16 @@ def validate_admin_tu(tu: AdminTuInfo) -> None:
                 fail(f"Неизвестный статус СОУ для ТУ '{tu.tuName}': {tu.status}", pytrace=False)
 
 
+def get_admin_tus(admin_reply: GetBasicInfoAdminReply) -> list[AdminTuInfo]:
+    """Список ТУ из GetBasicInfoAdmin; пустой список при отсутствии replyContent/basicInfo."""
+    if not admin_reply.replyContent or not admin_reply.replyContent.basicInfo:
+        return []
+    return admin_reply.replyContent.basicInfo.tus or []
+
+
 def extract_running_tus(admin_reply: GetBasicInfoAdminReply) -> list[AdminTuInfo]:
     """Возвращает все ТУ со статусом RUNNING из GetBasicInfoAdminResponse."""
-    tus = admin_reply.replyContent.basicInfo.tus if admin_reply.replyContent else []
-    return [tu for tu in tus if tu.status == SouAdminStatus.RUNNING.value]
+    return [tu for tu in get_admin_tus(admin_reply) if tu.status == SouAdminStatus.RUNNING.value]
 
 
 def running_tus_to_snapshot(tus: list[AdminTuInfo]) -> list[dict[str, Any]]:
@@ -255,12 +261,14 @@ def check_sou_status_sync(
     tu_name: str,
 ) -> None:
     """
-    Сверяет статус СОУ в Администрировании и на ЭФ Состояние МТ по двум DTO BasicInfo и MainPageInfoContent.
+    Сверяет статус СОУ в Администрировании и на ЭФ Состояние МТ.
+    Администрирование - источник правды
     """
     with _step(
         f"Сверка статуса СОУ: Администрирование vs Состояние МТ "
         f"(tuId={tu_id}, '{tu_name}')"
     ):
+        # True, если в Администрировании СОУ включена; иначе ожидаем отсутствие ТУ на UI
         expected_enabled = sou_status == SouAdminStatus.RUNNING
         with _step("Проверка согласованности статусов Администрирования и Состояния МТ"):
             if is_in_basic_info == expected_enabled and is_on_main_page == expected_enabled:
@@ -323,8 +331,7 @@ async def poll_admin_tu_status(
         deadline = asyncio.get_running_loop().time() + total_wait_seconds
         while asyncio.get_running_loop().time() < deadline:
             admin_reply = await get_basic_info_admin(ws_client, parser)
-            tus = admin_reply.replyContent.basicInfo.tus if admin_reply.replyContent else []
-            tu = next((item for item in tus if item.tuId == tu_id), None)
+            tu = next((item for item in get_admin_tus(admin_reply) if item.tuId == tu_id), None)
             if tu and tu.status == expected_status.value:
                 return True
             await asyncio.sleep(poll_interval_seconds)
@@ -557,8 +564,7 @@ def get_admin_tu_status(admin_reply: GetBasicInfoAdminReply, tu_id: int) -> Opti
     """
     Возвращает статус СОУ из GetBasicInfoAdmin для указанного tuId.
     """
-    tus = admin_reply.replyContent.basicInfo.tus if admin_reply.replyContent else []
-    tu = next((item for item in tus if item.tuId == tu_id), None)
+    tu = next((item for item in get_admin_tus(admin_reply) if item.tuId == tu_id), None)
     if tu is None:
         return None
     try:
