@@ -1,4 +1,0 @@
-[1, {}, '13', 'subscribeMainPageInfoRequest', [{'tuIds': [230, 231, 233, 235], 'additionalProperties': None}]]
-
-
-[1, {}, None, 'MainPageInfoContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 231, 'tuInfo': {'tuId': 231, 'stationaryStatus': 2, 'ldsStatus': {'numberOfOkControlledSites': 0, 'numberOfInitializingControlledSites': 0, 'numberOfFaultyControlledSites': 6, 'numberOfDegradedControlledSites': 60, 'numberOfMaskedLps': 0, 'maskedLps': None}, 'freeFlows': [{'freeFlowStartCoordinate': 168750.0, 'freeFlowStartHeight': 164.05, 'freeFlowEndHeight': 162.93}, {'freeFlowStartCoordinate': 169051.0, 'freeFlowStartHeight': 162.65, 'freeFlowEndHeight': 161.85}], 'leaksInfo': None}}}], []]
