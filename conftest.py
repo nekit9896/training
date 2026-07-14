@@ -573,6 +573,7 @@ def pytest_runtest_setup(item):
             try:
                 _run_lds_verify_after_core(suite_config)
             except BaseException as error:
+                # Имитатор остановится в pytest_sessionfinish через stop_imitator_wrapper
                 pytest.exit(f"[SETUP] [ERROR] LDS Configurator проверка после запуска ядра: {error}")
 
         cfg["suite_infra_ready"] = True
