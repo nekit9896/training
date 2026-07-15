@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Dict, Optional
 
@@ -109,8 +110,9 @@ async def lds_configurator_verify_after_core(
     Проверка готовности стенда после запуска lds-core.
 
     1. Актуальный статус СОУ из Администрирования.
-    2. Ожидание согласованного состояния ТУ на Состоянии МТ в BasicInfo, до 120 с.
-    3. Ожидание согласованного состояния ТУ на Состоянии МТ в MainPageInfoContent, до 120 с.
+    2. Ожидание согласованного состояния ТУ в BasicInfo (из общего запаса времени).
+       При RUNNING - VERIFY_UI_SYNC_TIME_SECONDS (300 с).
+    3. Ожидание согласованного состояния ТУ в MainPageInfoContent (остаток запаса времени).
     4. Сверка статуса СОУ: Администрирование vs Состояние МТ.
     """
     tu_id = cfg.tu_id
@@ -127,18 +129,39 @@ async def lds_configurator_verify_after_core(
 
     expect_enabled = sou_status == SouAdminStatus.RUNNING
     action = "появления" if expect_enabled else "отсутствия"
+    loop = asyncio.get_running_loop()
+
+    if expect_enabled:
+        ui_sync_time_total = LdsCfgConst.VERIFY_UI_SYNC_TIME_SECONDS
+        admin_label = "Admin=RUNNING"
+    else:
+        ui_sync_time_total = LdsCfgConst.POLL_TIMEOUT_SECONDS
+        admin_label = "Admin=STOPPED"
+
+    ui_sync_time_seconds = int(ui_sync_time_total)
+    ui_sync_deadline = loop.time() + ui_sync_time_total
+    basic_timeout = ui_sync_deadline - loop.time()
     logger.info(
-        "[SETUP] Ожидание %s ТУ в BasicInfo (таймаут %s с)",
+        "[SETUP] %s, запас времени UI-sync %s с; ожидание %s ТУ в BasicInfo (до %s с)",
+        admin_label,
+        ui_sync_time_seconds,
         action,
-        int(LdsCfgConst.POLL_TIMEOUT_SECONDS),
+        int(basic_timeout),
     )
+
     basic_info_poll_ok = await lds_utils.poll_basic_info_tu_presence(
-        ws_client, parser, tu_id, tu_name, expect_present=expect_enabled
+        ws_client,
+        parser,
+        tu_id,
+        tu_name,
+        expect_present=expect_enabled,
+        total_wait_seconds=basic_timeout,
     )
     if not basic_info_poll_ok:
         if expect_enabled:
             fail(
-                "СОУ не отображается на Состоянии МТ в BasicInfo: ТУ не появилась за 2 минуты после запуска core",
+                f"СОУ не отображается на Состоянии МТ в BasicInfo: ТУ не появилась за {ui_sync_time_seconds} с "
+                "(запас времени UI-sync после запуска core)",
                 pytrace=False,
             )
         fail(
@@ -146,18 +169,30 @@ async def lds_configurator_verify_after_core(
             pytrace=False,
         )
 
+    main_timeout = ui_sync_deadline - loop.time()
+    if main_timeout <= 0:
+        fail(
+            f"Весь запас времени UI-sync {ui_sync_time_seconds} с израсходован на ожидание BasicInfo, "
+            "на MainPage времени не осталось",
+            pytrace=False,
+        )
     logger.info(
-        "[SETUP] Ожидание %s ТУ в Состоянии МТ (таймаут %s с)",
+        "[SETUP] Ожидание %s ТУ в Состоянии МТ (остаток запаса времени %s с)",
         action,
-        int(LdsCfgConst.POLL_TIMEOUT_SECONDS),
+        int(main_timeout),
     )
+
     main_page_poll_ok = await lds_utils.poll_main_page_tu_presence(
-        ws_client, tu_id, expect_present=expect_enabled
+        ws_client,
+        tu_id,
+        expect_present=expect_enabled,
+        total_wait_seconds=main_timeout,
     )
     if not main_page_poll_ok:
         if expect_enabled:
             fail(
-                "СОУ не отображается в Состоянии МТ: ТУ не появилась за 2 минуты после запуска core",
+                f"СОУ не отображается в Состоянии МТ: ТУ не появилась в оставшееся время "
+                f"запаса UI-sync ({ui_sync_time_seconds} с после запуска core)",
                 pytrace=False,
             )
         fail(
