@@ -165,13 +165,14 @@ class StandSetupManager:
 
     def stop_imitator_wrapper(self) -> None:
         """
-        В teardown может вызываться даже если имитатор не запущен
+        Останавливает имитатор немедленно (без ожидания --stopTime).
+        В teardown может вызываться даже если имитатор не запущен.
         """
         try:
             if not self._imitator_manager.imitator_process:
                 logger.info("[TEARDOWN] [SKIP] Имитатор не был запущен")
                 return
-            self._imitator_manager.wait_and_stop_imitator()
+            self._imitator_manager.stop_imitator()
             logger.info("[TEARDOWN] [OK] Имитатор остановлен")
         except Exception as error:
             error_msg = "[TEARDOWN] [ERROR] Не удалось остановить имитатор"
