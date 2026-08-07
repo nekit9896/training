@@ -7,17 +7,21 @@
 - может разобраться, почему тест упал (диагностика по логам/Allure/TestOps)
 
 ## 0) TL;DR (архитектура в 8 строк)
-- Один тестовый модуль: `tests/test_smoke.py` (suite‑level + leak‑level тесты).
-- Параметризация идёт от `test_config/datasets.ALL_CONFIGS` (автодискавер).
+- Три тестовых модуля: `tests/test_smoke.py`, `tests/test_lds_status_regress.py`, `tests/test_is_rejected_regress.py`.
+- Параметризация от `test_config/datasets`: `ALL_SMOKE_CONFIGS`, `ALL_LDS_STATUS_CONFIGS`, `ALL_IS_REJECTED_CONFIGS` (автодискавер `*_CONFIG`).
 - `conftest.py`:
   - добавляет `--suites` фильтр
   - навешивает `offset`/`test_case_id` маркеры из datasets
   - группирует тесты по `test_suite_name`
   - **перезапускает стенд/имитатор при смене suite**
+  - при `use_lds_configurator=True` — setup/teardown СОУ через Администрирование
+  - при ошибке setup набора — **skip набора**, прогон продолжается
   - в конце выгружает Allure в TestOps
-- Сценарии тестов: `test_scenarios/scenarios.py` (WS вызовы + ассёрты по полям).
+- Сценарии: `test_scenarios/smoke_scenarios.py`, `lds_status_scenarios.py`, `rejected_scenarios.py`, `lds_configurator_scenarios.py`.
 - WS клиент: `clients/websocket_client.py` (SignalR + messagepack).
-- Setup стенда: `infra/stand_setup_manager.py` (контейнеры/redis/имитатор/данные).
+- Setup стенда: `infra/stand_setup_manager.py` (контейнеры/redis/clickhouse/имитатор/данные).
+
+> Полная документация (пользователи + разработчики): **`doca`** в корне репозитория — master по инфраструктуре.
 
 ## 1) Жизненный цикл прогона: setup → autotests → teardown
 
@@ -25,11 +29,14 @@
 Источник параметров:
 - `test_config/datasets/__init__.py` сканирует `test_config/datasets/*.py`
 - ищет атрибуты с суффиксом `_CONFIG`
-- добавляет найденные `SuiteConfig` в `ALL_CONFIGS`
+- раскладывает по типу: `SmokeSuiteConfig`, `LDSStatusConfig`, `IsRejectedConfig`
 
-В `tests/test_smoke.py` из `ALL_CONFIGS` генерируются:
+В `tests/test_smoke.py` из `ALL_SMOKE_CONFIGS` генерируются:
 - `SUITE_PARAMS`: один параметр на набор
 - `LEAK_PARAMS`: один параметр на утечку (для multi‑leak — несколько)
+
+`tests/test_lds_status_regress.py` → `ALL_LDS_STATUS_CONFIGS`.  
+`tests/test_is_rejected_regress.py` → `ALL_IS_REJECTED_CONFIGS`.
 
 ### 1.2 Фильтрация по `--suites` и отключённые тесты
 В `conftest.py` реализовано:
@@ -49,18 +56,38 @@
 ### 1.4 Setup/teardown выполняются при смене набора данных
 В `conftest.py` в `pytest_runtest_setup`:
 - если текущий `test_suite_name` отличается от предыдущего:
+  - `lds_configurator_teardown` для предыдущего набора (если был configurator)
   - останавливаем старый имитатор (если был)
+  - восстанавливаем `signal_unit_conversion_rules.json`
   - (опционально) чистим данные прогона через TestOps
-  - поднимаем стенд под новый набор:
-    - останов контейнеров lds
-    - чистка Redis ключей
-    - старт сервисов (LB, journals, web-app, api-gw, reports)
+  - поднимаем стенд под новый набор (docker, redis, clickhouse, сервисы)
   - проверяем доступность OPC
+  - при `use_lds_configurator=True`: **admin setup до имитатора**
   - стартуем имитатор и core
-  - сохраняем `imitator_start_time` в group_state
+  - при `use_lds_configurator=True`: **verify после core** (BasicInfo/MainPage, запас 300 с)
+  - `suite_infra_ready = True`
+  - сохраняем `imitator_start_time` в `group_state`
 
 В `pytest_runtest_teardown`:
 - если следующий тест уже другого suite — останавливаем имитатор/чистим данные.
+
+### 1.5 Ошибки setup → skip набора (не exit сессии)
+При ошибке подготовки набора (OPC, stand, admin, imitator, core, verify):
+- `_skip_current_suite_after_setup_failure` — cleanup + `pytest.skip`
+- `require_suite_infra` — skip остальных тестов того же набора
+- следующий `--suites` стартует при смене `test_suite_name`
+
+### 1.6 Setup через LDS Configurator
+Флаг `use_lds_configurator=True` в dataset. Порядок:
+1. Обычная подготовка стенда
+2. `lds_configurator_admin_setup` — snapshot RUNNING ТУ, stop all, LaunchLds, verify launchedAt
+3. imitator + core
+4. `lds_configurator_verify_after_core` — Admin + BasicInfo/MainPage (`VERIFY_UI_SYNC_TIME_SECONDS` = 300 с) + sync
+5. `lds_configurator_teardown` — stop СОУ автотестов, restore чужих ТУ из снимка
+
+Два слоя ТУ: legacy (`TU` enum, имитатор) vs configurator (`admin_tu`, `resolved_tu_id` для WS).
+
+Файлы: `test_scenarios/lds_configurator_scenarios.py`, `utils/helpers/lds_configurator_utils.py`.
 
 ## 2) Инфраструктурная внутрянка
 
@@ -82,6 +109,9 @@
 - **`infra/imitator_manager.py::ImitatorManager`**: запуск/логирование/останов имитатора как “длинного процесса”.
 - **`infra/docker_manager.py::DockerContainerManager`**: stop/start групп контейнеров и проверка статусов.
 - **`infra/redis_manager.py::RedisCleaner`**: чистка ключей Redis для стенда.
+- **`infra/clickhouse_manager.py::ClickHouseManager`**: чистка ClickHouse.
+- **`infra/signal_unit_conversion_manager.py`**: правки `signal_unit_conversion_rules.json`.
+- **`utils/helpers/lds_configurator_utils.py`**: WS setup/teardown СОУ через Администрирование.
 - **`clients/subprocess_client.py::SubprocessClient`**: транспорт для выполнения команд:
   - `run_cmd()` → разовые команды (ssh wrapper)
   - `exec_popen()` → длинные процессы (например запуск имитатора)
@@ -89,9 +119,11 @@
 - **`clients/http_client.py::HttpClient`**: HTTP запросы в TestOps (attachments list/download).
 
 ### 2.2 Что именно приходит из datasets в инфраструктуру
-`SuiteConfig` содержит два ключевых поля, которые *инфраструктура* использует напрямую:
+`BaseSuiteConfig` (и наследники) содержит поля, которые *инфраструктура* использует напрямую:
 - **`suite_data_id`**: id тест‑кейса в TestOps, откуда берём attachments (архив данных)
-- **`archive_name`**: имя файла вложения (`.tar.gz`) внутри TestOps, которое нужно скачать
+- **`archive_name`**: имя файла вложения (`.tar.gz`) внутри TestOps
+- **`measure_conversion_rules`** (опционально)
+- **`use_lds_configurator`**, **`admin_tu`** (опционально)
 
 В `tests/test_smoke.py` они попадают в pytest маркеры:
 - `test_suite_data_id(suite_data_id)`
@@ -141,12 +173,15 @@
 Teardown делится на два уровня: “между suite” и “в конце сессии”.
 
 - **Между suite (в `conftest.py`)**:
+  - `lds_configurator_teardown` (если был configurator)
   - `StandSetupManager.stop_imitator_wrapper()`:
-    - ждёт завершения процесса имитатора и затем принудительно останавливает, если нужно
+    - **немедленно** останавливает имитатор через `stop_imitator()` (без ожидания `--stopTime`)
     - при необходимости делает `pkill -f Playground`
+  - `restore_signal_unit_conversion_rules()`
   - `StandSetupManager.server_test_data_remover()` → удаляет временную директорию с данными на стенде
 
 - **В конце сессии (в `pytest_sessionfinish`)**:
+  - `lds_configurator_teardown` + `stop_imitator_wrapper`
   - выгрузка Allure результатов в TestOps
   - чистка `allure-results` и временных `.tar.gz` на runner
 
@@ -200,11 +235,11 @@ Teardown делится на два уровня: “между suite” и “�
 - параметры утечек, интервалы, ожидания и допустимые отклонения
 
 ### 4.2 Покрытие “в глубину” = scenarios
-Добавили новую проверку в `test_scenarios/scenarios.py` → получили новый тип контракта/полей.
+Добавили новую проверку в `test_scenarios/smoke_scenarios.py` (или `lds_status_scenarios.py` / `rejected_scenarios.py`) → новый тип контракта/полей.
 
 ## 5) Как добавить новый dataset (suite)
 1) Создать `test_config/datasets/select_XX.py` по образцу.
-2) Экспортировать переменную `*_CONFIG` типа `SuiteConfig`.
+2) Экспортировать переменную `*_CONFIG` типа `SmokeSuiteConfig` (или `LDSStatusConfig` / `IsRejectedConfig`).
 3) Для single‑leak:
    - заполнить `leak=LeakTestConfig(...)`
 4) Для multi‑leak:
@@ -220,7 +255,7 @@ Teardown делится на два уровня: “между suite” и “�
 ## 6) Как добавить новую проверку (новый тест/сценарий)
 
 ### 6.1 Добавить сценарий
-- В `test_scenarios/scenarios.py` добавить новую `async def ...`
+- В `test_scenarios/smoke_scenarios.py` (или соответствующем модуле) добавить новую `async def ...`
 - Внутри использовать `ws_test_utils` для invoke/subscribe
 - Ассёрты делать через `StepCheck`/`SoftAssertions`
 
@@ -232,7 +267,7 @@ Teardown делится на два уровня: “между suite” и “�
 
 ### 6.3 Подключить маркеры (важно!)
 В `conftest.py` обновить маппинги:
-- `SUITE_LEVEL_TEST_MAPPING` или `LEAK_LEVEL_TEST_MAPPING`
+- `SMOKE_SUITE_LEVEL_MAPPING`, `LDS_STATUS_SUITE_LEVEL_MAPPING`, `LEAK_LEVEL_TEST_MAPPING`, `IS_REJECTED_*_MAPPING`
 
 Зачем: чтобы автоматически навешивались `offset` и `test_case_id` из datasets.
 

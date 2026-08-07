@@ -19,10 +19,10 @@ from models.basic_info_model import BasicInfoReply
 from models.export_reports_model import ReportDataExportedNotification
 from models.get_basic_info_admin_model import GetBasicInfoAdminReply
 from models.get_exported_files_list_model import GetExportedDataListReply
-from models.get_tus_information_model import GetTusInformationReply
 from models.get_input_signals_model import GetInputSignalsReply
 from models.get_messages_model import GetMessagesReply
 from models.get_output_signals_model import GetOutputSignalsReply
+from models.get_tus_information_model import GetTusInformationReply
 from models.imitate_signal_model import ImitateSignalReply
 from models.launch_lds_model import LaunchLdsReply
 from models.launch_pig_model import LaunchPigReply
@@ -76,6 +76,8 @@ class WsMessageParser:
                     return datetime.fromtimestamp(time_timestamp.seconds, datetime_timezone)
             if isinstance(value, Timestamp):
                 return datetime.fromtimestamp(value.seconds, tz=timezone.utc)
+            if isinstance(value, str):
+                return datetime.fromisoformat(value)
         except (AttributeError, TypeError, ValueError) as error:
             fail(f"Ошибка конвертации времени: {error}")
 
@@ -95,11 +97,11 @@ class WsMessageParser:
         except (AttributeError, TypeError, ValueError) as error:
             fail(f"Ошибка конвертации UUID: {error}")
 
-    def parse_acknowledge_leak_msg(self, data: list) -> AcknowledgeLeakReply:
+    def parse_acknowledge_leak_msg(self, data: dict) -> AcknowledgeLeakReply:
         """
         Парсит acknowledgeLeak сообщение
         """
-        return self._find_and_parse_message(data_class=AcknowledgeLeakReply, data=data)
+        return self._parse_message(data_class=AcknowledgeLeakReply, data=data)
 
     def parse_all_leaks_info_msg(self, data: list) -> SubscribeAllLeaksInfoReply:
         """
@@ -107,11 +109,11 @@ class WsMessageParser:
         """
         return self._find_and_parse_message(data_class=SubscribeAllLeaksInfoReply, data=data)
 
-    def parse_basic_info_msg(self, data: list) -> BasicInfoReply:
+    def parse_basic_info_msg(self, data: dict) -> BasicInfoReply:
         """
         Парсит basicInfo сообщение
         """
-        return self._find_and_parse_message(data_class=BasicInfoReply, data=data)
+        return self._parse_message(data_class=BasicInfoReply, data=data)
 
     def parse_common_scheme_info_msg(self, data: list) -> SubscribeCommonSchemeReply:
         """
@@ -119,11 +121,11 @@ class WsMessageParser:
         """
         return self._find_and_parse_message(data_class=SubscribeCommonSchemeReply, data=data)
 
-    def parse_imitate_signal_msg(self, data: list) -> ImitateSignalReply:
+    def parse_imitate_signal_msg(self, data: dict) -> ImitateSignalReply:
         """
         Парсит сообщение ImitateSignal
         """
-        return self._find_and_parse_message(data_class=ImitateSignalReply, data=data)
+        return self._parse_message(data_class=ImitateSignalReply, data=data)
 
     def parse_input_signals_info_msg(self, data: list) -> SubscribeInputSignalsReply:
         """
@@ -154,11 +156,11 @@ class WsMessageParser:
         """
         return self._find_and_parse_message(data_class=GetInputSignalsReply, data=data)
 
-    def parse_journal_msg(self, data: list) -> GetMessagesReply:
+    def parse_journal_msg(self, data: dict) -> GetMessagesReply:
         """
         Парсит сообщение журнала messagesInfo
         """
-        return self._find_and_parse_message(data_class=GetMessagesReply, data=data)
+        return self._parse_message(data_class=GetMessagesReply, data=data)
 
     def parse_leaks_content_msg(self, data: list) -> SubscribeLeaksReply:
         """
@@ -208,11 +210,11 @@ class WsMessageParser:
         """
         return self._find_and_parse_message(data_class=SubscribeOutputSignalsReply, data=data)
 
-    def parse_output_signals_msg(self, data: list):
+    def parse_output_signals_msg(self, data: dict):
         """
         Парсит getOutputSignals сообщение
         """
-        return self._find_and_parse_message(data_class=GetOutputSignalsReply, data=data)
+        return self._parse_message(data_class=GetOutputSignalsReply, data=data)
 
     def parse_balance_algorithm_msg(self, data: list) -> SubscribeBalanceAlgorithmResultsReply:
         """
@@ -259,11 +261,11 @@ class WsMessageParser:
             fail(f"Ошибка в сообщении типа SchemeSignalsStateContent: {parsed_payload.replyErrors}")
         return parsed_payload
 
-    def parse_unimitate_signal_msg(self, data: list) -> UnimitateSignalReply:
+    def parse_unimitate_signal_msg(self, data: dict) -> UnimitateSignalReply:
         """
         Парсит сообщение UnimitateSignal
         """
-        return self._find_and_parse_message(data_class=UnimitateSignalReply, data=data)
+        return self._parse_message(data_class=UnimitateSignalReply, data=data)
 
     def parse_unmask_signal_msg(self, data: list) -> UnmaskSignalReply:
         """
@@ -289,9 +291,9 @@ class WsMessageParser:
         """
         return self._find_and_parse_message(data_class=DownloadExportedDataReply, data=data)
 
-    def parse_get_basic_info_admin_msg(self, data: list) -> GetBasicInfoAdminReply:
+    def parse_get_basic_info_admin_msg(self, data: dict) -> GetBasicInfoAdminReply:
         """Парсит ответ GetBasicInfoAdminRequest."""
-        return self._find_and_parse_message(data_class=GetBasicInfoAdminReply, data=data)
+        return self._parse_message(data_class=GetBasicInfoAdminReply, data=data)
 
     def parse_launch_lds_msg(self, data: list) -> LaunchLdsReply:
         """Парсит Completion-ответ LaunchLdsRequest."""
@@ -301,9 +303,9 @@ class WsMessageParser:
         """Парсит Completion-ответ StopLdsRequest."""
         return self._find_and_parse_message(data_class=StopLdsReply, data=data)
 
-    def parse_get_tus_information_msg(self, data: list) -> GetTusInformationReply:
+    def parse_get_tus_information_msg(self, data: dict) -> GetTusInformationReply:
         """Парсит ответ GetTusInformationRequest."""
-        return self._find_and_parse_message(data_class=GetTusInformationReply, data=data)
+        return self._parse_message(data_class=GetTusInformationReply, data=data)
 
     def _find_and_parse_message(
         self,
@@ -331,7 +333,7 @@ class WsMessageParser:
         data_class_name = data_class.__name__
         if not data:
             fail(f"Пустое сообщение типа: {data_class_name}")
-        error_message = data.get('replyErrors')
+        error_message = data.get('replyErrors', None)
         if error_message:
             fail(f"Ошибка в сообщении типа: {data_class_name} текст ошибки: {error_message}")
         try:
@@ -357,9 +359,7 @@ class WsMessageParser:
         signals_states = []
         for item in raw_signals:
             if self._is_valid_signal_tuple(item):
-                signals_states.append(
-                    self._parse_message(signals_state_model.SignalState, item[_SIGNAL_DATA_POSITION])
-                )
+                signals_states.append(self._parse_message(signals_state_model.SignalState, item[_SIGNAL_DATA_POSITION]))
             elif isinstance(item, dict):
                 signals_states.append(self._parse_message(signals_state_model.SignalState, item))
         return signals_states

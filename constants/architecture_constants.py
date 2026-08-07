@@ -1,6 +1,28 @@
 import os
 
 
+class StandConstants:
+    MAIN_SUBDOMAIN: str = "web-app"
+    COMPONENT: str = "lds"
+    ROOT_DOMAIN: str = "tn.tngrp.ru"
+    API_GATEWAY_PATH_SEGMENT: str = "lds-api-gateway"
+    ACKNOWLEDGE_LEAK_URL_PATH: str = "/journals/GetMessages"  # TODO Исправить на актуальный в LDS-14845
+    IMITATE_SIGNAL_URL_PATH: str = "/layerbuilder/ImitateSignal"
+    GET_BASIC_INFO_URL_PATH: str = "/configurator/GetBasicInfo"
+    GET_BASIC_INFO_ADMIN_URL_PATH: str = "/configurator/GetBasicInfoAdmin"
+    GET_TUS_INFORMATION_URL_PATH: str = "/configurator/GetTusInformation"
+    LAUNCH_LDS_URL_PATH: str = "/configurator/LaunchLds"
+    STOP_LDS_URL_PATH: str = "/configurator/StopLds"
+    PING_URL_PATH: str = "/apigateway/Ping"
+    GET_MESSAGES_URL_PATH: str = "/journals/GetMessages"
+    GET_OUTPUT_SIGNALS_URL_PATH: str = "/apigateway/GetOutputSignals"
+    MASK_SIGNAL_URL_PATH: str = "/layerbuilder/MaskSignal"
+    MASK_LDS_URL_PATH: str = "/core/MaskLds"
+    UNIMITATE_SIGNAL_URL_PATH: str = "/layerbuilder/UnimitateSignal"
+    UNMASK_SIGNAL_URL_PATH: str = "/layerbuilder/UnmaskSignal"
+    UNMASK_LDS_URL_PATH: str = "/core/UnmaskLds"
+
+
 class ImitatorConstants:
     TEST_SETTINGS_KEY_NAME: str = "test_settings"
     IMITATOR_FLAGS_KEY_NAME: str = "imitator_flags"
@@ -87,11 +109,12 @@ class RedisConstants:
     REDIS_KEY_DEL_CMD: str = "| xargs -r docker exec -i redis-redis-01-1-1 redis-cli DEL"
 
 
-class KeycloakClientConstants:
+class KeycloakClientConstants(StandConstants):
     TOKEN_LEEWAY: int = 30
     GRANT_TYPE: str = "password"
     KEYCLOAK_HEADERS: dict = {"Content-Type": "application/x-www-form-urlencoded"}
     TOKEN_KEY: str = "access_token"
+    TOKEN_URL_PATH: str = "/realms/master/protocol/openid-connect/token"
     ISSUED_AT_KEY: str = "issued_at"
     EXPIRES_IN_KEY: str = "expires_in"
 
@@ -106,9 +129,11 @@ class TestOpsConstants:
     GZIP_FILE_SIGNATURE: bytes = b'\x1f\x8b'
 
 
-class HTTPClientConstants:
+class HTTPClientConstants(StandConstants):
     GET_METHOD: str = "get"
     POST_METHOD: str = "post"
+    X_SECURITY_SIGNATURE_KEY: str = 'x-security-signature'
+    X_USER_ID_KEY: str = 'x-user-id'
     TESTOPS_UPLOAD_ENDPOINT: str = "/upload"
     TESTOPS_ATTACHMENTS_LIST_ENDPOINT: str = "/test_cases/{test_case_id}/attachments"
     TESTOPS_LOAD_ATTACHMENT_ENDPOINT: str = "/test_cases/{test_case_id}/attachments/{attachment_id}?download=1"
@@ -117,9 +142,13 @@ class HTTPClientConstants:
     TESTOPS_ATTACHMENT_ID_KEY: str = "id"
     TEST_ID_KEY: str = "test_id"
     IMITATOR_RUN_DATA_FILENAME: str = "imitator_run_data.tar.gz"  # Название архива данных для прогона
+    DEFAULT_HEADERS: dict = {'content-type': 'application/json'}
+    STATUS_FORCE_LIST: tuple = (400, 401, 500, 501, 502, 503, 504)
+    ALLOWED_METHODS: tuple = ("GET", "POST", "PUT", "PATCH", "HEAD")
+    COLUMNS_SELECTION_DEFAULT: list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
 
 
-class WebSocketClientConstants:
+class WebSocketClientConstants(StandConstants):
     RS: bytes = b'\x1E'  # ASCII Record Separator
     HANDSHAKE_WAITING: float | int = 5.0
     HANDSHAKE_MESSAGE: str = "{\"protocol\":\"messagepack\",\"version\":1}"
@@ -139,9 +168,7 @@ class WebSocketClientConstants:
     DEFAULT_SIGNALR_MAP_HEADERS: dict = {}
     EVENT_TYPE_INDEX = 3
     INVOCATION_ID_INDEX = 2
-    SERVICE_NAME = "web-app"
-    COMPONENT = "lds"
-    ROOT_DOMAIN = "tn.tngrp.ru"
+    SERVICE_NAME: str = StandConstants.MAIN_SUBDOMAIN
     FILTERING_TIMEOUT: int | float = 10.0
     ZONE_INFO: str = 'Europe/Moscow'
 
@@ -155,8 +182,10 @@ class MockConstants:
 class EnvKeyConstants:
     CONNECTION_HOST: str = "CONNECTION_HOST"
     KEYCLOAK_URL: str = "KEYCLOAK_URL"
+    KEYCLOAK_SZI_URL: str = "KEYCLOAK_SZI_URL"
     KEYCLOAK_CLIENT_ID: str = "KEYCLOAK_CLIENT_ID"
     KEYCLOAK_CLIENT_SECRET: str = "KEYCLOAK_CLIENT_SECRET"
+    KEYCLOAK_SZI_CLIENT_SECRET: str = "KEYCLOAK_SZI_CLIENT_SECRET"
     KEYCLOAK_USERNAME: str = "KEYCLOAK_USERNAME"
     KEYCLOAK_PASSWORD: str = "KEYCLOAK_PASSWORD"
     TESTOPS_BASE_URL: str = "TESTOPS_BASE_URL"
@@ -166,4 +195,3 @@ class EnvKeyConstants:
     DATA_PATH: str = "DATA_PATH"
     OPC_URL: str = "OPC_URL"
     TU_ID: str = "TU_ID"
-    

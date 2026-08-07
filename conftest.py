@@ -4,15 +4,18 @@ import os
 import shutil
 import threading
 import time
+from typing import Optional
 
 import allure
 import pytest
 import pytest_asyncio
 
+from clients.http_client import StandHttpClient
 from clients.keycloak_clients import KeycloakAuthError, KeycloakClient
 from clients.testops_client import AllureResultsUploader, logger
 from clients.websocket_client import WebSocketClient
 from constants.architecture_constants import EnvKeyConstants as EnvConst
+from constants.architecture_constants import HTTPClientConstants as HttpConst
 from constants.architecture_constants import ImitatorConstants as ImConst
 from constants.architecture_constants import WebSocketClientConstants as WSCliConst
 from constants.enums import RejectionSensorTag
@@ -95,7 +98,6 @@ def pytest_configure(config):
         "admin_tu_name": None,
         "pre_run_running_tus": None,
         "suite_infra_ready": False,
-        "suite_setup_failure": None,
     }
 
 
@@ -145,6 +147,8 @@ SMOKE_SUITE_LEVEL_MAPPING = {
     'test_lds_status_completed_leak': 'lds_status_completed_leak_test',
     'test_diagnostics_of_signals_after_initialization': 'diagnostics_of_signals_after_initialization_test',
     'test_mode_mt_in_journal': 'mode_mt_in_journal_test',
+    'test_export_lds_status_report': 'export_lds_status_report_test',
+    'test_export_mt_mode_report': 'export_mt_mode_report_test',
 }
 
 # Regress-тесты режимов СОУ (маркеры из LDSStatusConfig)
@@ -162,6 +166,8 @@ LDS_STATUS_SUITE_LEVEL_MAPPING = {
     'test_lds_status_serviceable_after_switching_shut_off': 'serviceable_after_switching_shut_off_test',
     'test_lds_status_serviceable_after_switching_shut_off_in_journal': 'serviceable_after_switching_shut_off_in_journal_test',  # noqa: E501
     'test_lds_status_serviceable_after_deg_absence_min_pressure_sensors': 'serviceable_after_deg_absence_min_pressure_sensors_test',  # noqa: E501
+    'test_lds_status_serviceable_after_deg_additive_injectors_operation': 'serviceable_after_deg_additive_injectors_operation_test',  # noqa: E501
+    'test_lds_status_serviceable_after_deg_exceeding_distance_between_flow_meters': 'serviceable_after_deg_exceeding_distance_between_flow_meters_test',  # noqa: E501
     'test_lds_status_serviceable_after_deg_starting_pumping_out_pumps': 'serviceable_after_deg_starting_pumping_out_pumps_test',  # noqa: E501
     'test_lds_status_serviceable_after_deg_faulty_pressure_sensors_at_pump': 'serviceable_after_deg_faulty_pressure_sensors_at_pump_test',  # noqa: E501
     'test_lds_status_serviceable_after_deg_faulty_pressure_sensors_at_pump_in_journal': 'serviceable_after_deg_faulty_pressure_sensors_at_pump_in_journal_test',  # noqa: E501
@@ -184,6 +190,7 @@ LDS_STATUS_SUITE_LEVEL_MAPPING = {
     'test_lds_status_degradation_rejection_density_and_viscosity_on_du_2': 'deg_rejection_density_and_viscosity_on_du_2_test',  # noqa: E501
     'test_lds_status_degradation_rejection_density_and_viscosity_on_du_3': 'deg_rejection_density_and_viscosity_on_du_3_test',  # noqa: E501
     'test_lds_status_degradation_rejection_density_and_viscosity_on_du_5': 'deg_rejection_density_and_viscosity_on_du_5_test',  # noqa: E501
+    'test_lds_status_faulty_absence_min_flow_meters_continuous': 'faulty_absence_min_flow_meters_continuous_test',
     'test_lds_status_faulty_absence_min_flow_meters': 'faulty_absence_min_flow_meters_test',
     'test_lds_status_faulty_absence_min_pressure_sensors': 'faulty_absence_min_pressure_sensors_test',
     'test_lds_status_faulty_absence_min_pressure_sensors_in_journal': 'faulty_absence_min_pressure_sensors_in_journal_test',  # noqa: E501
@@ -211,8 +218,12 @@ LEAK_LEVEL_TEST_MAPPING = {
     'test_balance_algorithm_leak_completed': 'balance_algorithm_leak_completed_test',
     'test_completed_leak_info_in_journal': 'completed_leak_info_in_journal_test',
     'test_export_leaks_report': 'export_leaks_report_test',
-    'test_export_lds_status_report': 'export_lds_status_report_test',
-    'test_export_mt_mode_report': 'export_mt_mode_report_test',
+}
+
+STATIONARY_STATUS_SUITE_LEVEL_MAPPING = {
+    'test_stationary_status_basic_info': 'stationary_status_basic_info_test',
+    'test_stationary_status_check_with_reasons': 'stationary_status_check_with_reasons_test',
+    'test_stationary_status_in_journal': 'stationary_status_in_journal_test',
 }
 
 # Тесты уровня отбраковки (маркеры из RejectionTestCase - параметр rejection_case)
@@ -229,7 +240,12 @@ IS_REJECTED_SUITE_LEVEL_MAPPING = {
 }
 
 # Мержим все вместе чтобы не переписывать логику коллектора айтемов (тестов)
-SUITE_LEVEL_TEST_MAPPING = {**SMOKE_SUITE_LEVEL_MAPPING, **LDS_STATUS_SUITE_LEVEL_MAPPING}
+SUITE_LEVEL_TEST_MAPPING = {
+    **SMOKE_SUITE_LEVEL_MAPPING,
+    **LDS_STATUS_SUITE_LEVEL_MAPPING,
+    **STATIONARY_STATUS_SUITE_LEVEL_MAPPING,
+    **IS_REJECTED_SUITE_LEVEL_MAPPING,
+}
 
 
 def _get_test_markers_config(item, test_name):
@@ -274,7 +290,10 @@ def _get_test_markers_config(item, test_name):
             suite_config = params['config']
             attr_name = LDS_STATUS_SUITE_LEVEL_MAPPING[test_name]
             return getattr(suite_config, attr_name, None)
-
+        if test_name in STATIONARY_STATUS_SUITE_LEVEL_MAPPING:
+            suite_config = params['config']
+            attr_name = STATIONARY_STATUS_SUITE_LEVEL_MAPPING[test_name]
+            return getattr(suite_config, attr_name, None)
     return None
 
 
@@ -324,8 +343,7 @@ def pytest_collection_modifyitems(session, config, items):
             test_name in SUITE_LEVEL_TEST_MAPPING
             or test_name in LEAK_LEVEL_TEST_MAPPING
             or test_name in IS_REJECTED_LEVEL_TEST_MAPPING
-            or test_name in IS_REJECTED_SUITE_LEVEL_MAPPING
-        ):  # noqa: E501
+        ):
             # Конфиг теста = None - исключаем тест из прогона
             deselected_items.append(item)
             continue
@@ -397,7 +415,7 @@ def offset_wait(request):
     Offset‑ожидание перед каждым тестом относительно фактического старта core
     """
     if offset_marker := request.node.get_closest_marker("offset"):
-        offset_sec = float(offset_marker.args[0]) * 60
+        offset_sec = float(offset_marker.args[0]) * BaseTN3Constants.SEC_PER_MIN
         start = request.config.group_state["suite_start_time"] or 0
         elapsed = time.monotonic() - start
         to_wait = max(0, offset_sec - elapsed)
@@ -456,34 +474,15 @@ def compute_imitator_duration(item, current_test_suite: str) -> float:
 @pytest.fixture(autouse=True)
 def require_suite_infra(request):
     """
-    Пропускает тесты набора, если infra-setup не завершился успешно.
+    Блокирует тесты набора, если infra-setup не завершился успешно.
     """
     if not request.node.get_closest_marker("test_suite_name"):
         return
     cfg = request.config.group_state
     if cfg.get("current_suite") and not cfg.get("suite_infra_ready"):
-        reason = cfg.get("suite_setup_failure") or "ошибка подготовки набора"
-        pytest.skip(f"[SETUP] [ERROR] Инфраструктура набора не готова: {reason}")
-
-
-def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
-    """
-    Пропускает текущий набор после ошибки setup: cleanup частичной инфраструктуры и pytest.skip.
-    """
-    logger.error(message)
-    try:
-        allure.attach(message, name="Ошибка setup набора", attachment_type=allure.attachment_type.TEXT)
-    except Exception:
-        logger.debug("Не удалось прикрепить ошибку setup к Allure", exc_info=True)
-    _run_lds_configurator_teardown_if_needed(cfg)
-    if stand_manager := cfg.get("stand_manager"):
-        try:
-            stand_manager.stop_imitator_wrapper()
-        except Exception:
-            logger.exception("[SETUP] Ошибка остановки имитатора после неудачного setup набора")
-    cfg["suite_infra_ready"] = False
-    cfg["suite_setup_failure"] = message
-    pytest.skip(message)
+        pytest.exit(
+            "[SETUP] [ERROR] Инфраструктура набора не готова (suite_infra_ready=False). " "Тесты не запускаются."
+        )
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -518,7 +517,6 @@ def pytest_runtest_setup(item):
         cfg["current_suite"] = current_test_suite
         cfg["suite_start_time"] = None
         cfg["suite_infra_ready"] = False
-        cfg["suite_setup_failure"] = None
 
         data_id = item.get_closest_marker("test_suite_data_id").args[0]
         test_data_name = item.get_closest_marker("test_data_name").args[0]
@@ -531,11 +529,10 @@ def pytest_runtest_setup(item):
         measure_conversion_rules = suite_config.measure_conversion_rules if suite_config is not None else None
 
         if suite_config is not None and suite_config.use_lds_configurator:
-            if suite_config.admin_tu is None:
-                _skip_current_suite_after_setup_failure(
-                    cfg,
-                    f"[SETUP] [ERROR] Набор '{suite_config.suite_name}': admin_tu обязателен "
-                    "при use_lds_configurator=True",
+            if not suite_config.admin_tu_name.strip():
+                pytest.exit(
+                    f"[SETUP] [ERROR] Набор '{suite_config.suite_name}': admin_tu_name обязателен "
+                    "при use_lds_configurator=True"
                 )
 
         stand_manager = StandSetupManager(
@@ -554,29 +551,22 @@ def pytest_runtest_setup(item):
                 f"Ошибка при проверке статуса OPC: {error}"
             )
             allure.attach(msg, name="OPC сервер недоступен", attachment_type=allure.attachment_type.TEXT)
-            _skip_current_suite_after_setup_failure(cfg, msg)
+            pytest.exit(msg)
         try:
             stand_manager.setup_stand_for_imitator_run()
         except Exception as error:
-            _skip_current_suite_after_setup_failure(
-                cfg, f"[SETUP] [ERROR] ошибка при подготовке стенда: {error}"
-            )
+            pytest.exit(f"[SETUP] [ERROR] ошибка при подготовке стенда: {error}")
 
         try:
             _update_sensor_ids(stand_manager)
         except Exception as error:
-            _skip_current_suite_after_setup_failure(
-                cfg,
-                f"[SETUP] [ERROR] ошибка обновления id датчиков отбраковки из конфигурации: {error}",
-            )
+            pytest.exit(f"[SETUP] [ERROR] ошибка обновления id датчиков отбраковки из конфигурации: {error}")
 
         if suite_config is not None and suite_config.use_lds_configurator:
             try:
                 _run_lds_admin_setup(suite_config, cfg)
             except BaseException as error:
-                _skip_current_suite_after_setup_failure(
-                    cfg, f"[SETUP] [ERROR] LDS Configurator admin setup: {error}"
-                )
+                pytest.exit(f"[SETUP] [ERROR] LDS Configurator admin setup: {error}")
 
         imitator_thread = threading.Thread(
             target=stand_manager.start_imitator, name=f"imitator->{current_test_suite}", daemon=True
@@ -585,29 +575,29 @@ def pytest_runtest_setup(item):
         try:
             imitator_thread.start()
         except Exception as error:
-            _skip_current_suite_after_setup_failure(
-                cfg, f"[SETUP] [ERROR] ошибка запуска имитатора: {error}"
-            )
+            pytest.exit(f"[SETUP] [ERROR] ошибка запуска имитатора: {error}")
         time.sleep(ImConst.CORE_START_DELAY_S)
         try:
             cfg["suite_start_time"] = time.monotonic()
             core_thread.start()
             core_thread.join(timeout=5)
         except Exception as error:
-            _skip_current_suite_after_setup_failure(
-                cfg, f"[SETUP] [ERROR] ошибка запуска СORE контейнеров: {error}"
-            )
+            pytest.exit(f"[SETUP] [ERROR] ошибка запуска СORE контейнеров: {error}")
 
         # Сохраняем время старта имитатора для расчёта интервалов утечек в тестах
         cfg["imitator_start_time"] = stand_manager.start_time
 
         if suite_config is not None and suite_config.use_lds_configurator:
+            if suite_config.admin_tu is None:
+                pytest.exit(
+                    f"[SETUP] [ERROR] Набор '{suite_config.suite_name}': admin_tu обязателен "
+                    "при use_lds_configurator=True"
+                )
             try:
                 _run_lds_verify_after_core(suite_config)
             except BaseException as error:
-                _skip_current_suite_after_setup_failure(
-                    cfg, f"[SETUP] [ERROR] LDS Configurator проверка после запуска ядра: {error}"
-                )
+                # Имитатор остановится в pytest_sessionfinish через stop_imitator_wrapper
+                pytest.exit(f"[SETUP] [ERROR] LDS Configurator проверка после запуска lds-core: {error}")
 
         cfg["suite_infra_ready"] = True
 
@@ -627,16 +617,12 @@ def _run_lds_configurator_ws(coro_factory) -> None:
 
 def _run_lds_admin_setup(suite_config, group_state: dict) -> None:
     """
-    WS-setup СОУ через Администрирование до старта имитатора.
+    Setup СОУ через Администрирование до старта имитатора.
     """
+
     async def _admin_setup() -> None:
-        ws_host = get_ws_host()
-        token = get_token()
-        async with WebSocketClient(ws_host, token) as client:
-            client.suppress_recv_logging = True
-            await lds_configurator_scenarios.lds_configurator_admin_setup(
-                client, suite_config, group_state
-            )
+        http_client = init_http_stand_client()
+        await lds_configurator_scenarios.lds_configurator_admin_setup(http_client, suite_config, group_state)
 
     _run_lds_configurator_ws(_admin_setup)
 
@@ -645,12 +631,13 @@ def _run_lds_verify_after_core(suite_config) -> None:
     """
     WS-проверка готовности стенда после запуска lds-core.
     """
+
     async def _verify() -> None:
-        ws_host = get_ws_host()
-        token = get_token()
-        async with WebSocketClient(ws_host, token) as client:
-            client.suppress_recv_logging = True
-            await lds_configurator_scenarios.lds_configurator_verify_after_core(client, suite_config)
+        websocket_client = init_ws_stand_client()
+        http_client = init_http_stand_client()
+        async with websocket_client as ws_client:
+            ws_client.suppress_recv_logging = True
+            await lds_configurator_scenarios.lds_configurator_verify_after_core(ws_client, http_client, suite_config)
 
     _run_lds_configurator_ws(_verify)
 
@@ -670,16 +657,15 @@ def _run_lds_configurator_teardown_if_needed(cfg: dict) -> None:
     pre_run_running_tus = cfg.get("pre_run_running_tus") or []
 
     async def _teardown() -> None:
-        ws_host = get_ws_host()
-        token = get_token()
-        async with WebSocketClient(ws_host, token) as client:
-            client.suppress_recv_logging = True
+        websocket_client = init_ws_stand_client()
+        http_client = init_http_stand_client()
+        async with websocket_client as ws_client:
+            ws_client.suppress_recv_logging = True
             await lds_configurator_scenarios.lds_configurator_teardown(
-                client, tu_id, admin_tu_name, pre_run_running_tus
+                ws_client, http_client, tu_id, admin_tu_name, pre_run_running_tus
             )
 
     try:
-        # setup/verify/teardown вне теста: asyncio.run + сброс флагов в _run_lds_configurator_ws
         _run_lds_configurator_ws(_teardown)
     except BaseException as error:
         logger.warning(
@@ -720,7 +706,6 @@ def pytest_runtest_teardown(item, nextitem):
         cfg["suite_start_time"] = None
         cfg["imitator_start_time"] = None
         cfg["suite_infra_ready"] = False
-        cfg["suite_setup_failure"] = None
 
         # опционально дождаться завершения потока (если не daemon) — безопасный join
         imitator_thread = cfg.get("imitator_thread")
@@ -731,32 +716,45 @@ def pytest_runtest_teardown(item, nextitem):
                 logger.exception("Ошибка при join() фона имитатора")
 
 
-def get_ws_host() -> str:
+def get_instance() -> str:
+    """
+    Получает имя стенда
+    """
     instance = os.environ.get(EnvConst.STAND_NAME)
     if not instance:
         pytest.exit(f"Переменная окружения {EnvConst.STAND_NAME} не задана в .env")
+    return instance
 
-    ws_host = f"{WSCliConst.SERVICE_NAME}.{WSCliConst.COMPONENT}-{instance}.{WSCliConst.ROOT_DOMAIN}"
+
+def build_stand_host() -> str:
+    """
+    Создает URL для ws и http запросов к стенду
+    """
+    instance = get_instance()
+    ws_host = (
+        f"{WSCliConst.SERVICE_NAME}.{WSCliConst.COMPONENT}-{instance}.{WSCliConst.ROOT_DOMAIN}/"
+        f"{WSCliConst.API_GATEWAY_PATH_SEGMENT}"
+    )
 
     return ws_host
 
 
-def get_token(max_retries: int = 3, backoff: float = 5.0) -> str:
+def get_token(max_retries: int = 10, backoff: float = 5.0) -> str:
     """
     :param max_retries: сколько всего попыток (включая первую)
     :param backoff: время в секундах между попытками
     """
     last_exc = None
-
+    keycloak = KeycloakClient(
+        url=os.environ.get(EnvConst.KEYCLOAK_SZI_URL),
+        client_id=os.environ.get(EnvConst.KEYCLOAK_CLIENT_ID),
+        client_secret=os.environ.get(EnvConst.KEYCLOAK_SZI_CLIENT_SECRET),
+        username=os.environ.get(EnvConst.KEYCLOAK_USERNAME),
+        password=os.environ.get(EnvConst.KEYCLOAK_PASSWORD),
+    )
     for attempt in range(1, max_retries + 1):
         try:
-            keycloak = KeycloakClient(
-                url=os.environ.get(EnvConst.KEYCLOAK_URL),
-                client_id=os.environ.get(EnvConst.KEYCLOAK_CLIENT_ID),
-                client_secret=os.environ.get(EnvConst.KEYCLOAK_CLIENT_SECRET),
-                username=os.environ.get(EnvConst.KEYCLOAK_USERNAME),
-                password=os.environ.get(EnvConst.KEYCLOAK_PASSWORD),
-            )
+
             token = keycloak.get_access_token()
             if not token:
                 raise KeycloakAuthError("Получен пустой access token")
@@ -773,8 +771,50 @@ def get_token(max_retries: int = 3, backoff: float = 5.0) -> str:
             time.sleep(backoff)
 
     # все попытки исчерпаны
-    logger.error(f"Не удалось получить токен после {max_retries} попыток: {last_exc}")
-    pytest.fail(f"Не удалось получить токен после {max_retries} попыток: {last_exc}")
+    logger.error(f"[KEYCLOAK] [ERROR] Не удалось получить токен после {max_retries} попыток: {last_exc}")
+    pytest.fail(f"[KEYCLOAK][ERROR] Не удалось получить токен после {max_retries} попыток: {last_exc}")
+
+
+def get_connection_params() -> tuple:
+    """
+    Получает адрес стенда и токен авторизации
+    """
+    stand_host = build_stand_host()
+    auth_token = get_token()
+    return stand_host, auth_token
+
+
+def init_http_stand_client() -> StandHttpClient:
+    """
+    Создает экземпляр класса StandHttpClient для запросов к стенду
+    """
+    stand_host, auth_token = get_connection_params()
+    http_client = StandHttpClient(stand_host, auth_token)
+    return http_client
+
+
+def get_x_user_id() -> Optional[str]:
+    """
+    Получает x-user-id из headers Ping запроса
+    """
+    http_client = init_http_stand_client()
+    try:
+        response = http_client.post_request(HttpConst.PING_URL_PATH, {})
+        logger.info("[HTTP_CLIENT] [OK] Успешно получен x-user-id")
+        return response.headers.get(HttpConst.X_USER_ID_KEY)
+    except Exception as error:
+        logger.error(f"[HTTP_CLIENT] [ERROR] Не удалось получить x-user-id: {error}")
+        pytest.exit(f"[HTTP_CLIENT] [ERROR] Не удалось получить x-user-id: {error}")
+
+
+def init_ws_stand_client() -> WebSocketClient:
+    """
+    Создает экземпляр класса WebSocketClient для запросов к стенду
+    """
+    ws_host, token = get_connection_params()
+    x_user_id = get_x_user_id()
+    ws_client = WebSocketClient(ws_host, token, x_user_id)
+    return ws_client
 
 
 @pytest_asyncio.fixture
@@ -783,10 +823,19 @@ async def ws_client():
     Фикстура для работы с websocket клиентом
     :return: Объект wss соединения
     """
-    ws_host = get_ws_host()
-    auth_token = get_token()
-    async with WebSocketClient(ws_host, auth_token) as client:
+    ws_client = init_ws_stand_client()
+    async with ws_client as client:
         yield client
+
+
+@pytest.fixture
+def http_client():
+    """
+    Фикстура для работы с http клиентом
+    :return: экземпляр класса для выполнения http запросов к стенду
+    """
+    http_client = init_http_stand_client()
+    yield http_client
 
 
 @pytest.fixture
@@ -805,12 +854,11 @@ def imitator_start_time(request):
 
 def pytest_sessionfinish(session, exitstatus):
     """
-    Завершение сессии pytest: teardown стенда и выгрузка Allure в TestOps.
+    В завершении сессии — отправляем единый Allure‑отчёт в TestOps.
     """
     # 1) teardown стенда: LDS Configurator + остановка имитатора
     try:
         group_state = getattr(session.config, "group_state", {})
-        # Выключить ТУ автотестов и восстановить "чужие" ТУ из слепка
         _run_lds_configurator_teardown_if_needed(group_state)
         stand_manager = group_state.get("stand_manager")
         if stand_manager:
@@ -846,12 +894,4 @@ def pytest_sessionfinish(session, exitstatus):
     else:
         for file in files_for_drop:
             os.remove(file)
-
-
-@pytest.fixture()
-def ws_params(request):
-    """
-    Передает параметры для websocket в тест
-    """
-    return request.param
-    
+            

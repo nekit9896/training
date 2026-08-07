@@ -4,7 +4,6 @@ import asyncio
 import pprint
 import random
 import re
-from contextlib import contextmanager
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum, IntFlag
@@ -14,6 +13,7 @@ from zoneinfo import ZoneInfo
 import allure
 from msgpack import Timestamp as MsgpackTimestamp
 from pytest import fail
+from requests import Response
 
 from clients.websocket_client import WebSocketClient
 from constants.architecture_constants import WebSocketClientConstants as WS_Const
@@ -144,11 +144,6 @@ def report_time_offset_hours(tz_name: str = TestConst.ZONE_INFO) -> Optional[int
     if utc_offset is None:
         return None
     return int(utc_offset.total_seconds() // TestConst.SECONDS_PER_HOUR)
-
-
-def moscow_now() -> datetime:
-    """Текущее время в часовом поясе Europe/Moscow."""
-    return datetime.now(ZoneInfo(TestConst.ZONE_INFO))
 
 
 def localize_as_moscow(input_datetime: datetime) -> None | datetime:
@@ -315,7 +310,7 @@ def find_object_by_a_few_fields(item_list: List[ObjectType], fields_dict: dict) 
 
 def parse_event(event_value: str) -> tuple[str | None, str | None]:
     """
-    Разделяет строку события на имя и причину, вложенную с скобки
+    Разделяет строку события на имя и причину, вложенную в скобки
     """
     if not event_value or not isinstance(event_value, str):
         return None, None
@@ -327,9 +322,9 @@ def parse_event(event_value: str) -> tuple[str | None, str | None]:
     if match:
         mode_part = match.group(1).strip()
         reason_part = match.group(2).strip()
-        return (mode_part if mode_part else None, reason_part if reason_part else None)
+        return mode_part if mode_part else None, reason_part if reason_part else None
     # Если значение события не соответствует паттерну, возвращаю текст, если нет текста, тогда None
-    return event_value, None
+    return event_value.strip(), None
 
 
 def get_signal(site_message, signal_type):
@@ -366,12 +361,12 @@ def find_confirmed_leaks_on_main_page(item_list: List[MainPageLeakInfo]) -> List
         return []
 
 
-def find_diagnostic_area_by_id(flow_areas: List[FlowArea], id_value: int) -> Optional[DiagnosticArea]:
+def find_diagnostic_area_by_id(flow_areas: List[FlowArea], id_value: Optional[int]) -> Optional[DiagnosticArea]:
     """
     Ищет ДУ по id в списке участков карты течений, исключает дубликаты по количеству pipeIds
     """
     candidates = []
-    if not flow_areas:
+    if not flow_areas or not id_value:
         return None
     try:
         for flow_area in flow_areas:
@@ -521,7 +516,7 @@ def extract_first_number(value: object) -> Optional[float]:
     return None
 
 
-def _attach_ws_poll_failure(
+def attach_ws_poll_failure(
     collected_messages: List[Any],
     total_wait_seconds: float,
     expected_message_type: str,
@@ -637,7 +632,7 @@ async def poll_for_report_export_notification(
         ws_client.suppress_recv_logging = False
         parser.suppress_recv_logging = False
 
-    _attach_ws_poll_failure(
+    attach_ws_poll_failure(
         collected_messages,
         total_wait_seconds,
         ReportConst.REPORT_DATA_EXPORTED_NOTIFICATION,
@@ -746,7 +741,7 @@ async def poll_for_exported_file(
         ws_client.suppress_recv_logging = False
         parser.suppress_recv_logging = False
 
-    _attach_ws_poll_failure(
+    attach_ws_poll_failure(
         collected_messages,
         total_wait_seconds,
         request_name,
@@ -863,6 +858,13 @@ def parse_bit_flags(
     return sorted(found_flags, key=lambda flag: flag.value)
 
 
+def get_json_from_http_response(response: Response) -> dict:
+    try:
+        return response.json()
+    except ValueError:
+        fail("Не удалось преобразовать тело ответа в JSON")
+
+
 def get_reason_enum_by_lds_status(lds_status: int | LdsStatus, failures: Optional[List[str]] = None) -> Type[IntFlag]:
     """
     Получение класса причин по режимам СОУ
@@ -938,6 +940,12 @@ def parse_lds_status_reasons(lds_status: int, lds_status_reasons: int, failures:
     return flags
 
 
+def _is_configurator_flow_active() -> bool:
+    from utils.helpers import lds_configurator_utils as lds_cfg
+
+    return lds_cfg.is_configurator_flow_active()
+
+
 def parse_stationary_status_reasons(
     stationary_status: int, stationary_status_reasons: int, failures: Optional[List[str]] = None
 ):
@@ -953,29 +961,16 @@ def parse_stationary_status_reasons(
     return flags
 
 
-def _is_configurator_flow_active() -> bool:
-    from utils.helpers import lds_configurator_utils as lds_cfg
-
-    return lds_cfg.is_configurator_flow_active()
-
-
-@contextmanager
-def _ws_step(name: str):
-    """Allure-шаг в тестах; без обёртки в setup/teardown configurator (conftest)."""
-    if _is_configurator_flow_active():
-        yield
-    else:
-        with allure.step(name):
-            yield
-
-
 async def connect(ws_client: WebSocketClient, ws_invoke_type: str, ws_invoke_params: Any = None) -> None:
     """
     Подключение к заданной подписке
     """
     try:
-        with _ws_step(f"Вызов {ws_invoke_type} c параметрами {ws_invoke_params}"):
+        if _is_configurator_flow_active():
             await ws_client.invoke(ws_invoke_type, ws_invoke_params)
+        else:
+            with allure.step(f"Вызов {ws_invoke_type} c параметрами {ws_invoke_params}"):
+                await ws_client.invoke(ws_invoke_type, ws_invoke_params)
     except (asyncio.TimeoutError, ConnectionError, ConnectionResetError, OSError) as error:
         if _is_configurator_flow_active():
             raise
@@ -1070,7 +1065,7 @@ async def receive_download_exported_data_reply(
         ws_client.suppress_recv_logging = False
         parser.suppress_recv_logging = False
 
-    _attach_ws_poll_failure(collected_messages, total_wait_seconds, f"{request_name} (StreamItem)")
+    attach_ws_poll_failure(collected_messages, total_wait_seconds, f"{request_name} (StreamItem)")
     fail(
         f"При {purpose} за {total_wait_seconds} с не получен StreamItem с fileChunk "
         f"({request_name}, invocation_id={invocation_id}). Смотреть вложения received ws message"
@@ -1122,8 +1117,11 @@ async def connect_and_get_msg(
     timeout = receive_timeout if receive_timeout is not None else WS_Const.FILTERING_TIMEOUT
 
     try:
-        with _ws_step(f"Получение входящего сообщения c invocation_id: {invocation_id}"):
+        if _is_configurator_flow_active():
             payload = await ws_client.receive_by_invocation_id(invocation_id, timeout=timeout)
+        else:
+            with allure.step(f"Получение входящего сообщения c invocation_id: {invocation_id}"):
+                payload = await ws_client.receive_by_invocation_id(invocation_id, timeout=timeout)
         return payload
     except (asyncio.TimeoutError, ConnectionError, ConnectionResetError, OSError) as error:
         if _is_configurator_flow_active():
@@ -1273,3 +1271,8 @@ def get_leak_diagnostic_area_samples(
     if not leak_diagnostic_area_samples:
         fail(f"За {total_wait} секунд не пришло ни одного сообщения для ДУ с name={leak_diagnostic_area_name}.")
     return leak_diagnostic_area_samples
+
+
+def moscow_now() -> datetime:
+    """Текущее время в часовом поясе Europe/Moscow."""
+    return datetime.now(ZoneInfo(TestConst.ZONE_INFO))

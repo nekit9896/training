@@ -7,8 +7,8 @@ from zoneinfo import ZoneInfo
 
 import msgpack
 import websockets
-from websockets.exceptions import InvalidStatus
 from allure import attach, attachment_type
+from websockets import InvalidStatus
 
 from constants.architecture_constants import WebSocketClientConstants as WS_Const
 from utils.msgpack_utils.message_filters import is_desired_invocation_id, is_desired_type
@@ -26,10 +26,12 @@ class WebSocketClient:
         self,
         host: str,
         access_token: str,
+        x_user_id: str,
         reconnect_interval: float = WS_Const.DEFAULT_RECONNECT_INTERVAL,
     ):
         self._host = host
         self._access_token = access_token
+        self._x_user_id = x_user_id
         self._reconnect_interval = reconnect_interval
         self._ws_url = f"wss://{host.rstrip('/')}{WS_Const.WS_HUBS}"
         self._buffer = b""
@@ -50,7 +52,6 @@ class WebSocketClient:
         """
         Очищает очередь путем пересоздания экземпляра класса очереди
         """
-        # TODO разобраться почему не выполняется очистка очереди сообщений LDS-8599
         while not self.recv_queue.empty():
             try:
                 self.recv_queue.get_nowait()
@@ -102,8 +103,8 @@ class WebSocketClient:
         while not self._stop_event.is_set():
             attempt += 1
             try:
-                self.ws_request = f"{self._ws_url}/?access_token={self._access_token}"
-                logger.info(f"Попытка подключения по wss: {self._ws_url}/?access_token=...")
+                self.ws_request = f"{self._ws_url}/?token={self._access_token}&xUserId={self._x_user_id}"
+                logger.info(f"Попытка подключения по wss: {self._ws_url}/?token=...&xUserId=...")
                 self._ws = await websockets.connect(
                     self.ws_request,
                     ping_interval=WS_Const.PING_INTERVAL,
@@ -120,8 +121,7 @@ class WebSocketClient:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise TimeoutError(
-                        f"WSS hub не готов за {WS_Const.WS_CONNECT_TIMEOUT_SECONDS} с "
-                        f"(попыток: {attempt}): {exc}"
+                        f"WSS hub не готов за {WS_Const.WS_CONNECT_TIMEOUT_SECONDS} с " f"(попыток: {attempt}): {exc}"
                     ) from exc
                 status_info = ""
                 if isinstance(exc, InvalidStatus):
@@ -129,8 +129,7 @@ class WebSocketClient:
                     if response is not None:
                         status_info = f", HTTP {response.status_code}"
                 logger.warning(
-                    "WSS подключение не установлено (попытка %s%s): %s. "
-                    "Повтор через %s с, осталось %.0f с",
+                    "WSS подключение не установлено (попытка %s%s): %s. " "Повтор через %s с, осталось %.0f с",
                     attempt,
                     status_info,
                     exc,

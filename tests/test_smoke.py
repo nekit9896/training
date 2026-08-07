@@ -21,6 +21,7 @@ from typing import Any, List, Optional
 import allure
 import pytest
 
+from clients.http_client import StandHttpClient
 from clients.websocket_client import WebSocketClient
 from constants.test_constants import BaseTN3Constants as Base_const
 from test_config.datasets import ALL_SMOKE_CONFIGS
@@ -123,16 +124,14 @@ class TestSuiteScenarios:
     """
 
     @pytest.mark.critical_stop
-    @pytest.mark.asyncio
-    async def test_basic_info(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
+    def test_basic_info(self, http_client: StandHttpClient, config: SmokeSuiteConfig) -> None:
         """[BasicInfo] Проверка базовой информации СОУ: список ТУ"""
         tag = "BasicInfo"
         title = f"[{tag}] Проверка списка ТУ. ЭФ: Главная страница"
         _apply_allure_markers(config.basic_info_test, tag, title)
-        await scenarios.basic_info(ws_client, config)
+        scenarios.basic_info(http_client, config)
 
-    @pytest.mark.asyncio
-    async def test_journal_info(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
+    def test_journal_info(self, http_client: StandHttpClient, config: SmokeSuiteConfig) -> None:
         """[MessagesInfo] Проверка наличия сообщений в журнале"""
         tag = "MessagesInfo"
         title = f"[{tag}] Проверка наличия сообщений в журнале. ЭФ: Журнал.Реальное время"
@@ -142,7 +141,7 @@ class TestSuiteScenarios:
             title,
             "Проверка наличия сообщений в журнале.\n" "Синхронный запрос типа: MessagesInfo",
         )
-        await scenarios.journal_info(ws_client)
+        scenarios.messages_exist_in_journal(http_client)
 
     @pytest.mark.asyncio
     async def test_lds_status_initialization(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
@@ -180,11 +179,12 @@ class TestSuiteScenarios:
                 f"Время проведения проверки : {config.diagnostics_of_signals_after_initialization_test.offset} мин.\n"
             ),
         )
-        await scenarios.diagnostics_of_signals_after_initialization(ws_client, config)
+        test_data = config.controlled_sites_with_segment
+        await scenarios.diagnostics_of_signals_after_initialization(ws_client, config, test_data)
 
     @pytest.mark.asyncio
-    async def test_lds_status_init_in_journal(
-        self, ws_client: WebSocketClient, config: SmokeSuiteConfig, imitator_start_time: datetime
+    def test_lds_status_init_in_journal(
+        self, http_client: StandHttpClient, config: SmokeSuiteConfig, imitator_start_time: datetime
     ) -> None:
         """[MessagesInfo] Проверка записи в журнале о входе СОУ в Инициализацию"""
         tag = "MessagesInfo"
@@ -196,7 +196,7 @@ class TestSuiteScenarios:
             "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
         )
         _apply_allure_markers(config.lds_status_init_in_journal_test, tag, title, description)
-        await scenarios.lds_status_init_in_journal(ws_client, config, imitator_start_time)
+        scenarios.lds_status_init_in_journal(http_client, config, imitator_start_time)
 
     @pytest.mark.asyncio
     async def test_main_page_info(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
@@ -236,10 +236,16 @@ class TestSuiteScenarios:
         await scenarios.main_page_info_signals(ws_client, config)
 
     @pytest.mark.asyncio
-    async def test_imitate_flowmeter_signal(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
+    async def test_imitate_flowmeter_signal(
+        self,
+        ws_client: WebSocketClient,
+        http_client: StandHttpClient,
+        config: SmokeSuiteConfig,
+        imitator_start_time: datetime,
+    ) -> None:
         """[ImitateSignal] Проверка имитации расходомера"""
         tag = "ImitateSignal"
-        title = f"[{tag}] Проверка имитации сигнала расходомера. ЭФ: Схема, Входные сигналы"
+        title = f"[{tag}] Проверка имитации сигнала расходомера. ЭФ: Схема, Входные сигналы, Журнал"
         _apply_allure_markers(
             config.imitate_flowmeter_signal_test,
             tag,
@@ -262,13 +268,19 @@ class TestSuiteScenarios:
             ),
         )
         test_data = config.imitate_flowmeter_signal_test_data
-        await scenarios.imitate_sensor_signal(ws_client, config, test_data)
+        await scenarios.imitate_sensor_signal(ws_client, http_client, config, test_data, imitator_start_time)
 
     @pytest.mark.asyncio
-    async def test_imitate_pressure_sensor_signal(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
+    async def test_imitate_pressure_sensor_signal(
+        self,
+        ws_client: WebSocketClient,
+        http_client: StandHttpClient,
+        config: SmokeSuiteConfig,
+        imitator_start_time: datetime,
+    ) -> None:
         """[ImitateSignal] Проверка имитации датчика давления"""
         tag = "ImitateSignal"
-        title = f"[{tag}] Проверка имитации сигнала датчика давления. ЭФ: Схема, Входные сигналы"
+        title = f"[{tag}] Проверка имитации сигнала датчика давления. ЭФ: Схема, Входные сигналы, Журнал"
         _apply_allure_markers(
             config.imitate_pressure_sensor_signal_test,
             tag,
@@ -291,10 +303,12 @@ class TestSuiteScenarios:
             ),
         )
         test_data = config.imitate_pressure_sensor_signal_test_data
-        await scenarios.imitate_sensor_signal(ws_client, config, test_data)
+        await scenarios.imitate_sensor_signal(ws_client, http_client, config, test_data, imitator_start_time)
 
     @pytest.mark.asyncio
-    async def test_mask_signal(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
+    async def test_mask_signal(
+        self, ws_client: WebSocketClient, http_client: StandHttpClient, config: SmokeSuiteConfig
+    ) -> None:
         """[MaskSignal] Проверка маскирования датчиков"""
         tag = "MaskSignal"
         title = f"[{tag}] проверка маскирования датчиков. ЭФ: Схема"
@@ -318,11 +332,10 @@ class TestSuiteScenarios:
             ),
         )
         test_data = config.mask_signal_test_data
-        await scenarios.mask_signal_test(ws_client, config, test_data)
+        await scenarios.mask_signal_test(ws_client, http_client, config, test_data)
 
-    @pytest.mark.asyncio
-    async def test_mask_info_in_journal(
-        self, ws_client: WebSocketClient, config: SmokeSuiteConfig, imitator_start_time: datetime
+    def test_mask_info_in_journal(
+        self, http_client: StandHttpClient, config: SmokeSuiteConfig, imitator_start_time: datetime
     ) -> None:
         """[MessagesInfo] Проверка записей журнала о маскировании и размаскировании"""
         tag = "MessagesInfo"
@@ -336,10 +349,12 @@ class TestSuiteScenarios:
             "Примечание: тест выполняется после теста маскирования, чтобы записи успели попасть в журнал"
         )
         _apply_allure_markers(config.mask_info_in_journal_test, tag, title, description)
-        await scenarios.mask_info_in_journal(ws_client, config, imitator_start_time)
+        scenarios.mask_info_in_journal(http_client, config, imitator_start_time)
 
     @pytest.mark.asyncio
-    async def test_mask_du_on_mini_scheme(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
+    async def test_mask_du_on_mini_scheme(
+        self, ws_client: WebSocketClient, http_client: StandHttpClient, config: SmokeSuiteConfig
+    ) -> None:
         """Проверка маскирования ДУ"""
         tag = "MaskDuOnMiniScheme"
         title = f"[{tag}] проверка маскирования линейного участка. ЭФ: Схема"
@@ -355,10 +370,12 @@ class TestSuiteScenarios:
             "Проверка сообщения о маскировании в журнале.\n"
         )
         _apply_allure_markers(config.mask_du_on_mini_scheme_test, tag, title, description)
-        await scenarios.mask_du_on_mini_scheme(ws_client, config)
+        await scenarios.mask_du_on_mini_scheme(ws_client, http_client, config)
 
     @pytest.mark.asyncio
-    async def test_unmask_du_on_mini_scheme(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
+    async def test_unmask_du_on_mini_scheme(
+        self, ws_client: WebSocketClient, http_client: StandHttpClient, config: SmokeSuiteConfig
+    ) -> None:
         """Проверка размаскирования ДУ"""
         tag = "UnmaskDuOnMiniScheme"
         title = f"[{tag}] проверка снятия маскирования линейному участку. ЭФ: Схема"
@@ -373,7 +390,7 @@ class TestSuiteScenarios:
             "Проверка сообщения о снятии маскирования в журнале.\n"
         )
         _apply_allure_markers(config.unmask_du_on_mini_scheme_test, tag, title, description)
-        await scenarios.unmask_du_on_mini_scheme(ws_client, config)
+        await scenarios.unmask_du_on_mini_scheme(ws_client, http_client, config)
 
     @pytest.mark.asyncio
     async def test_lds_status_initialization_out(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
@@ -394,9 +411,8 @@ class TestSuiteScenarios:
         )
         await scenarios.lds_status_initialization_out(ws_client, config)
 
-    @pytest.mark.asyncio
-    async def test_lds_status_init_out_in_journal(
-        self, ws_client: WebSocketClient, config: SmokeSuiteConfig, imitator_start_time: datetime
+    def test_lds_status_init_out_in_journal(
+        self, http_client: StandHttpClient, config: SmokeSuiteConfig, imitator_start_time: datetime
     ) -> None:
         """[MessagesInfo] Проверка записи в журнале о выходе СОУ из Инициализации"""
         tag = "MessagesInfo"
@@ -408,7 +424,7 @@ class TestSuiteScenarios:
             "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
         )
         _apply_allure_markers(config.lds_status_init_out_in_journal_test, tag, title, description)
-        await scenarios.lds_status_init_out_in_journal(ws_client, config, imitator_start_time)
+        scenarios.lds_status_init_out_in_journal(http_client, config, imitator_start_time)
 
     @pytest.mark.asyncio
     async def test_main_page_info_unstationary(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
@@ -431,10 +447,9 @@ class TestSuiteScenarios:
         )
         await scenarios.main_page_info_unstationary(ws_client, config)
 
-    @pytest.mark.asyncio
-    async def test_mode_mt_in_journal(
+    def test_mode_mt_in_journal(
         self,
-        ws_client: WebSocketClient,
+        http_client: StandHttpClient,
         config: SmokeSuiteConfig,
         imitator_start_time: datetime,
     ) -> None:
@@ -447,7 +462,75 @@ class TestSuiteScenarios:
         )
         _apply_allure_markers(config.mode_mt_in_journal_test, tag, title, description)
         test_data = config.exp_mode_mt_message
-        await scenarios.mode_mt_in_journal(ws_client, config, imitator_start_time, test_data)
+        scenarios.stationary_status_in_journal(http_client, config, imitator_start_time, test_data)
+
+    @pytest.mark.skip("Не готов после перехода на REST API, включить в задаче LDS-14843")
+    @pytest.mark.asyncio
+    async def test_export_lds_status_report(
+        self,
+        ws_client: WebSocketClient,
+        config: SmokeSuiteConfig,
+        imitator_start_time: datetime,
+    ) -> None:
+        tag = "ExportReports"
+        title = f"[{tag}] Проверка формирования отчёта о режиме работы СОУ. ЭФ: Выпадашка отчётов"
+        _apply_allure_markers(
+            config.export_lds_status_report_test,
+            tag,
+            title,
+            (
+                f"Проверка формирования и содержимого xlsx-отчёта о режиме работы СОУ на наборе данных "
+                f"{config.suite_name},\n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Период отчёта: от старта имитатора до старта + сдвиг теста "
+                f"{config.export_lds_status_report_test.offset} мин.\n"
+                "Этапы сценария:\n"
+                "1) SubscribeReportsDataExportedRequest - подписка на пуш-нотификации\n"
+                "2) ExportReportsCommandRequest - запрос формирования отчёта (тип LdsStateReport, фильтр по периоду)\n"
+                "3) Ожидание ReportDataExportedNotification\n"
+                "4) Лонг-поллинг GetExportedDataListRequest - поиск отчёта в списке\n"
+                "5) DownloadExportedDataRequest (StreamInvocation) - скачивание по exportedDataId\n"
+                "6) Проверка xlsx: участки, длительности режимов СОУ, суммарное время работы\n"
+                "7) Проверка двойной шапки и названий колонок\n"
+                "8) Проверка имени файла (.xlsx, название отчёта, ТУ, период +-1 мин)\n"
+                "Во вложениях Allure xlsx прикладывается только при падении теста"
+            ),
+        )
+        await scenarios.export_lds_status_report(ws_client, config, imitator_start_time)
+
+    @pytest.mark.skip("Не готов после перехода на REST API, включить в задаче LDS-14843")
+    @pytest.mark.asyncio
+    async def test_export_mt_mode_report(
+        self,
+        ws_client: WebSocketClient,
+        config: SmokeSuiteConfig,
+        imitator_start_time: datetime,
+    ) -> None:
+        tag = "ExportReports"
+        title = f"[{tag}] Проверка формирования отчёта о режиме работы МТ. ЭФ: Выпадашка отчётов"
+        _apply_allure_markers(
+            config.export_mt_mode_report_test,
+            tag,
+            title,
+            (
+                f"Проверка формирования и содержимого xlsx-отчёта о режиме работы МТ на наборе данных "
+                f"{config.suite_name},\n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Период отчёта: от старта имитатора до старта + сдвиг теста "
+                f"{config.export_mt_mode_report_test.offset} мин.\n"
+                "Этапы сценария:\n"
+                "1) SubscribeReportsDataExportedRequest - подписка на пуш-нотификации\n"
+                "2) ExportReportsCommandRequest - запрос формирования отчёта (тип StationaryStatusReport)\n"
+                "3) Ожидание ReportDataExportedNotification\n"
+                "4) Лонг-поллинг GetExportedDataListRequest - поиск отчёта в списке\n"
+                "5) DownloadExportedDataRequest (StreamInvocation) - скачивание по exportedDataId\n"
+                "6) Проверка xlsx: участки, длительности режимов МТ, суммарное время, доминирующий режим\n"
+                "7) Проверка двойной шапки и названий колонок\n"
+                "8) Проверка имени файла (.xlsx, название отчёта, ТУ, период +-1 мин)\n"
+                "Во вложениях Allure xlsx прикладывается только при падении теста"
+            ),
+        )
+        await scenarios.export_mt_mode_report(ws_client, config, imitator_start_time)
 
 
 # ===== ТЕСТЫ УРОВНЯ УТЕЧКИ =====
@@ -549,10 +632,9 @@ class TestLeakScenarios:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.leaks_content(ws_client, config, leak, imitator_start_time)
 
-    @pytest.mark.asyncio
-    async def test_leak_info_in_journal(
+    def test_leak_info_in_journal(
         self,
-        ws_client: WebSocketClient,
+        http_client: StandHttpClient,
         config: SmokeSuiteConfig,
         leak: LeakTestConfig,
         leak_number: int,
@@ -578,12 +660,11 @@ class TestLeakScenarios:
         # Добавляем номер утечки в title для multi-leak
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
-        await scenarios.leak_info_in_journal(ws_client, config, leak, imitator_start_time)
+        scenarios.leak_info_in_journal(http_client, config, leak, imitator_start_time)
 
-    @pytest.mark.asyncio
-    async def test_completed_leak_info_in_journal(
+    def test_completed_leak_info_in_journal(
         self,
-        ws_client: WebSocketClient,
+        http_client: StandHttpClient,
         config: SmokeSuiteConfig,
         leak: LeakTestConfig,
         leak_number: int,
@@ -606,12 +687,11 @@ class TestLeakScenarios:
         )
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
-        await scenarios.completed_leak_info_in_journal(ws_client, config, leak, imitator_start_time)
+        scenarios.completed_leak_info_in_journal(http_client, config, leak, imitator_start_time)
 
-    @pytest.mark.asyncio
-    async def test_possible_leak_in_journal(
+    def test_possible_leak_in_journal(
         self,
-        ws_client: WebSocketClient,
+        http_client: StandHttpClient,
         config: SmokeSuiteConfig,
         leak: LeakTestConfig,
         leak_number: int,
@@ -629,7 +709,7 @@ class TestLeakScenarios:
         _apply_allure_markers(leak.possible_leak_in_journal_test, tag, title, description)
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
-        await scenarios.possible_leak_in_journal(ws_client, config, imitator_start_time)
+        scenarios.possible_leak_in_journal(http_client, config, imitator_start_time)
 
     @pytest.mark.asyncio
     async def test_tu_leaks_info(
@@ -689,9 +769,15 @@ class TestLeakScenarios:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.lds_status_during_leak(ws_client, config, leak)
 
+    @pytest.mark.skip("Не готов после перехода на REST API, включить в задаче LDS-14845")
     @pytest.mark.asyncio
     async def test_acknowledge_leak_info(
-        self, ws_client: WebSocketClient, config: SmokeSuiteConfig, leak: LeakTestConfig, leak_number: int
+        self,
+        ws_client: WebSocketClient,
+        http_client: StandHttpClient,
+        config: SmokeSuiteConfig,
+        leak: LeakTestConfig,
+        leak_number: int,
     ) -> None:
         """[AcknowledgeLeak] Проверка квитирования утечки"""
         tag = "AcknowledgeLeak"
@@ -713,12 +799,12 @@ class TestLeakScenarios:
         )
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
-        await scenarios.acknowledge_leak_info(ws_client, config, leak)
+        await scenarios.acknowledge_leak_info(ws_client, http_client, config, leak)
 
-    @pytest.mark.asyncio
-    async def test_acknowledge_leak_in_journal(
+    @pytest.mark.skip("Не готов после перехода на REST API, включить в задаче LDS-14845")
+    def test_acknowledge_leak_in_journal(
         self,
-        ws_client: WebSocketClient,
+        http_client: StandHttpClient,
         config: SmokeSuiteConfig,
         leak: LeakTestConfig,
         leak_number: int,
@@ -736,12 +822,14 @@ class TestLeakScenarios:
         _apply_allure_markers(leak.acknowledge_leak_in_journal_test, tag, title, description)
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
-        await scenarios.acknowledge_leak_in_journal(ws_client, config, imitator_start_time)
+        scenarios.acknowledge_leak_in_journal(http_client, config, imitator_start_time)
 
+    @pytest.mark.skip("Не готов после перехода на REST API, включить в задаче LDS-14845")
     @pytest.mark.asyncio
     async def test_output_signals(
         self,
         ws_client: WebSocketClient,
+        http_client: StandHttpClient,
         config: SmokeSuiteConfig,
         leak: LeakTestConfig,
         leak_number: int,
@@ -774,7 +862,7 @@ class TestLeakScenarios:
         )
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
-        await scenarios.output_signals(ws_client, config, leak, imitator_start_time)
+        await scenarios.output_signals(ws_client, http_client, config, leak, imitator_start_time)
 
     @pytest.mark.asyncio
     async def test_balance_algorithm_leak_waiting(
@@ -1001,12 +1089,13 @@ class TestLeakScenarios:
         )
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
-        await scenarios.the_leak_is_complete_on_kg(ws_client, config, leak)
+        await scenarios.leak_is_complete_on_kg(ws_client, config, leak)
 
     @pytest.mark.asyncio
     async def test_leak_is_complete_in_output_signals(
         self,
         ws_client: WebSocketClient,
+        http_client: StandHttpClient,
         config: SmokeSuiteConfig,
         leak: LeakTestConfig,
         leak_number: int,
@@ -1026,7 +1115,7 @@ class TestLeakScenarios:
         )
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
-        await scenarios.leak_is_complete_in_output_signals(ws_client, config, leak)
+        await scenarios.leak_is_complete_in_output_signals(ws_client, http_client, config, leak)
 
     @pytest.mark.asyncio
     async def test_complete_tu_leaks_info_content(
@@ -1053,6 +1142,7 @@ class TestLeakScenarios:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.complete_tu_leaks_info_content(ws_client, config)
 
+    @pytest.mark.skip("Не готов после перехода на REST API, включить в задаче LDS-14843")
     @pytest.mark.asyncio
     async def test_export_leaks_report(
         self,
@@ -1093,77 +1183,3 @@ class TestLeakScenarios:
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.export_leaks_report(ws_client, config, leak, imitator_start_time)
-
-    @pytest.mark.asyncio
-    async def test_export_lds_status_report(
-        self,
-        ws_client: WebSocketClient,
-        config: SmokeSuiteConfig,
-        leak: LeakTestConfig,
-        leak_number: int,
-        imitator_start_time: datetime,
-    ) -> None:
-        tag = "ExportReports"
-        title = f"[{tag}] Проверка формирования отчёта о режиме работы СОУ. ЭФ: Выпадашка отчётов"
-        _apply_allure_markers(
-            leak.export_lds_status_report_test,
-            tag,
-            title,
-            (
-                f"Проверка формирования и содержимого xlsx-отчёта о режиме работы СОУ на наборе данных "
-                f"{config.suite_name},\n"
-                f"на технологическом участке {config.tu_name}\n"
-                f"Период отчёта: от старта имитатора до старта + сдвиг теста "
-                f"{leak.export_lds_status_report_test.offset} мин.\n"
-                "Этапы сценария:\n"
-                "1) SubscribeReportsDataExportedRequest - подписка на пуш-нотификации\n"
-                "2) ExportReportsCommandRequest - запрос формирования отчёта (тип LdsStateReport, фильтр по периоду)\n"
-                "3) Ожидание ReportDataExportedNotification\n"
-                "4) Лонг-поллинг GetExportedDataListRequest - поиск отчёта в списке\n"
-                "5) DownloadExportedDataRequest (StreamInvocation) - скачивание по exportedDataId\n"
-                "6) Проверка xlsx: участки, длительности режимов СОУ, суммарное время работы\n"
-                "7) Проверка двойной шапки и названий колонок\n"
-                "8) Проверка имени файла (.xlsx, название отчёта, ТУ, период +-1 мин)\n"
-                "Во вложениях Allure xlsx прикладывается только при падении теста"
-            ),
-        )
-        if config.has_multiple_leaks:
-            allure.dynamic.title(f"{title} (утечка #{leak_number})")
-        await scenarios.export_lds_status_report(ws_client, config, leak, imitator_start_time)
-
-    @pytest.mark.asyncio
-    async def test_export_mt_mode_report(
-        self,
-        ws_client: WebSocketClient,
-        config: SmokeSuiteConfig,
-        leak: LeakTestConfig,
-        leak_number: int,
-        imitator_start_time: datetime,
-    ) -> None:
-        tag = "ExportReports"
-        title = f"[{tag}] Проверка формирования отчёта о режиме работы МТ. ЭФ: Выпадашка отчётов"
-        _apply_allure_markers(
-            leak.export_mt_mode_report_test,
-            tag,
-            title,
-            (
-                f"Проверка формирования и содержимого xlsx-отчёта о режиме работы МТ на наборе данных "
-                f"{config.suite_name},\n"
-                f"на технологическом участке {config.tu_name}\n"
-                f"Период отчёта: от старта имитатора до старта + сдвиг теста "
-                f"{leak.export_mt_mode_report_test.offset} мин.\n"
-                "Этапы сценария:\n"
-                "1) SubscribeReportsDataExportedRequest - подписка на пуш-нотификации\n"
-                "2) ExportReportsCommandRequest - запрос формирования отчёта (тип StationaryStatusReport)\n"
-                "3) Ожидание ReportDataExportedNotification\n"
-                "4) Лонг-поллинг GetExportedDataListRequest - поиск отчёта в списке\n"
-                "5) DownloadExportedDataRequest (StreamInvocation) - скачивание по exportedDataId\n"
-                "6) Проверка xlsx: участки, длительности режимов МТ, суммарное время, доминирующий режим\n"
-                "7) Проверка двойной шапки и названий колонок\n"
-                "8) Проверка имени файла (.xlsx, название отчёта, ТУ, период +-1 мин)\n"
-                "Во вложениях Allure xlsx прикладывается только при падении теста"
-            ),
-        )
-        if config.has_multiple_leaks:
-            allure.dynamic.title(f"{title} (утечка #{leak_number})")
-        await scenarios.export_mt_mode_report(ws_client, config, leak, imitator_start_time)
