@@ -1,13 +1,10 @@
 import asyncio
 import logging
 import time
-from datetime import datetime
 from typing import Any, Callable, List, Optional
-from zoneinfo import ZoneInfo
 
 import msgpack
 import websockets
-from allure import attach, attachment_type
 from websockets import InvalidStatus
 
 from constants.architecture_constants import WebSocketClientConstants as WS_Const
@@ -155,28 +152,12 @@ class WebSocketClient:
 
             result_message = parse_message(chunk)
             await self.recv_queue.put(result_message)
-            if self._should_suppress_recv_attach():
-                continue
-
-            str_message = str(result_message)
-            logger.info(
-                f"Обработанное сообщение от api-gateway: {str_message[:200]}... полное сообщение в attach",
-            )
-            try:
-                attach(
-                    str_message,
-                    name=f"Распакованное сообщение от api-gateway {datetime.now(ZoneInfo(WS_Const.ZONE_INFO))}",
-                    attachment_type=attachment_type.TEXT,
+            if not self.suppress_recv_logging:
+                str_message = str(result_message)
+                logger.info(
+                    f"Обработанное сообщение от api-gateway: {str_message[:200]}... полное сообщение в attach",
                 )
-            except (KeyError, RuntimeError) as error:
-                logger.debug("Allure attach пропущен: %s", error)
-
-    def _should_suppress_recv_attach(self) -> bool:
-        if self.suppress_recv_logging:
-            return True
-        from utils.helpers import lds_configurator_utils as lds_cfg
-
-        return lds_cfg.is_configurator_flow_active()
+            continue
 
     async def invoke(self, target: str, args: list) -> None:
         """
@@ -274,3 +255,4 @@ class WebSocketClient:
             # 5) Фильтрация по filter_func
             if isinstance(msg, list) and filter_func(msg):
                 return msg
+                

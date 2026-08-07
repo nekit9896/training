@@ -15,7 +15,9 @@ from msgpack import Timestamp as MsgpackTimestamp
 from pytest import fail
 from requests import Response
 
+from clients.http_client import StandHttpClient
 from clients.websocket_client import WebSocketClient
+from constants.architecture_constants import HTTPClientConstants as HttpConst
 from constants.architecture_constants import WebSocketClientConstants as WS_Const
 from constants.enums import (
     ConfirmationStatus,
@@ -26,6 +28,7 @@ from constants.enums import (
     LdsStatusInitialization,
     LeakStatus,
     ReplyStatus,
+    SignalType,
     StationaryReason,
     StationaryStatus,
     StoppedPumpingReason,
@@ -46,7 +49,6 @@ ObjectType = TypeVar("ObjectType")  # создает типовую переме
 RandomObjectType = TypeVar("RandomObjectType")
 Event = TypeVar("Event")
 ParsedPayloadType = TypeVar("ParsedPayloadType")
-SignalType = TypeVar("SignalType")
 
 
 def convert_leak_volume_m3(volume: float) -> float:
@@ -296,7 +298,7 @@ def find_object_by_field(item_list: List[ObjectType], field_name: str, value: An
         return None
 
 
-def find_object_by_a_few_fields(item_list: List[ObjectType], fields_dict: dict) -> ObjectType:
+def find_object_by_few_fields(item_list: List[ObjectType], fields_dict: dict) -> ObjectType:
     """
     Ищет объект в списке объектов по значениям нескольких полей
     """
@@ -306,6 +308,38 @@ def find_object_by_a_few_fields(item_list: List[ObjectType], fields_dict: dict) 
     return next(
         (item for item in item_list if all(getattr(item, field) == value for field, value in fields_dict.items())), None
     )
+
+
+def extract_signal_on_site_and_segment(controlled_site_messages: dict) -> dict | None:
+    """
+    Ищет сигналы для всех пар КП-КП
+    """
+
+    result = {}
+    for site_obj in controlled_site_messages:
+        key = (site_obj.controlledSiteId, site_obj.segmentId)
+
+        result[key] = {signal.signalType: signal.value for signal in site_obj.signals}
+
+    return result
+
+
+def get_signal_value(all_signals_dict: dict, site_kp_kp: int, signals_id: int) -> Optional[int]:
+    """
+    Получает значение сигналов
+    Приводит значение к типу инт
+    Кладет в обертку значения режима МТ и режима СОУ
+    """
+    signals_value = all_signals_dict.get(site_kp_kp, {}).get(signals_id)
+    try:
+        int_signals_value = int(signals_value)
+    except (TypeError, ValueError):
+        return None
+    if signals_id == SignalType.REGLU:
+        return StationaryStatus(int_signals_value) if signals_value else None
+    if signals_id == SignalType.REGSOU:
+        return LdsStatus(int_signals_value) if signals_value else None
+    return int_signals_value
 
 
 def parse_event(event_value: str) -> tuple[str | None, str | None]:
@@ -487,6 +521,12 @@ def datetime_to_msgpack_timestamp(dt: datetime) -> list:
     return [MsgpackTimestamp(seconds=int(dt.timestamp()), nanoseconds=0), 0]
 
 
+def datetime_to_iso_format(dt: datetime) -> str:
+    """Конвертирует datetime в строку 2026-07-27T21:00:00.000Z для отправки по http на бэкенд."""
+    utc_datetime = dt.astimezone(timezone.utc)
+    return utc_datetime.isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+
+
 def create_journal_req_body(**kwargs) -> dict:
     """Создает дефолтные параметры запроса к журналу"""
     result = create_dict_from_dataclass(GetMessagesRequest, **kwargs)
@@ -494,7 +534,7 @@ def create_journal_req_body(**kwargs) -> dict:
     if period:
         for key in ('start', 'end'):
             if isinstance(period.get(key), datetime):
-                period[key] = datetime_to_msgpack_timestamp(period[key])
+                period[key] = datetime_to_iso_format(period[key])
     return result
 
 
@@ -543,9 +583,9 @@ def attach_ws_poll_failure(
 
 def _attach_ws_reply_parse_failure(
     reply_payload: Optional[Any],
-    invocation_id: str,
     request_name: str,
     error: BaseException,
+    invocation_id: str = "",
 ) -> None:
     """Прикрепляет к Allure ответ бэка при ошибке парсинга."""
     allure.attach(
@@ -654,7 +694,7 @@ def _find_ws_reply_by_invocation_id(messages: List[Any], invocation_id: str, par
 
 
 async def poll_for_exported_file(
-    ws_client: WebSocketClient,
+    http_client: StandHttpClient,
     parser,
     list_limit: int,
     expected_data_type: Any,
@@ -675,36 +715,23 @@ async def poll_for_exported_file(
     deadline = asyncio.get_event_loop().time() + total_wait_seconds
     last_items_count = -1
     collected_messages: List[Any] = []
-    request_name = ReportConst.GET_EXPORTED_DATA_LIST_REQUEST
-    ws_client.suppress_recv_logging = True
+    request_name = HttpConst.GET_EXPORTED_DATA_LIST_URL_PATH
+    request_payload = {"limit": list_limit}
     parser.suppress_recv_logging = True
     try:
         while asyncio.get_event_loop().time() < deadline:
-            drained_before_request = _drain_recv_queue(ws_client)
-            collected_messages.extend(drained_before_request)
-            await connect(
-                ws_client,
-                request_name,
-                {"limit": list_limit},
-            )
-            invocation_id = ws_client.invocation_id
-            await asyncio.sleep(poll_interval_seconds)
-
-            batch = _drain_recv_queue(ws_client)
-            collected_messages.extend(batch)
-            list_reply_payload = _find_ws_reply_by_invocation_id(batch, invocation_id, parser)
-
-            if list_reply_payload is None:
-                continue
-
+            response = http_client.post_request(request_name, request_payload)
+            if response.json():
+                collected_messages.extend(response.json())
+            payload = get_json_from_http_response(response)
             try:
-                parsed_payload = parser.parse_exported_data_list_msg(list_reply_payload)
+                parsed_payload = parser.parse_exported_data_list_msg(payload)
             except Exception as error:
-                _attach_ws_reply_parse_failure(list_reply_payload, invocation_id, request_name, error)
+                _attach_ws_reply_parse_failure(payload, request_name, error)
                 for msg in collected_messages:
                     allure.attach(
                         pprint.pformat(msg, width=120, sort_dicts=False),
-                        name="received ws message",
+                        name="received http message",
                         attachment_type=allure.attachment_type.TEXT,
                     )
                 fail(f"Не удалось разобрать ответ на {request_name}: {error}")
@@ -736,9 +763,11 @@ async def poll_for_exported_file(
             )
             if match is not None:
                 return match
+            else:
+                await asyncio.sleep(poll_interval_seconds)
+                continue
+
     finally:
-        collected_messages.extend(_drain_recv_queue(ws_client))
-        ws_client.suppress_recv_logging = False
         parser.suppress_recv_logging = False
 
     attach_ws_poll_failure(
@@ -1037,7 +1066,7 @@ async def receive_download_exported_data_reply(
             for msg in batch:
                 stream_error = _stream_completion_error(msg, invocation_id)
                 if stream_error:
-                    _attach_ws_reply_parse_failure(msg, invocation_id, request_name, RuntimeError(stream_error))
+                    _attach_ws_reply_parse_failure(msg, request_name, RuntimeError(stream_error), invocation_id)
                     fail(
                         f"При {purpose} бэк вернул Completion с ошибкой "
                         f"({request_name}, invocation_id={invocation_id}): {stream_error}"
@@ -1055,7 +1084,7 @@ async def receive_download_exported_data_reply(
                 try:
                     return parser.parse_download_exported_data_msg(msg)
                 except Exception as error:
-                    _attach_ws_reply_parse_failure(msg, invocation_id, request_name, error)
+                    _attach_ws_reply_parse_failure(msg, request_name, error, invocation_id)
                     fail(
                         f"При {purpose} получен StreamItem ({request_name}, invocation_id={invocation_id}), "
                         f"но не удалось разобрать ответ с fileChunk: {error}"
@@ -1276,3 +1305,4 @@ def get_leak_diagnostic_area_samples(
 def moscow_now() -> datetime:
     """Текущее время в часовом поясе Europe/Moscow."""
     return datetime.now(ZoneInfo(TestConst.ZONE_INFO))
+    

@@ -6,21 +6,24 @@ class StandConstants:
     COMPONENT: str = "lds"
     ROOT_DOMAIN: str = "tn.tngrp.ru"
     API_GATEWAY_PATH_SEGMENT: str = "lds-api-gateway"
-    ACKNOWLEDGE_LEAK_URL_PATH: str = "/journals/GetMessages"  # TODO Исправить на актуальный в LDS-14845
+    ACKNOWLEDGE_LEAK_URL_PATH: str = "/core/AcknowledgeLeak"
+    EXPORT_REPORTS_URL_PATH: str = "/reports/ExportReports"
     IMITATE_SIGNAL_URL_PATH: str = "/layerbuilder/ImitateSignal"
     GET_BASIC_INFO_URL_PATH: str = "/configurator/GetBasicInfo"
+    GET_EXPORTED_DATA_LIST_URL_PATH: str = "/journals/GetExportedDataList"
     GET_BASIC_INFO_ADMIN_URL_PATH: str = "/configurator/GetBasicInfoAdmin"
     GET_TUS_INFORMATION_URL_PATH: str = "/configurator/GetTusInformation"
     LAUNCH_LDS_URL_PATH: str = "/configurator/LaunchLds"
     STOP_LDS_URL_PATH: str = "/configurator/StopLds"
-    PING_URL_PATH: str = "/apigateway/Ping"
     GET_MESSAGES_URL_PATH: str = "/journals/GetMessages"
     GET_OUTPUT_SIGNALS_URL_PATH: str = "/apigateway/GetOutputSignals"
     MASK_SIGNAL_URL_PATH: str = "/layerbuilder/MaskSignal"
     MASK_LDS_URL_PATH: str = "/core/MaskLds"
+    PING_URL_PATH: str = "/apigateway/Ping"
     UNIMITATE_SIGNAL_URL_PATH: str = "/layerbuilder/UnimitateSignal"
     UNMASK_SIGNAL_URL_PATH: str = "/layerbuilder/UnmaskSignal"
     UNMASK_LDS_URL_PATH: str = "/core/UnmaskLds"
+    ZONE_INFO: str = 'Europe/Moscow'
 
 
 class ImitatorConstants:
@@ -170,7 +173,6 @@ class WebSocketClientConstants(StandConstants):
     INVOCATION_ID_INDEX = 2
     SERVICE_NAME: str = StandConstants.MAIN_SUBDOMAIN
     FILTERING_TIMEOUT: int | float = 10.0
-    ZONE_INFO: str = 'Europe/Moscow'
 
 
 class MockConstants:

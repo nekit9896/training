@@ -52,7 +52,6 @@ from utils.helpers import report_xlsx_utils as report_utils
 from utils.helpers import ws_test_utils as t_utils
 from utils.helpers.asserts import SoftAssertions, StepCheck
 from utils.helpers.ws_message_parser import ws_message_parser as parser
-from utils.helpers.ws_test_utils import get_value
 
 
 def basic_info(http_client, cfg: BaseSuiteConfig):
@@ -177,14 +176,14 @@ async def diagnostics_of_signals_after_initialization(ws_client, cfg: SmokeSuite
                 'objects': {
                     'linearParts': [],
                     'controlledSites': [
-                        SiteKpKp.TIXORECZKAYA_NOVOVELICHKOVSKAYA.value,
-                        SiteKpKp.NOVOVELICHKOVSKAYA_KRYMSKAYA.value,
-                        SiteKpKp.KRYMSKAYA_GRUSHOVAYA.value,
-                        SiteKpKp.BACKUP_ROUTE_BEJSUG.value,
-                        SiteKpKp.BACKUP_ROUTE_PONURA.value,
-                        SiteKpKp.BACKUP_ROUTE_KUBAN.value,
-                        SiteKpKp.NPZ_AFIPSKIJ.value,
-                        SiteKpKp.NPZ_ILINSKIJ.value,
+                        SiteKpKp.TIXORECZKAYA_NOVOVELICHKOVSKAYA.controlledSiteSegmentDict,
+                        SiteKpKp.NOVOVELICHKOVSKAYA_KRYMSKAYA.controlledSiteSegmentDict,
+                        SiteKpKp.KRYMSKAYA_GRUSHOVAYA.controlledSiteSegmentDict,
+                        SiteKpKp.BACKUP_ROUTE_BEJSUG.controlledSiteSegmentDict,
+                        SiteKpKp.BACKUP_ROUTE_PONURA.controlledSiteSegmentDict,
+                        SiteKpKp.BACKUP_ROUTE_KUBAN.controlledSiteSegmentDict,
+                        SiteKpKp.NPZ_AFIPSKIJ.controlledSiteSegmentDict,
+                        SiteKpKp.NPZ_ILINSKIJ.controlledSiteSegmentDict,
                     ],
                 },
                 'signalTypes': 1023,
@@ -195,261 +194,209 @@ async def diagnostics_of_signals_after_initialization(ws_client, cfg: SmokeSuite
 
         parsed_payload = parser.parse_output_signals_info_msg(payload)
     with allure.step("Извлечение и подготовка данных для проверки"):
-        controlled_site_dict = {
-            "controlled_site_first": SiteKpKp.TIXORECZKAYA_NOVOVELICHKOVSKAYA.value,
-            "controlled_site_second": SiteKpKp.NOVOVELICHKOVSKAYA_KRYMSKAYA.value,
-            "controlled_site_third": SiteKpKp.KRYMSKAYA_GRUSHOVAYA.value,
-            "controlled_site_fourth": SiteKpKp.BACKUP_ROUTE_BEJSUG.value,
-            "controlled_site_fifth": SiteKpKp.BACKUP_ROUTE_PONURA.value,
-            "controlled_site_sixth": SiteKpKp.BACKUP_ROUTE_KUBAN.value,
-            "controlled_site_seventh": SiteKpKp.NPZ_AFIPSKIJ.value,
-            "controlled_site_eight": SiteKpKp.NPZ_ILINSKIJ.value,
-        }
 
-        controlled_site_messages = {}
-        for name, key in controlled_site_dict.items():
-            controlled_site_messages[name] = t_utils.find_object_by_a_few_fields(
-                parsed_payload.replyContent.controlledSiteSignals, key
-            )
+        controlled_site_messages = getattr(parsed_payload.replyContent, 'controlledSiteSignals', [])
 
-        all_signals = {}
-        for site_name, site_message in controlled_site_messages.items():
-            signal_dict = {'pump': None, 'sou': None, 'gravity': None}
-            if site_message:
-                all_signals[site_name] = {
-                    'pump': t_utils.get_signal(site_message, SignalType.REGLU),
-                    'sou': t_utils.get_signal(site_message, SignalType.REGSOU),
-                    'gravity': t_utils.get_signal(site_message, SignalType.GRAVITYPIPE),
-                }
-            else:
-                all_signals[site_name] = signal_dict
+        all_signals_dict = t_utils.extract_signal_on_site_and_segment(controlled_site_messages)
 
-        first_kp_kp = all_signals.get("controlled_site_first") or {}
-
-        if first_kp_kp:
-            first_site_signal_pump = (
-                StationaryStatus(int(get_value(first_kp_kp.get("pump")))) if first_kp_kp.get("pump") else None
-            )
-            first_site_signal_sou = (
-                LdsStatus(int(get_value(first_kp_kp.get("sou")))) if first_kp_kp.get("sou") else None
-            )
-            first_site_signal_gravity = get_value(first_kp_kp.get("gravity"))
-
-        second_kp_kp = all_signals.get("controlled_site_second") or {}
-        if second_kp_kp:
-            second_site_signal_pump = (
-                StationaryStatus(int(get_value(second_kp_kp.get("pump")))) if second_kp_kp.get("pump") else None
-            )
-            second_site_signal_sou = (
-                LdsStatus(int(get_value(second_kp_kp.get("sou")))) if second_kp_kp.get("sou") else None
-            )
-            second_site_signal_gravity = get_value(second_kp_kp.get("gravity"))
-
-        third_kp_kp = all_signals.get("controlled_site_third") or {}
-        if third_kp_kp:
-            third_site_signal_pump = (
-                StationaryStatus(int(get_value(third_kp_kp.get("pump")))) if third_kp_kp.get("pump") else None
-            )
-            third_site_signal_sou = (
-                LdsStatus(int(get_value(third_kp_kp.get("sou")))) if third_kp_kp.get("sou") else None
-            )
-            third_site_signal_gravity = get_value(third_kp_kp.get("gravity"))
-
-        fourth_kp_kp = all_signals.get("controlled_site_fourth") or {}
-        if fourth_kp_kp:
-            fourth_site_signal_pump = (
-                StationaryStatus(int(get_value(fourth_kp_kp.get("pump")))) if fourth_kp_kp.get("pump") else None
-            )
-            fourth_site_signal_sou = (
-                LdsStatus(int(get_value(fourth_kp_kp.get("sou")))) if fourth_kp_kp.get("sou") else None
-            )
-            fourth_site_signal_gravity = get_value(fourth_kp_kp.get("gravity"))
-
-        fifth_kp_kp = all_signals.get("controlled_site_fifth") or {}
-        if fifth_kp_kp:
-            fifth_site_signal_pump = (
-                StationaryStatus(int(get_value(fifth_kp_kp.get("pump")))) if fifth_kp_kp.get("pump") else None
-            )
-            fifth_site_signal_sou = (
-                LdsStatus(int(get_value(fifth_kp_kp.get("sou")))) if fifth_kp_kp.get("sou") else None
-            )
-            fifth_site_signal_gravity = get_value(fifth_kp_kp.get("gravity"))
-
-        sixth_kp_kp = all_signals.get("controlled_site_sixth") or {}
-        if sixth_kp_kp:
-            sixth_site_signal_pump = (
-                StationaryStatus(int(get_value(sixth_kp_kp.get("pump")))) if sixth_kp_kp.get("pump") else None
-            )
-            sixth_site_signal_sou = (
-                LdsStatus(int(get_value(sixth_kp_kp.get("sou")))) if sixth_kp_kp.get("sou") else None
-            )
-            sixth_site_signal_gravity = get_value(sixth_kp_kp.get("gravity"))
-
-        seventh_kp_kp = all_signals.get("controlled_site_seventh") or {}
-        if seventh_kp_kp:
-            seventh_site_signal_pump = (
-                StationaryStatus(int(get_value(seventh_kp_kp.get("pump")))) if seventh_kp_kp.get("pump") else None
-            )
-            seventh_site_signal_sou = (
-                LdsStatus(int(get_value(seventh_kp_kp.get("sou")))) if seventh_kp_kp.get("sou") else None
-            )
-            seventh_site_signal_gravity = get_value(seventh_kp_kp.get("gravity"))
-
-        eighth_kp_kp = all_signals.get("controlled_site_eight") or {}
-        if eighth_kp_kp:
-            eight_site_signal_pump = (
-                StationaryStatus(int(get_value(eighth_kp_kp.get("pump")))) if eighth_kp_kp.get("pump") else None
-            )
-            eight_site_signal_sou = (
-                LdsStatus(int(get_value(eighth_kp_kp.get("sou")))) if eighth_kp_kp.get("sou") else None
-            )
-            eight_site_signal_gravity = get_value(eighth_kp_kp.get("gravity"))
+        pump_tixoreczkaya = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.TIXORECZKAYA_NOVOVELICHKOVSKAYA.value, SignalType.REGLU
+        )
+        sou_tixoreczkaya = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.TIXORECZKAYA_NOVOVELICHKOVSKAYA.value, SignalType.REGSOU
+        )
+        gravity_tixoreczkaya = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.TIXORECZKAYA_NOVOVELICHKOVSKAYA.value, SignalType.GRAVITYPIPE
+        )
+        pump_novovelichkovskay = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.NOVOVELICHKOVSKAYA_KRYMSKAYA.value, SignalType.REGLU
+        )
+        sou_novovelichkovskay = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.NOVOVELICHKOVSKAYA_KRYMSKAYA.value, SignalType.REGSOU
+        )
+        gravity_novovelichkovskay = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.NOVOVELICHKOVSKAYA_KRYMSKAYA.value, SignalType.GRAVITYPIPE
+        )
+        pump_krymskay = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.KRYMSKAYA_GRUSHOVAYA.value, SignalType.REGLU
+        )
+        sou_krymskay = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.KRYMSKAYA_GRUSHOVAYA.value, SignalType.REGSOU
+        )
+        gravity_krymskay = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.KRYMSKAYA_GRUSHOVAYA.value, SignalType.GRAVITYPIPE
+        )
+        pump_bejsug = t_utils.get_signal_value(all_signals_dict, SiteKpKp.BACKUP_ROUTE_BEJSUG.value, SignalType.REGLU)
+        sou_bejsug = t_utils.get_signal_value(all_signals_dict, SiteKpKp.BACKUP_ROUTE_BEJSUG.value, SignalType.REGSOU)
+        gravity_bejsug = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.BACKUP_ROUTE_BEJSUG.value, SignalType.GRAVITYPIPE
+        )
+        pump_ponura = t_utils.get_signal_value(all_signals_dict, SiteKpKp.BACKUP_ROUTE_PONURA.value, SignalType.REGLU)
+        sou_ponura = t_utils.get_signal_value(all_signals_dict, SiteKpKp.BACKUP_ROUTE_PONURA.value, SignalType.REGSOU)
+        gravity_ponura = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.BACKUP_ROUTE_PONURA.value, SignalType.GRAVITYPIPE
+        )
+        pump_kuban = t_utils.get_signal_value(all_signals_dict, SiteKpKp.BACKUP_ROUTE_KUBAN.value, SignalType.REGLU)
+        sou_kuban = t_utils.get_signal_value(all_signals_dict, SiteKpKp.BACKUP_ROUTE_KUBAN.value, SignalType.REGSOU)
+        gravity_kuban = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.BACKUP_ROUTE_KUBAN.value, SignalType.GRAVITYPIPE
+        )
+        pump_afipskij = t_utils.get_signal_value(all_signals_dict, SiteKpKp.NPZ_AFIPSKIJ.value, SignalType.REGLU)
+        sou_afipskij = t_utils.get_signal_value(all_signals_dict, SiteKpKp.NPZ_AFIPSKIJ.value, SignalType.REGSOU)
+        gravity_afipskij = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.NPZ_AFIPSKIJ.value, SignalType.GRAVITYPIPE
+        )
+        pump_ilinskij = t_utils.get_signal_value(all_signals_dict, SiteKpKp.NPZ_ILINSKIJ.value, SignalType.REGLU)
+        sou_ilinskij = t_utils.get_signal_value(all_signals_dict, SiteKpKp.NPZ_ILINSKIJ.value, SignalType.REGSOU)
+        gravity_ilinskij = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.NPZ_ILINSKIJ.value, SignalType.GRAVITYPIPE
+        )
 
     with SoftAssertions() as soft_failures:
         StepCheck(
             "Проверка сигнала - режим МТ на участке Тихорецкая-Нововеличковская",
             "Режим МТ",
             soft_failures,
-        ).actual(first_site_signal_pump).expected(exp_first_site_reg_lu).equal_to()
+        ).actual(pump_tixoreczkaya).expected(exp_first_site_reg_lu).equal_to()
         StepCheck(
             "Проверка сигнала - режим СОУ на участке Тихорецкая-Нововеличковская",
             "Режим СОУ",
             soft_failures,
-        ).actual(first_site_signal_sou).expected(exp_first_site_reg_sou).equal_to()
+        ).actual(sou_tixoreczkaya).expected(exp_first_site_reg_sou).equal_to()
         StepCheck(
             f"Проверка {GravityPipe.absent_gravity.description} \n" f"на участке Тихорецкая-Нововеличковская",
             "Количество самотеков",
             soft_failures,
-        ).actual(first_site_signal_gravity).expected(str(GravityPipe.absent_gravity.id)).equal_to()
+        ).actual(gravity_tixoreczkaya).expected(GravityPipe.absent_gravity.id).equal_to()
         StepCheck(
             "Проверка сигнала - режим МТ на участке Нововеличковская-Крымская",
             "Режим МТ",
             soft_failures,
-        ).actual(second_site_signal_pump).expected(exp_second_site_reg_lu).equal_to()
+        ).actual(pump_novovelichkovskay).expected(exp_second_site_reg_lu).equal_to()
         StepCheck(
             f"Проверка {GravityPipe.absent_gravity.description}\n" f"на участке Нововеличковская-Крымская",
             "Количество самотеков",
             soft_failures,
-        ).actual(second_site_signal_gravity).expected(str(GravityPipe.absent_gravity.id)).equal_to()
+        ).actual(gravity_novovelichkovskay).expected(GravityPipe.absent_gravity.id).equal_to()
         StepCheck(
             "Проверка сигнала - режим СОУ на участке Нововеличковская-Крымская",
             "Режим СОУ",
             soft_failures,
-        ).actual(second_site_signal_sou).expected(exp_second_site_reg_sou).equal_to()
+        ).actual(sou_novovelichkovskay).expected(exp_second_site_reg_sou).equal_to()
         StepCheck(
             "Проверка сигнала - режим МТ на участке Крымская-Грушовая",
             "Режим МТ",
             soft_failures,
         ).actual(
-            third_site_signal_pump
+            pump_krymskay
         ).expected(exp_third_site_reg_lu).equal_to()
         StepCheck(
             f"Проверка {GravityPipe.present_gravity.description} на участке Крымская-Грушовая",
             "Количество самотеков",
             soft_failures,
-        ).actual(third_site_signal_gravity).expected(str(GravityPipe.present_gravity.id)).equal_to()
+        ).actual(gravity_krymskay).expected(GravityPipe.present_gravity.id).equal_to()
         StepCheck(
             "Проверка сигнала - режим СОУ на участке Крымская-Грушовая",
             "Режим СОУ",
             soft_failures,
         ).actual(
-            third_site_signal_sou
+            sou_krymskay
         ).expected(exp_third_site_reg_sou).equal_to()
         StepCheck(
             "Проверка сигнала - режим МТ на резервной нитке Бейсуг",
             "Режим МТ",
             soft_failures,
         ).actual(
-            fourth_site_signal_pump
+            pump_bejsug
         ).expected(exp_fourth_site_reg_lu).equal_to()
         StepCheck(
             f"Проверка {GravityPipe.absent_gravity.description} на резервной нитке Бейсуг",
             "Количество самотеков",
             soft_failures,
-        ).actual(fourth_site_signal_gravity).expected(str(GravityPipe.absent_gravity.id)).equal_to()
+        ).actual(gravity_bejsug).expected(GravityPipe.absent_gravity.id).equal_to()
         StepCheck(
             "Проверка сигнала - режим СОУ на резервной нитке Бейсуг",
             "Режим СОУ",
             soft_failures,
         ).actual(
-            fourth_site_signal_sou
+            sou_bejsug
         ).expected(exp_fourth_site_reg_sou).equal_to()
         StepCheck(
             "Проверка сигнала - режим МТ на резервной нитке Понура",
             "Режим МТ",
             soft_failures,
         ).actual(
-            fifth_site_signal_pump
+            pump_ponura
         ).expected(exp_fifth_site_reg_lu).equal_to()
         StepCheck(
             "Проверка сигнала - режим СОУ на резервной нитке Понура",
             "Режим СОУ",
             soft_failures,
         ).actual(
-            fifth_site_signal_sou
+            sou_ponura
         ).expected(exp_fifth_site_reg_sou).equal_to()
         StepCheck(
             f"Проверка {GravityPipe.absent_gravity.description} на резервной нитке Понура",
             "Количество самотеков",
             soft_failures,
-        ).actual(fifth_site_signal_gravity).expected(str(GravityPipe.absent_gravity.id)).equal_to()
+        ).actual(gravity_ponura).expected(GravityPipe.absent_gravity.id).equal_to()
         StepCheck(
             "Проверка сигнала - режим МТ на резервной нитке Кубань",
             "Режим МТ",
             soft_failures,
         ).actual(
-            sixth_site_signal_pump
+            pump_kuban
         ).expected(exp_sixth_site_reg_lu).equal_to()
         StepCheck(
             "Проверка сигнала - режим СОУ на резервной нитке Кубань",
             "Режим СОУ",
             soft_failures,
         ).actual(
-            sixth_site_signal_sou
+            sou_kuban
         ).expected(exp_sixth_site_reg_sou).equal_to()
         StepCheck(
             f"Проверка {GravityPipe.absent_gravity.description} на резервной нитке Кубань",
             "Количество самотеков",
             soft_failures,
-        ).actual(sixth_site_signal_gravity).expected(str(GravityPipe.absent_gravity.id)).equal_to()
+        ).actual(gravity_kuban).expected(GravityPipe.absent_gravity.id).equal_to()
         StepCheck(
             "Проверка сигнала - режим МТ на НПЗ Афипский",
             "Режим МТ",
             soft_failures,
         ).actual(
-            seventh_site_signal_pump
+            pump_afipskij
         ).expected(exp_seventh_site_reg_lu).equal_to()
         StepCheck(
             "Проверка сигнала - режим СОУ на НПЗ Афипский",
             "Режим СОУ",
             soft_failures,
         ).actual(
-            seventh_site_signal_sou
+            sou_afipskij
         ).expected(exp_seventh_site_reg_sou).equal_to()
         StepCheck(
             f"Проверка {GravityPipe.absent_gravity.description} на НПЗ Афипский",
             "Количество самотеков",
             soft_failures,
-        ).actual(seventh_site_signal_gravity).expected(str(GravityPipe.absent_gravity.id)).equal_to()
+        ).actual(gravity_afipskij).expected(GravityPipe.absent_gravity.id).equal_to()
         StepCheck(
             "Проверка сигнала - режим МТ на НПЗ Ильинский",
             "Режим МТ",
             soft_failures,
         ).actual(
-            eight_site_signal_pump
+            pump_ilinskij
         ).expected(exp_eighth_site_reg_lu).equal_to()
         StepCheck(
             "Проверка сигнала - режим СОУ на НПЗ Ильинский",
             "Режим СОУ",
             soft_failures,
         ).actual(
-            eight_site_signal_sou
+            sou_ilinskij
         ).expected(exp_eighth_site_reg_sou).equal_to()
         StepCheck(
             f"Проверка {GravityPipe.absent_gravity.description} на НПЗ Ильинский",
             "Количество самотеков",
             soft_failures,
-        ).actual(eight_site_signal_gravity).expected(str(GravityPipe.absent_gravity.id)).equal_to()
+        ).actual(gravity_ilinskij).expected(GravityPipe.absent_gravity.id).equal_to()
 
 
 def lds_status_init_in_journal(http_client, cfg: SmokeSuiteConfig | LDSStatusConfig, imitator_start_time):
@@ -2182,7 +2129,7 @@ def acknowledge_leak_in_journal(http_client, cfg: SmokeSuiteConfig, imitator_sta
         end_time = datetime.now()
         request_body = t_utils.create_journal_req_body(
             pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
-            filtering=Filtering(messageTypes=int(MessageType.LEAKS), objects=FilteringObjects(tuId=cfg.tu_id)),
+            filtering=Filtering(messageTypes=int(MessageType.USER_ACTION), objects=FilteringObjects(tuId=cfg.tu_id)),
         )
         response = http_client.post_request(HttpConst.GET_MESSAGES_URL_PATH, request_body)
         payload = t_utils.get_json_from_http_response(response)
@@ -2611,16 +2558,14 @@ async def leak_is_complete_on_kg(ws_client, cfg: SmokeSuiteConfig, leak: LeakTes
             {'tuId': cfg.tu_id},
         )
         parsed_payload = parser.parse_leaks_content_msg(payload)
+
     with allure.step("Извлечение и подготовка данных для проверки"):
         leaks_list_info = getattr(parsed_payload.replyContent, 'leaksListInfo', None)
         complete_leak_info = t_utils.find_leak_by_coordinate(leaks_list_info, leak.coordinate_meters)
         leak_coordinate_round = round(complete_leak_info.leakCoordinate, cfg.precision)
-        complete_leak = t_utils.find_object_by_field(
-            leaks_list_info, "confirmationStatus", ConfirmationStatus.CONFIRMED_AND_LEAK_CLOSED.value
-        )
         leak_algorithm_type = ReservedType(complete_leak_info.type) if complete_leak_info.type else None
         leak_confirmation_status = (
-            ConfirmationStatus(complete_leak.confirmationStatus) if complete_leak.confirmationStatus else None
+            ConfirmationStatus(complete_leak_info.confirmationStatus) if complete_leak_info.confirmationStatus else None
         )
 
     with SoftAssertions() as soft_failures:
@@ -2744,7 +2689,9 @@ async def complete_tu_leaks_info_content(ws_client, cfg: SmokeSuiteConfig):
     StepCheck("Проверка отсутствия утечки на схеме", "leaksInfo").actual(leak_on_scheme).is_empty()
 
 
-async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time: datetime):
+async def export_leaks_report(
+    ws_client, http_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time: datetime
+):
     """
     Сценарий формирования отчёта об утечках.
 
@@ -2809,18 +2756,21 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
     with allure.step(f"Этап 1. Подписка на пуш-нотификации ({ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST})"):
         await t_utils.connect(ws_client, ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST, [])
 
-    with allure.step(f"Этап 2. Запрос формирования отчёта ({ReportConst.EXPORT_REPORTS_COMMAND_REQUEST})"):
+    with allure.step(f"Этап 2. Http запрос формирования отчёта. endpoint: {HttpConst.EXPORT_REPORTS_URL_PATH}"):
         request_payload = {
             "tuId": cfg.tu_id,
             "exportedDataTypes": [ExportedDataType.LEAKS_REPORT.value],
             "timeOffset": actual_report_state.time_offset_hours,
             "period": {
-                "start": t_utils.datetime_to_msgpack_timestamp(actual_report_state.period_start),
-                "end": t_utils.datetime_to_msgpack_timestamp(actual_report_state.period_end),
-                "additionalProperties": {},
+                "start": t_utils.datetime_to_iso_format(actual_report_state.period_start),
+                "end": t_utils.datetime_to_iso_format(actual_report_state.period_end),
             },
         }
-        await t_utils.connect(ws_client, ReportConst.EXPORT_REPORTS_COMMAND_REQUEST, request_payload)
+        export_command_response = http_client.post_request(HttpConst.EXPORT_REPORTS_URL_PATH, request_payload)
+        export_command_status_code = export_command_response.status_code
+        StepCheck("Проверка кода ответа на формирование отчёта", "replyStatus").actual(
+            export_command_status_code
+        ).expected(ReplyStatus.OK.value).equal_to()
 
     with allure.step(
         f"Этап 3. Ожидание пуш-нотификации {ReportConst.REPORT_DATA_EXPORTED_NOTIFICATION} о готовности отчёта"
@@ -2841,9 +2791,9 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
             (notification_reply_content.errorMessage or "") if notification_reply_content else ""
         )
 
-    with allure.step(f"Этап 4. Лонг-поллинг {ReportConst.GET_EXPORTED_DATA_LIST_REQUEST} до появления отчёта в списке"):
+    with allure.step(f"Этап 4. Лонг-поллинг {HttpConst.GET_EXPORTED_DATA_LIST_URL_PATH} до появления отчёта в списке"):
         actual_report_state.report_item = await t_utils.poll_for_exported_file(
-            ws_client=ws_client,
+            http_client=http_client,
             parser=parser,
             list_limit=ReportConst.EXPORTED_DATA_LIST_LIMIT,
             expected_data_type=ExportedDataType.LEAKS_REPORT,
@@ -3142,7 +3092,7 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
             ).is_empty()
 
 
-async def export_lds_status_report(ws_client, cfg: SmokeSuiteConfig, imitator_start_time: datetime):
+async def export_lds_status_report(ws_client, http_client, cfg: SmokeSuiteConfig, imitator_start_time: datetime):
     """
     Сценарий формирования xlsx-отчёта о режиме работы СОУ.
     """
@@ -3179,18 +3129,21 @@ async def export_lds_status_report(ws_client, cfg: SmokeSuiteConfig, imitator_st
     with allure.step(f"Этап 1. Подписка на пуш-нотификации {ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST}"):
         await t_utils.connect(ws_client, ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST, [])
 
-    with allure.step(f"Этап 2. Запрос формирования отчёта {ReportConst.EXPORT_REPORTS_COMMAND_REQUEST}"):
+    with allure.step(f"Этап 2. Http запрос формирования отчёта. endpoint: {HttpConst.EXPORT_REPORTS_URL_PATH}"):
         request_payload = {
             "tuId": cfg.tu_id,
             "exportedDataTypes": [ExportedDataType.LDS_STATUS_REPORT.value],
             "timeOffset": report_state.time_offset_hours,
             "period": {
-                "start": t_utils.datetime_to_msgpack_timestamp(report_state.period_start),
-                "end": t_utils.datetime_to_msgpack_timestamp(report_state.period_end),
-                "additionalProperties": {},
+                "start": t_utils.datetime_to_iso_format(report_state.period_start),
+                "end": t_utils.datetime_to_iso_format(report_state.period_end),
             },
         }
-        await t_utils.connect(ws_client, ReportConst.EXPORT_REPORTS_COMMAND_REQUEST, request_payload)
+        export_command_response = http_client.post_request(HttpConst.EXPORT_REPORTS_URL_PATH, request_payload)
+        export_command_status_code = export_command_response.status_code
+        StepCheck("Проверка кода ответа на формирование отчёта", "replyStatus").actual(
+            export_command_status_code
+        ).expected(ReplyStatus.OK.value).equal_to()
 
     with allure.step(
         f"Этап 3. Ожидание пуш-нотификации {ReportConst.REPORT_DATA_EXPORTED_NOTIFICATION} о готовности отчёта"
@@ -3202,9 +3155,9 @@ async def export_lds_status_report(ws_client, cfg: SmokeSuiteConfig, imitator_st
             poll_interval_seconds=ReportConst.LIST_POLL_INTERVAL_SECONDS,
         )
 
-    with allure.step(f"Этап 4. Лонг-поллинг {ReportConst.GET_EXPORTED_DATA_LIST_REQUEST} до появления отчёта в списке"):
+    with allure.step(f"Этап 4. Лонг-поллинг {HttpConst.GET_EXPORTED_DATA_LIST_URL_PATH} до появления отчёта в списке"):
         report_state.report_item = await t_utils.poll_for_exported_file(
-            ws_client=ws_client,
+            http_client=http_client,
             parser=parser,
             list_limit=ReportConst.EXPORTED_DATA_LIST_LIMIT,
             expected_data_type=ExportedDataType.LDS_STATUS_REPORT,
@@ -3596,7 +3549,7 @@ def stationary_status_in_journal(http_client, cfg: SmokeSuiteConfig, imitator_st
         ).equal_to()
 
 
-async def export_mt_mode_report(ws_client, cfg: SmokeSuiteConfig, imitator_start_time: datetime):
+async def export_mt_mode_report(ws_client, http_client, cfg: SmokeSuiteConfig, imitator_start_time: datetime):
     """
     Сценарий формирования xlsx-отчёта о режиме работы МТ.
 
@@ -3667,18 +3620,21 @@ async def export_mt_mode_report(ws_client, cfg: SmokeSuiteConfig, imitator_start
     with allure.step(f"Этап 1. Подписка на пуш-нотификации {ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST}"):
         await t_utils.connect(ws_client, ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST, [])
 
-    with allure.step(f"Этап 2. Запрос формирования отчёта {ReportConst.EXPORT_REPORTS_COMMAND_REQUEST}"):
+    with allure.step(f"Этап 2. Http запрос формирования отчёта. endpoint: {HttpConst.EXPORT_REPORTS_URL_PATH}"):
         request_payload = {
             "tuId": cfg.tu_id,
             "exportedDataTypes": [ExportedDataType.STATIONARY_STATUS_REPORT.value],
             "timeOffset": report_state.actual_time_offset_hours,
             "period": {
-                "start": t_utils.datetime_to_msgpack_timestamp(report_state.expected_period_start),
-                "end": t_utils.datetime_to_msgpack_timestamp(report_state.expected_period_end),
-                "additionalProperties": {},
+                "start": t_utils.datetime_to_iso_format(report_state.expected_period_start),
+                "end": t_utils.datetime_to_iso_format(report_state.expected_period_end),
             },
         }
-        await t_utils.connect(ws_client, ReportConst.EXPORT_REPORTS_COMMAND_REQUEST, request_payload)
+        export_command_response = http_client.post_request(HttpConst.EXPORT_REPORTS_URL_PATH, request_payload)
+        export_command_status_code = export_command_response.status_code
+        StepCheck("Проверка кода ответа на формирование отчёта", "replyStatus").actual(
+            export_command_status_code
+        ).expected(ReplyStatus.OK.value).equal_to()
 
     with allure.step(
         f"Этап 3. Ожидание пуш-нотификации {ReportConst.REPORT_DATA_EXPORTED_NOTIFICATION} о готовности отчёта"
@@ -3690,9 +3646,9 @@ async def export_mt_mode_report(ws_client, cfg: SmokeSuiteConfig, imitator_start
             poll_interval_seconds=ReportConst.LIST_POLL_INTERVAL_SECONDS,
         )
 
-    with allure.step(f"Этап 4. Лонг-поллинг {ReportConst.GET_EXPORTED_DATA_LIST_REQUEST} до появления отчёта в списке"):
+    with allure.step(f"Этап 4. Лонг-поллинг {HttpConst.GET_EXPORTED_DATA_LIST_URL_PATH} до появления отчёта в списке"):
         report_state.actual_report_item = await t_utils.poll_for_exported_file(
-            ws_client=ws_client,
+            http_client=http_client,
             parser=parser,
             list_limit=ReportConst.EXPORTED_DATA_LIST_LIMIT,
             expected_data_type=ExportedDataType.STATIONARY_STATUS_REPORT,

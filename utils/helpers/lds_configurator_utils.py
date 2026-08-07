@@ -543,4 +543,3 @@ def get_admin_tu_status(admin_reply: GetBasicInfoAdminReply, tu_id: int) -> Opti
         return SouAdminStatus(tu.status)
     except ValueError:
         return None
-        

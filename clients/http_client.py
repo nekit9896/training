@@ -1,9 +1,12 @@
 import json
 import logging
 import os
+from datetime import datetime
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import requests
+from allure import attach, attachment_type
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -20,9 +23,9 @@ class HttpClient:
 
     def __init__(self):
         self.session = self._create_retry_session()
+        self.suppress_recv_logging: bool = False
 
-    @staticmethod
-    def make_request(method: str, url: str, **kwargs) -> Optional[requests.Response]:
+    def make_request(self, method: str, url: str, **kwargs) -> Optional[requests.Response]:
         """
         Обертка для отправки запроса
         :param method:
@@ -31,7 +34,8 @@ class HttpClient:
         :return: объект ответа
         """
         try:
-            logging.info(f"[HTTP_CLIENT] Выполняю запрос: METHOD: {method} URL: {url}")
+            if not self.suppress_recv_logging:
+                logging.info(f"[HTTP_CLIENT] Выполняю запрос: METHOD: {method} URL: {url}")
             response = requests.request(method, url, **kwargs)
             response.raise_for_status()
             return response
@@ -53,9 +57,12 @@ class HttpClient:
         :return: объект ответа
         """
         try:
-            logging.info(f"[HTTP_CLIENT] Выполняю запрос: METHOD: {method} URL: {url}")
+            if not self.suppress_recv_logging:
+                logging.info(f"[HTTP_CLIENT] Выполняю запрос: METHOD: {method} URL: {url}")
             response = self.session.request(method, url, **kwargs)
             response.raise_for_status()
+            if not self._should_suppress_recv_attach():
+                self._create_attach_from_http_response(response)
             return response
         except requests.HTTPError as error:
             logger.error(
@@ -111,6 +118,30 @@ class HttpClient:
             raise ValueError
         return response.content
 
+    def _should_suppress_recv_attach(self) -> bool:
+        if self.suppress_recv_logging:
+            return True
+        from utils.helpers import lds_configurator_utils as lds_cfg
+
+        return lds_cfg.is_configurator_flow_active()
+
+    @staticmethod
+    def _create_attach_from_http_response(response: requests.Response) -> None:
+        """
+        Создает json вложение http ответа в аллюр
+        """
+
+        try:
+            attach(
+                body=json.dumps(
+                    {"headers": dict(response.headers), "body": response.json()}, ensure_ascii=False, indent=2
+                ),
+                name=f"HTTP Response от api-gateway {datetime.now(ZoneInfo(Http_const.ZONE_INFO))}",
+                attachment_type=attachment_type.JSON,
+            )
+        except (KeyError, RuntimeError) as error:
+            logger.debug("Allure attach пропущен: %s", error)
+
     @staticmethod
     def _create_retry_session(
         retries: int = 3,
@@ -132,8 +163,8 @@ class HttpClient:
             raise_on_status=False,
         )
         adapter = HTTPAdapter(max_retries=retry)
-        session.mount("http//", adapter)
-        session.mount("https//", adapter)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
         return session
 
 
@@ -149,14 +180,6 @@ class StandHttpClient(HttpClient):
         self._headers = self._add_token_to_headers()
         self.session.headers.update(self._headers)
 
-    def _add_token_to_headers(self) -> dict:
-        """
-        Добавляет token в headers запроса
-        """
-        headers = Http_const.DEFAULT_HEADERS.copy()
-        headers[Http_const.X_SECURITY_SIGNATURE_KEY] = self._token
-        return headers
-
     def post_request(self, endpoint: str, payload: dict | str) -> Optional[requests.Response]:
         """
         Делает http post запрос к стенду
@@ -165,3 +188,11 @@ class StandHttpClient(HttpClient):
         json_payload = json.dumps(payload)
         response = self.make_session_request(Http_const.POST_METHOD, full_url, data=json_payload)
         return response
+
+    def _add_token_to_headers(self) -> dict:
+        """
+        Добавляет token в headers запроса
+        """
+        headers = Http_const.DEFAULT_HEADERS.copy()
+        headers[Http_const.X_SECURITY_SIGNATURE_KEY] = self._token
+        return headers

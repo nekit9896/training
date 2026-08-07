@@ -98,6 +98,7 @@ def pytest_configure(config):
         "admin_tu_name": None,
         "pre_run_running_tus": None,
         "suite_infra_ready": False,
+        "suite_setup_failure": None,
     }
 
 
@@ -474,15 +475,34 @@ def compute_imitator_duration(item, current_test_suite: str) -> float:
 @pytest.fixture(autouse=True)
 def require_suite_infra(request):
     """
-    Блокирует тесты набора, если infra-setup не завершился успешно.
+    Пропускает тесты набора, если infra-setup не завершился успешно.
     """
     if not request.node.get_closest_marker("test_suite_name"):
         return
     cfg = request.config.group_state
     if cfg.get("current_suite") and not cfg.get("suite_infra_ready"):
-        pytest.exit(
-            "[SETUP] [ERROR] Инфраструктура набора не готова (suite_infra_ready=False). " "Тесты не запускаются."
-        )
+        reason = cfg.get("suite_setup_failure") or "ошибка подготовки набора"
+        pytest.skip(f"[SETUP] [ERROR] Инфраструктура набора не готова: {reason}")
+
+
+def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
+    """
+    Пропускает текущий набор после ошибки setup: cleanup частичной инфраструктуры и pytest.skip.
+    """
+    logger.error(message)
+    try:
+        allure.attach(message, name="Ошибка setup набора", attachment_type=allure.attachment_type.TEXT)
+    except Exception:
+        logger.debug("Не удалось прикрепить ошибку setup к Allure", exc_info=True)
+    _run_lds_configurator_teardown_if_needed(cfg)
+    if stand_manager := cfg.get("stand_manager"):
+        try:
+            stand_manager.stop_imitator_wrapper()
+        except Exception:
+            logger.exception("[SETUP] Ошибка остановки имитатора после неудачного setup набора")
+    cfg["suite_infra_ready"] = False
+    cfg["suite_setup_failure"] = message
+    pytest.skip(message)
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -517,6 +537,7 @@ def pytest_runtest_setup(item):
         cfg["current_suite"] = current_test_suite
         cfg["suite_start_time"] = None
         cfg["suite_infra_ready"] = False
+        cfg["suite_setup_failure"] = None
 
         data_id = item.get_closest_marker("test_suite_data_id").args[0]
         test_data_name = item.get_closest_marker("test_data_name").args[0]
@@ -551,22 +572,23 @@ def pytest_runtest_setup(item):
                 f"Ошибка при проверке статуса OPC: {error}"
             )
             allure.attach(msg, name="OPC сервер недоступен", attachment_type=allure.attachment_type.TEXT)
-            pytest.exit(msg)
+            _skip_current_suite_after_setup_failure(cfg, msg)
         try:
             stand_manager.setup_stand_for_imitator_run()
         except Exception as error:
-            pytest.exit(f"[SETUP] [ERROR] ошибка при подготовке стенда: {error}")
-
+            _skip_current_suite_after_setup_failure(cfg, f"[SETUP] [ERROR] ошибка при подготовке стенда: {error}")
         try:
             _update_sensor_ids(stand_manager)
         except Exception as error:
-            pytest.exit(f"[SETUP] [ERROR] ошибка обновления id датчиков отбраковки из конфигурации: {error}")
-
+            _skip_current_suite_after_setup_failure(
+                cfg,
+                f"[SETUP] [ERROR] ошибка обновления id датчиков отбраковки из конфигурации: {error}",
+            )
         if suite_config is not None and suite_config.use_lds_configurator:
             try:
                 _run_lds_admin_setup(suite_config, cfg)
             except BaseException as error:
-                pytest.exit(f"[SETUP] [ERROR] LDS Configurator admin setup: {error}")
+                _skip_current_suite_after_setup_failure(cfg, f"[SETUP] [ERROR] LDS Configurator admin setup: {error}")
 
         imitator_thread = threading.Thread(
             target=stand_manager.start_imitator, name=f"imitator->{current_test_suite}", daemon=True
@@ -575,29 +597,32 @@ def pytest_runtest_setup(item):
         try:
             imitator_thread.start()
         except Exception as error:
-            pytest.exit(f"[SETUP] [ERROR] ошибка запуска имитатора: {error}")
+            _skip_current_suite_after_setup_failure(cfg, f"[SETUP] [ERROR] ошибка запуска имитатора: {error}")
         time.sleep(ImConst.CORE_START_DELAY_S)
         try:
             cfg["suite_start_time"] = time.monotonic()
             core_thread.start()
             core_thread.join(timeout=5)
         except Exception as error:
-            pytest.exit(f"[SETUP] [ERROR] ошибка запуска СORE контейнеров: {error}")
+            _skip_current_suite_after_setup_failure(cfg, f"[SETUP] [ERROR] ошибка запуска СORE контейнеров: {error}")
 
         # Сохраняем время старта имитатора для расчёта интервалов утечек в тестах
         cfg["imitator_start_time"] = stand_manager.start_time
 
         if suite_config is not None and suite_config.use_lds_configurator:
             if suite_config.admin_tu is None:
-                pytest.exit(
+                _skip_current_suite_after_setup_failure(
+                    cfg,
                     f"[SETUP] [ERROR] Набор '{suite_config.suite_name}': admin_tu обязателен "
-                    "при use_lds_configurator=True"
+                    "при use_lds_configurator=True",
                 )
             try:
                 _run_lds_verify_after_core(suite_config)
             except BaseException as error:
                 # Имитатор остановится в pytest_sessionfinish через stop_imitator_wrapper
-                pytest.exit(f"[SETUP] [ERROR] LDS Configurator проверка после запуска lds-core: {error}")
+                _skip_current_suite_after_setup_failure(
+                    cfg, f"[SETUP] [ERROR] LDS Configurator проверка после запуска ядра: {error}"
+                )
 
         cfg["suite_infra_ready"] = True
 
@@ -622,6 +647,7 @@ def _run_lds_admin_setup(suite_config, group_state: dict) -> None:
 
     async def _admin_setup() -> None:
         http_client = init_http_stand_client()
+        http_client.suppress_recv_logging = True
         await lds_configurator_scenarios.lds_configurator_admin_setup(http_client, suite_config, group_state)
 
     _run_lds_configurator_ws(_admin_setup)
@@ -635,6 +661,7 @@ def _run_lds_verify_after_core(suite_config) -> None:
     async def _verify() -> None:
         websocket_client = init_ws_stand_client()
         http_client = init_http_stand_client()
+        http_client.suppress_recv_logging = True
         async with websocket_client as ws_client:
             ws_client.suppress_recv_logging = True
             await lds_configurator_scenarios.lds_configurator_verify_after_core(ws_client, http_client, suite_config)
@@ -659,6 +686,7 @@ def _run_lds_configurator_teardown_if_needed(cfg: dict) -> None:
     async def _teardown() -> None:
         websocket_client = init_ws_stand_client()
         http_client = init_http_stand_client()
+        http_client.suppress_recv_logging = True
         async with websocket_client as ws_client:
             ws_client.suppress_recv_logging = True
             await lds_configurator_scenarios.lds_configurator_teardown(
@@ -798,6 +826,7 @@ def get_x_user_id() -> Optional[str]:
     Получает x-user-id из headers Ping запроса
     """
     http_client = init_http_stand_client()
+    http_client.suppress_recv_logging = True
     try:
         response = http_client.post_request(HttpConst.PING_URL_PATH, {})
         logger.info("[HTTP_CLIENT] [OK] Успешно получен x-user-id")
@@ -894,4 +923,3 @@ def pytest_sessionfinish(session, exitstatus):
     else:
         for file in files_for_drop:
             os.remove(file)
-            

@@ -46,8 +46,6 @@ class CaseMarkers:
 class SuiteTuIdentityMixin:
     """
     Идентификация ТУ для WS-тестов и legacy-стенда.
-
-    Вынесено из @dataclass: иначе Pyright/PyCharm видят property как () -> T.
     Поля technological_unit, use_lds_configurator, admin_tu, resolved_tu_id
     объявляются в BaseSuiteConfig.
     """
@@ -153,15 +151,14 @@ class BaseSuiteConfig(SuiteTuIdentityMixin):
         if not self.use_lds_configurator:
             return
         if self.admin_tu is None:
-            raise ValueError(
-                f"Набор '{self.suite_name}': admin_tu обязателен при use_lds_configurator=True"
-            )
+            raise ValueError(f"Набор '{self.suite_name}': admin_tu обязателен при use_lds_configurator=True")
         if self.admin_tu.legacy_tu != self.technological_unit:
             raise ValueError(
                 f"Набор '{self.suite_name}': admin_tu.legacy_tu ({self.admin_tu.legacy_tu}) "
                 f"не совпадает с technological_unit ({self.technological_unit})"
             )
 
+    # ===== Свойства для удобства =====
     @property
     def has_multiple_leaks(self) -> bool:
         return False
@@ -189,6 +186,7 @@ class DiagnosticAreaStatusConfig:
     leak_diagnostic_area_name: str
     leak_du_expected_lds_status: Any
     neighbors_du_expected_lds_status: Any
+    leak_diagnostic_area_id: Optional[int] = None
 
 
 @dataclass
@@ -262,8 +260,6 @@ class LeakTestConfig:
     completed_leak_info_in_journal_test: Optional[CaseMarkers] = None
     balance_algorithm_leak_completed_test: Optional[CaseMarkers] = None
     export_leaks_report_test: Optional[CaseMarkers] = None
-    export_lds_status_report_test: Optional[CaseMarkers] = None
-    export_mt_mode_report_test: Optional[CaseMarkers] = None
 
     @property
     def leak_diagnostic_area_id(self) -> Optional[int]:
@@ -322,6 +318,14 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     technological_section: Optional[str] = None
     imitate_flowmeter_signal_test_data: Optional[CaseData] = None
     imitate_pressure_sensor_signal_test_data: Optional[CaseData] = None
+    exp_mode_mt_message: Optional[CaseData] = None
+
+    # Режим МТ в xlsx export_leaks_report
+    expected_report_stationary_status: int = StationaryStatus.STATIONARY.value
+
+    # ===== Данные участков КП-КП =====
+    controlled_sites_with_segment: Optional[CaseData] = None
+
     # дефолтные значения для датчиков маскирования
     mask_signal_test_data: Optional[CaseData] = CaseData(
         params={
@@ -329,27 +333,6 @@ class SmokeSuiteConfig(BaseSuiteConfig):
             "flowmeter_address": BaseTN3Constants.FLOWMETER_ADDRESS,
         }
     )
-
-    # ===== Ожидаемые переменные для проверок сообщений о режимах =====
-    exp_mode_mt_message: Optional[CaseData] = None
-
-    # ----- Ожидаемые статусы для проверки режимов на ЭФ Диагностика сигналов -----
-    exp_tixoreczkaya_novovelichkovskaya_reg_lu: Optional[int] = None
-    exp_tixoreczkaya_novovelichkovskaya_reg_sou: Optional[int] = None
-    exp_novovelichkovskaya_krymskaya_reg_lu: Optional[int] = None
-    exp_novovelichkovskaya_krymskaya_reg_sou: Optional[int] = None
-    exp_krymskaya_grushovaya_reg_lu: Optional[int] = None
-    exp_krymskaya_grushovaya_reg_sou: Optional[int] = None
-    exp_backup_route_bejsug_reg_lu: Optional[int] = None
-    exp_backup_route_bejsug_reg_sou: Optional[int] = None
-    exp_backup_route_ponura_reg_lu: Optional[int] = None
-    exp_backup_route_ponura_reg_sou: Optional[int] = None
-    exp_backup_route_kuban_reg_lu: Optional[int] = None
-    exp_backup_route_kuban_reg_sou: Optional[int] = None
-    exp_npz_afipskij_reg_lu: Optional[int] = None
-    exp_npz_afipskij_reg_sou: Optional[int] = None
-    exp_npz_ilinskij_reg_lu: Optional[int] = None
-    exp_npz_ilinskij_reg_sou: Optional[int] = None
 
     # ===== Базовые тесты =====
     basic_info_test: Optional[CaseMarkers] = None
@@ -368,6 +351,8 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     unmask_du_on_mini_scheme_test: Optional[CaseMarkers] = None
     diagnostics_of_signals_after_initialization_test: Optional[CaseMarkers] = None
     mode_mt_in_journal_test: Optional[CaseMarkers] = None
+    export_lds_status_report_test: Optional[CaseMarkers] = None
+    export_mt_mode_report_test: Optional[CaseMarkers] = None
 
     # ===== Конфигурации утечек =====
     # Для наборов с одной утечкой
@@ -464,9 +449,11 @@ class LDSStatusConfig(BaseSuiteConfig):
     serviceable_after_switching_shut_off_test: Optional[CaseMarkers] = None
     serviceable_after_switching_shut_off_in_journal_test: Optional[CaseMarkers] = None
     serviceable_after_deg_absence_min_pressure_sensors_test: Optional[CaseMarkers] = None
+    serviceable_after_deg_additive_injectors_operation_test: Optional[CaseMarkers] = None
     serviceable_after_deg_starting_pumping_out_pumps_test: Optional[CaseMarkers] = None
     serviceable_after_deg_faulty_pressure_sensors_at_pump_test: Optional[CaseMarkers] = None
     serviceable_after_deg_faulty_pressure_sensors_at_pump_in_journal_test: Optional[CaseMarkers] = None
+    serviceable_after_deg_exceeding_distance_between_flow_meters_test: Optional[CaseMarkers] = None
     serviceable_after_faulty_test: Optional[CaseMarkers] = None
     deg_additive_injectors_operation_test: Optional[CaseMarkers] = None
     deg_exceeding_distance_between_pressure_sensors_test: Optional[CaseMarkers] = None
@@ -487,8 +474,23 @@ class LDSStatusConfig(BaseSuiteConfig):
     deg_rejection_density_and_viscosity_on_du_3_test: Optional[CaseMarkers] = None
     deg_rejection_density_and_viscosity_on_du_5_test: Optional[CaseMarkers] = None
     faulty_absence_min_flow_meters_test: Optional[CaseMarkers] = None
+    faulty_absence_min_flow_meters_continuous_test: Optional[CaseMarkers] = None
     faulty_absence_min_pressure_sensors_test: Optional[CaseMarkers] = None
     faulty_absence_min_pressure_sensors_in_journal_test: Optional[CaseMarkers] = None
+
+
+@dataclass
+class StationaryStatusConfig(BaseSuiteConfig):
+    # ===== Название Магистрального Нефтепровода =====
+    main_pipeline: Optional[str] = None
+
+    # ===== Данные для тестов =====
+    stationary_status_check_with_reasons_test_data: Optional[CaseData] = None
+    stationary_status_in_journal_test_data: Optional[CaseData] = None
+    # ===== Тесты =====
+    stationary_status_basic_info_test: Optional[CaseMarkers] = None
+    stationary_status_in_journal_test: Optional[CaseMarkers] = None
+    stationary_status_check_with_reasons_test: Optional[CaseMarkers] = None
 
 
 @dataclass

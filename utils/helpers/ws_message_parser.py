@@ -12,8 +12,9 @@ from msgpack import Timestamp
 from pytest import fail
 
 import models.subscribe_scheme_signals_state_model as signals_state_model
-from constants.architecture_constants import WebSocketClientConstants
+from constants.architecture_constants import WebSocketClientConstants as WS_Const
 from constants.enums import ExportedDataType, ExportStatus, ReplyStatus
+from constants.test_constants import BaseTN3Constants as TestConst
 from models.acknowledge_leak_model import AcknowledgeLeakReply
 from models.basic_info_model import BasicInfoReply
 from models.export_reports_model import ReportDataExportedNotification
@@ -77,7 +78,10 @@ class WsMessageParser:
             if isinstance(value, Timestamp):
                 return datetime.fromtimestamp(value.seconds, tz=timezone.utc)
             if isinstance(value, str):
-                return datetime.fromisoformat(value)
+                try:
+                    return datetime.fromisoformat(value)
+                except ValueError:
+                    return datetime.strptime(value.replace("Z", "+00:00"), TestConst.JOURNAL_TIME_FORMAT)
         except (AttributeError, TypeError, ValueError) as error:
             fail(f"Ошибка конвертации времени: {error}")
 
@@ -279,11 +283,11 @@ class WsMessageParser:
         """
         return self._find_and_parse_message(data_class=ReportDataExportedNotification, data=data)
 
-    def parse_exported_data_list_msg(self, data: list) -> GetExportedDataListReply:
+    def parse_exported_data_list_msg(self, data: dict) -> GetExportedDataListReply:
         """
         Парсит ответ GetExportedDataListReply со списком сформированных файлов.
         """
-        return self._find_and_parse_message(data_class=GetExportedDataListReply, data=data)
+        return self._parse_message(data_class=GetExportedDataListReply, data=data)
 
     def parse_download_exported_data_msg(self, data: list) -> DownloadExportedDataReply:
         """
@@ -343,7 +347,7 @@ class WsMessageParser:
             if not self.suppress_recv_logging:
                 try:
                     attach(
-                        str(message) + f" {datetime.now(ZoneInfo(WebSocketClientConstants.ZONE_INFO))}",
+                        str(message) + f" {datetime.now(ZoneInfo(WS_Const.ZONE_INFO))}",
                         name=data_class_name,
                         attachment_type=attachment_type.TEXT,
                     )
@@ -384,12 +388,38 @@ class WsMessageParser:
         )
 
     @staticmethod
-    def find_reply_status_in_ws_msg(data: List[Any]) -> Optional[Dict[str, Any]]:
+    def _create_attach_from_ws_message(ws_message) -> None:
+        """
+        Создает txt вложение ws сообщения в аллюр
+        """
+
+        str_message = str(ws_message)
+        try:
+            attach(
+                str_message,
+                name=f"Распакованное сообщение от api-gateway {datetime.now(ZoneInfo(WS_Const.ZONE_INFO))}",
+                attachment_type=attachment_type.TEXT,
+            )
+        except (KeyError, RuntimeError) as error:
+            logger.debug("Allure attach пропущен: %s", error)
+
+    def _should_suppress_recv_attach(self) -> bool:
+        if self.suppress_recv_logging:
+            return True
+        from utils.helpers import lds_configurator_utils as lds_cfg
+
+        return lds_cfg.is_configurator_flow_active()
+
+    def find_reply_status_in_ws_msg(self, data: List[Any]) -> Optional[Dict[str, Any]]:
         """
         Ищет объект с replyStatus в ws сообщении
         """
         if not data:
             fail("Пустое сообщение")
+
+        if not self._should_suppress_recv_attach():
+            self._create_attach_from_ws_message(data)
+
         try:
             for item in reversed(data):
                 # 1) Если сам элемент — словарь с replyStatus
