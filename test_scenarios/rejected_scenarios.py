@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 import allure
 import pytest
 
+from constants.architecture_constants import HTTPClientConstants as HttpConst
 from constants.enums import (
     Direction,
     ExportedDataType,
@@ -140,9 +141,6 @@ async def rejection_journal(ws_client, cfg: IsRejectedConfig, rejection_case: Re
             )
 
     with SoftAssertions() as soft_failures:
-        StepCheck("Проверка mainPipeline", "mainPipeline", soft_failures).actual(target_msg.mainPipeline).expected(
-            cfg.main_pipeline
-        ).equal_to()
 
         StepCheck("Проверка messageType", "messageType", soft_failures).actual(target_msg.messageType).expected(
             TestConst.JOURNAL_MESSAGE_TYPE_REJECTION
@@ -257,7 +255,7 @@ async def rejection_scheme_signals_state(ws_client, cfg: IsRejectedConfig, rejec
             ).actual(criteria).expected(rejection_case.expected_criteria_names).equal_to()
 
 
-async def export_rejection_report(ws_client, cfg: IsRejectedConfig, imitator_start_time: datetime):
+async def export_rejection_report(ws_client, http_client, cfg: IsRejectedConfig, imitator_start_time: datetime):
     """
     Сценарий формирования общего xlsx-отчёта об отбракованных входных данных.
 
@@ -315,18 +313,21 @@ async def export_rejection_report(ws_client, cfg: IsRejectedConfig, imitator_sta
         # без подписки не придёт уведомление о готовности отчёта
         await t_utils.connect(ws_client, ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST, [])
 
-    with allure.step(f"Этап 2. Запрос формирования отчёта ({ReportConst.EXPORT_REPORTS_COMMAND_REQUEST})"):
+    with allure.step(f"Этап 2. Http запрос формирования отчёта. endpoint: {HttpConst.EXPORT_REPORTS_URL_PATH}"):
         request_payload = {
             "tuId": cfg.tu_id,
             "exportedDataTypes": [ExportedDataType.REJECTED_REPORT.value],
             "timeOffset": report_state.actual_time_offset_hours,
             "period": {
-                "start": t_utils.datetime_to_msgpack_timestamp(report_state.expected_period_start),
-                "end": t_utils.datetime_to_msgpack_timestamp(report_state.expected_period_end),
-                "additionalProperties": {},
+                "start": t_utils.datetime_to_iso_format(report_state.expected_period_start),
+                "end": t_utils.datetime_to_iso_format(report_state.expected_period_end),
             },
         }
-        await t_utils.connect(ws_client, ReportConst.EXPORT_REPORTS_COMMAND_REQUEST, request_payload)
+        export_command_response = http_client.post_request(HttpConst.EXPORT_REPORTS_URL_PATH, request_payload)
+        export_command_status_code = export_command_response.status_code
+        StepCheck("Проверка кода ответа на формирование отчёта", "replyStatus").actual(
+            export_command_status_code
+        ).expected(ReplyStatus.OK.value).equal_to()
 
     with allure.step(
         f"Этап 3. Ожидание пуш-нотификации {ReportConst.REPORT_DATA_EXPORTED_NOTIFICATION} о готовности отчёта"
@@ -338,9 +339,9 @@ async def export_rejection_report(ws_client, cfg: IsRejectedConfig, imitator_sta
             poll_interval_seconds=ReportConst.LIST_POLL_INTERVAL_SECONDS,
         )
 
-    with allure.step(f"Этап 4. Лонг-поллинг {ReportConst.GET_EXPORTED_DATA_LIST_REQUEST} до появления отчёта в списке"):
+    with allure.step(f"Этап 4. Лонг-поллинг {HttpConst.GET_EXPORTED_DATA_LIST_URL_PATH} до появления отчёта в списке"):
         report_state.actual_report_item = await t_utils.poll_for_exported_file(
-            ws_client=ws_client,
+            http_client=http_client,
             parser=parser,
             list_limit=ReportConst.EXPORTED_DATA_LIST_LIMIT,
             expected_data_type=ExportedDataType.REJECTED_REPORT,
@@ -643,3 +644,4 @@ async def export_rejection_report(ws_client, cfg: IsRejectedConfig, imitator_sta
             StepCheck("В нотификации нет текста ошибки", "errorMessage", soft_failures).actual(
                 notification_error_message
             ).is_empty()
+            

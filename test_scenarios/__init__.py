@@ -7,11 +7,16 @@
 """
 
 import test_scenarios.smoke_scenarios as scenarios
-from test_scenarios import lds_configurator_scenarios, lds_status_scenarios, rejected_scenarios
+from test_scenarios import (
+    lds_configurator_scenarios,
+    lds_status_scenarios,
+    rejected_scenarios,
+    stationary_status_scenarios,
+)
 
 __all__ = [
     scenarios.basic_info,
-    scenarios.journal_info,
+    scenarios.messages_exist_in_journal,
     scenarios.imitate_sensor_signal,
     scenarios.lds_status_initialization,
     scenarios.lds_status_init_in_journal,
@@ -31,7 +36,7 @@ __all__ = [
     scenarios.output_signals,
     scenarios.balance_algorithm_leak_completed,
     scenarios.completed_leak_info_in_journal,
-    scenarios.mode_mt_in_journal,
+    scenarios.stationary_status_in_journal,
     rejected_scenarios.rejection_input_signals,
     rejected_scenarios.rejection_journal,
     rejected_scenarios.rejection_main_page,
@@ -43,4 +48,6 @@ __all__ = [
     lds_configurator_scenarios.lds_configurator_admin_setup,
     lds_configurator_scenarios.lds_configurator_verify_after_core,
     lds_configurator_scenarios.lds_configurator_teardown,
+    stationary_status_scenarios.stationary_status_check_with_reasons,
+    stationary_status_scenarios.stationary_status_in_journal,
 ]

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Any, Optional
@@ -14,7 +15,9 @@ import allure
 from _pytest.outcomes import Failed
 from pytest import fail
 
+from clients.http_client import StandHttpClient
 from clients.websocket_client import WebSocketClient
+from constants.architecture_constants import HTTPClientConstants as HttpConst
 from constants.enums import ReplyStatus, SouAdminStatus
 from constants.test_constants import LdsConfiguratorConstants as LdsCfgConst
 from models.basic_info_model import BasicInfoReply, BasicTUInfo
@@ -30,18 +33,18 @@ _configurator_flow_active: bool = False
 
 
 def set_configurator_flow_active(enabled: bool) -> None:
-    """Включает логирование вместо Allure-шагов (setup/teardown через lds-configurator в conftest)."""
+    """Включает логирование setup/teardown при запуске СОУ через Администрирование"""
     global _configurator_flow_active
     _configurator_flow_active = enabled
 
 
 def is_configurator_flow_active() -> bool:
-    """True во время setup/teardown/verify СОУ через Администрирование (lds-configurator) вне теста."""
+    """True во время setup/teardown/verify СОУ через Администрирование"""
     return _configurator_flow_active
 
 
 def _fail_or_raise(message: str) -> None:
-    """В configurator flow — RuntimeError для retry/teardown; иначе pytest.fail."""
+    """В configurator flow - RuntimeError для retry/teardown; иначе pytest.fail."""
     if _configurator_flow_active:
         raise RuntimeError(message)
     fail(message, pytrace=False)
@@ -68,11 +71,12 @@ def attach_allure_alert(message: str) -> None:
         allure.attach(message, name="ALERT", attachment_type=allure.attachment_type.TEXT)
 
 
-async def get_basic_info(ws_client: WebSocketClient, parser: WsMessageParser) -> BasicInfoReply:
+def get_basic_info(http_client: StandHttpClient, parser: WsMessageParser) -> BasicInfoReply:
     """
     Выполняет getBasicInfoRequest и парсит ответ BasicInfoContent.
     """
-    payload = await t_utils.connect_and_get_msg(ws_client, LdsCfgConst.GET_BASIC_INFO_REQUEST, [])
+    response = http_client.post_request(HttpConst.GET_BASIC_INFO_URL_PATH, {})
+    payload = t_utils.get_json_from_http_response(response)
     return parser.parse_basic_info_msg(payload)
 
 
@@ -81,27 +85,20 @@ def is_tu_in_basic_info(tus: Optional[list[BasicTUInfo]], tu_id: int, tu_name: s
     return any(tu.tuId == tu_id and tu.tuName == tu_name for tu in (tus or []))
 
 
-async def get_basic_info_admin(
-    ws_client: WebSocketClient,
+def get_basic_info_admin(
+    http_client: StandHttpClient,
     parser: WsMessageParser,
-    receive_timeout: Optional[float] = None,
 ) -> GetBasicInfoAdminReply:
     """
     Выполняет GetBasicInfoAdminRequest и парсит ответ.
     """
-    if receive_timeout is None and _configurator_flow_active:
-        receive_timeout = LdsCfgConst.CONFIGURATOR_GET_BASIC_INFO_ADMIN_TIMEOUT_SECONDS
-    payload = await t_utils.connect_and_get_msg(
-        ws_client,
-        LdsCfgConst.GET_BASIC_INFO_ADMIN_REQUEST,
-        [],
-        receive_timeout=receive_timeout,
-    )
+    response = http_client.post_request(HttpConst.GET_BASIC_INFO_ADMIN_URL_PATH, {})
+    payload = t_utils.get_json_from_http_response(response)
     return parser.parse_get_basic_info_admin_msg(payload)
 
 
-async def get_basic_info_admin_with_retry(
-    ws_client: WebSocketClient,
+def get_basic_info_admin_with_retry(
+    http_client: StandHttpClient,
     parser: WsMessageParser,
     retries: int = LdsCfgConst.GET_BASIC_INFO_ADMIN_RETRIES,
 ) -> GetBasicInfoAdminReply:
@@ -112,7 +109,7 @@ async def get_basic_info_admin_with_retry(
     for attempt in range(1, retries + 1):
         with _step(f"Запрос списка ТУ в Администрировании - попытка {attempt} из {retries}"):
             try:
-                return await get_basic_info_admin(ws_client, parser)
+                return get_basic_info_admin(http_client, parser)
             except (
                 asyncio.TimeoutError,
                 ConnectionError,
@@ -131,7 +128,7 @@ async def get_basic_info_admin_with_retry(
                     error,
                 )
                 if attempt < retries:
-                    await asyncio.sleep(1)
+                    time.sleep(2)
 
     with _step("Проверка: GetBasicInfoAdminResponse получен"):
         _fail_or_raise(
@@ -179,16 +176,10 @@ def validate_admin_tu(tu: AdminTuInfo) -> None:
                 fail(f"Неизвестный статус СОУ для ТУ '{tu.tuName}': {tu.status}", pytrace=False)
 
 
-def get_admin_tus(admin_reply: GetBasicInfoAdminReply) -> list[AdminTuInfo]:
-    """Список ТУ из GetBasicInfoAdmin; пустой список при отсутствии replyContent/basicInfo."""
-    if not admin_reply.replyContent or not admin_reply.replyContent.basicInfo:
-        return []
-    return admin_reply.replyContent.basicInfo.tus or []
-
-
 def extract_running_tus(admin_reply: GetBasicInfoAdminReply) -> list[AdminTuInfo]:
     """Возвращает все ТУ со статусом RUNNING из GetBasicInfoAdminResponse."""
-    return [tu for tu in get_admin_tus(admin_reply) if tu.status == SouAdminStatus.RUNNING.value]
+    tus = admin_reply.replyContent.basicInfo.tus if admin_reply.replyContent else []
+    return [tu for tu in tus if tu.status == SouAdminStatus.RUNNING.value]
 
 
 def running_tus_to_snapshot(tus: list[AdminTuInfo]) -> list[dict[str, Any]]:
@@ -261,14 +252,9 @@ def check_sou_status_sync(
     tu_name: str,
 ) -> None:
     """
-    Сверяет статус СОУ в Администрировании и на ЭФ Состояние МТ.
-    Администрирование - источник правды
+    Сверяет статус СОУ в Администрировании и на ЭФ Состояние МТ по двум DTO BasicInfo и MainPageInfoContent.
     """
-    with _step(
-        f"Сверка статуса СОУ: Администрирование vs Состояние МТ "
-        f"(tuId={tu_id}, '{tu_name}')"
-    ):
-        # True, если в Администрировании СОУ включена; иначе ожидаем отсутствие ТУ на UI
+    with _step(f"Сверка статуса СОУ: Администрирование vs Состояние МТ (tuId={tu_id}, '{tu_name}')"):
         expected_enabled = sou_status == SouAdminStatus.RUNNING
         with _step("Проверка согласованности статусов Администрирования и Состояния МТ"):
             if is_in_basic_info == expected_enabled and is_on_main_page == expected_enabled:
@@ -286,9 +272,8 @@ def check_sou_status_sync(
             )
 
 
-async def invoke_lds_command(
-    ws_client: WebSocketClient,
-    parser: WsMessageParser,
+def run_lds_command(
+    http_client: StandHttpClient,
     request_name: str,
     tu_id: int,
 ) -> None:
@@ -296,24 +281,17 @@ async def invoke_lds_command(
     Отправляет StopLdsRequest или LaunchLdsRequest и ждёт Completion с replyStatus=200.
     """
     with _step(f"Команда {request_name} для tuId={tu_id}"):
-        await t_utils.connect(ws_client, request_name, {"tuId": tu_id})
-        invocation_id = ws_client.invocation_id
-        payload = await ws_client.receive_by_invocation_id(invocation_id)
-        if request_name == LdsCfgConst.STOP_LDS_REQUEST:
-            reply = parser.parse_stop_lds_msg(payload)
-        else:
-            reply = parser.parse_launch_lds_msg(payload)
-        with _step(f"Проверка: {request_name} завершился успешно (replyStatus=200)"):
-            if reply.replyStatus != ReplyStatus.OK:
+        response = http_client.post_request(request_name, {"tuId": tu_id})
+        with _step(f"Проверка: {request_name} завершился успешно (response.status_code=200)"):
+            if response.status_code != ReplyStatus.OK.value:
                 fail(
-                    f"{request_name} завершился с replyStatus={reply.replyStatus}, "
-                    f"ошибки: {reply.replyErrors}",
+                    f"{request_name} завершился с replyStatus={response.status_code}, " f"ошибки: {response.text}",
                     pytrace=False,
                 )
 
 
 async def poll_admin_tu_status(
-    ws_client: WebSocketClient,
+    http_client: StandHttpClient,
     parser: WsMessageParser,
     tu_id: int,
     expected_status: SouAdminStatus,
@@ -325,13 +303,13 @@ async def poll_admin_tu_status(
     """
     status_label = SouAdminStatus.report_text_by_value(expected_status.value)
     with _step(
-        f"Ожидание статуса '{status_label}' в Администрировании "
-        f"(tuId={tu_id}, таймаут {int(total_wait_seconds)} с)"
+        f"Ожидание статуса '{status_label}' в Администрировании " f"(tuId={tu_id}, таймаут {int(total_wait_seconds)} с)"
     ):
         deadline = asyncio.get_running_loop().time() + total_wait_seconds
         while asyncio.get_running_loop().time() < deadline:
-            admin_reply = await get_basic_info_admin(ws_client, parser)
-            tu = next((item for item in get_admin_tus(admin_reply) if item.tuId == tu_id), None)
+            admin_reply = get_basic_info_admin(http_client, parser)
+            tus = admin_reply.replyContent.basicInfo.tus if admin_reply.replyContent else []
+            tu = next((item for item in tus if item.tuId == tu_id), None)
             if tu and tu.status == expected_status.value:
                 return True
             await asyncio.sleep(poll_interval_seconds)
@@ -339,7 +317,7 @@ async def poll_admin_tu_status(
 
 
 async def stop_tu_and_wait(
-    ws_client: WebSocketClient,
+    http_client: StandHttpClient,
     parser: WsMessageParser,
     tu_id: int,
     tu_name: Optional[str] = None,
@@ -350,8 +328,8 @@ async def stop_tu_and_wait(
     """
     label = f"tuId={tu_id}, tuName={tu_name!r}" if tu_name else f"tuId={tu_id}"
     with _step(f"Остановка СОУ ({label})"):
-        await invoke_lds_command(ws_client, parser, LdsCfgConst.STOP_LDS_REQUEST, tu_id)
-        if not await poll_admin_tu_status(ws_client, parser, tu_id, SouAdminStatus.STOPPED):
+        run_lds_command(http_client, HttpConst.STOP_LDS_URL_PATH, tu_id)
+        if not await poll_admin_tu_status(http_client, parser, tu_id, SouAdminStatus.STOPPED):
             fail(
                 f"СОУ не выключилась за {int(LdsCfgConst.POLL_TIMEOUT_SECONDS)} с: {label}",
                 pytrace=False,
@@ -359,7 +337,7 @@ async def stop_tu_and_wait(
 
 
 async def launch_tu_and_wait(
-    ws_client: WebSocketClient,
+    http_client: StandHttpClient,
     parser: WsMessageParser,
     tu_id: int,
 ) -> bool:
@@ -368,12 +346,12 @@ async def launch_tu_and_wait(
     Возвращает True при успехе (для soft teardown).
     """
     with _step(f"Запуск СОУ (tuId={tu_id})"):
-        await invoke_lds_command(ws_client, parser, LdsCfgConst.LAUNCH_LDS_REQUEST, tu_id)
-        return await poll_admin_tu_status(ws_client, parser, tu_id, SouAdminStatus.RUNNING)
+        run_lds_command(http_client, HttpConst.LAUNCH_LDS_URL_PATH, tu_id)
+        return await poll_admin_tu_status(http_client, parser, tu_id, SouAdminStatus.RUNNING)
 
 
 async def stop_all_running_tus(
-    ws_client: WebSocketClient,
+    http_client: StandHttpClient,
     parser: WsMessageParser,
     tus: list[AdminTuInfo],
 ) -> None:
@@ -383,11 +361,11 @@ async def stop_all_running_tus(
     logger.info("[SETUP] Остановка всех включённых ТУ на стенде: %s шт.", len(tus))
     for tu in tus:
         logger.info("[SETUP] Остановка ТУ на стенде: tuId=%s, tuName=%r", tu.tuId, tu.tuName)
-        await stop_tu_and_wait(ws_client, parser, tu.tuId, tu.tuName)
+        await stop_tu_and_wait(http_client, parser, tu.tuId, tu.tuName)
 
 
 async def restore_pre_run_tus(
-    ws_client: WebSocketClient,
+    http_client: StandHttpClient,
     parser: WsMessageParser,
     snapshot: list[dict[str, Any]],
     exclude_tu_id: int,
@@ -412,7 +390,7 @@ async def restore_pre_run_tus(
             restore_tu_id,
             restore_tu_name,
         )
-        if not await launch_tu_and_wait(ws_client, parser, restore_tu_id):
+        if not await launch_tu_and_wait(http_client, parser, restore_tu_id):
             attach_allure_alert(
                 f"Не удалось восстановить ТУ из снимка: tuId={restore_tu_id}, "
                 f"tuName={restore_tu_name!r}. Проверить вручную."
@@ -420,7 +398,7 @@ async def restore_pre_run_tus(
 
 
 async def poll_basic_info_tu_presence(
-    ws_client: WebSocketClient,
+    http_client: StandHttpClient,
     parser: WsMessageParser,
     tu_id: int,
     tu_name: str,
@@ -433,12 +411,11 @@ async def poll_basic_info_tu_presence(
     """
     action = "появления" if expect_present else "исчезновения"
     with _step(
-        f"Ожидание {action} ТУ в BasicInfo "
-        f"(tuId={tu_id}, tuName='{tu_name}', таймаут {int(total_wait_seconds)} с)"
+        f"Ожидание {action} ТУ в BasicInfo " f"(tuId={tu_id}, tuName='{tu_name}', таймаут {int(total_wait_seconds)} с)"
     ):
         deadline = asyncio.get_running_loop().time() + total_wait_seconds
         while asyncio.get_running_loop().time() < deadline:
-            reply = await get_basic_info(ws_client, parser)
+            reply = get_basic_info(http_client, parser)
             tus = reply.replyContent.basicInfo.tus if reply.replyContent else None
             found = is_tu_in_basic_info(tus, tu_id, tu_name)
             if expect_present and found:
@@ -448,7 +425,7 @@ async def poll_basic_info_tu_presence(
             await asyncio.sleep(poll_interval_seconds)
 
         if _configurator_flow_active:
-            logger.warning(
+            logger.error(
                 "[LDS_CONFIGURATOR] Таймаут ожидания %s ТУ tuId=%s в BasicInfo за %s с",
                 action,
                 tu_id,
@@ -467,11 +444,8 @@ async def poll_main_page_tu_presence(
     """
     Long-poll MainPageInfoContent: ожидание появления или исчезновения ТУ в Состоянии МТ.
     """
-    action = "появления" if expect_present else "исчезновения"
-    with _step(
-        f"Ожидание {action} ТУ в Состоянии МТ "
-        f"(tuId={tu_id}, таймаут {int(total_wait_seconds)} с)"
-    ):
+    action = "появления" if expect_present else "отсутствия"
+    with _step(f"Ожидание {action} ТУ в Состоянии МТ (tuId={tu_id}, таймаут {int(total_wait_seconds)} с)"):
         ws_client.clear_queue()
         await t_utils.connect(
             ws_client,
@@ -489,7 +463,7 @@ async def poll_main_page_tu_presence(
                 return True
 
         if not _configurator_flow_active:
-            t_utils._attach_ws_poll_failure(
+            t_utils.attach_ws_poll_failure(
                 [],
                 total_wait_seconds,
                 f"{LdsCfgConst.MAIN_PAGE_INFO_CONTENT} tuId={tu_id} present={expect_present}",
@@ -504,8 +478,8 @@ async def poll_main_page_tu_presence(
         return False
 
 
-async def verify_launched_at(
-    ws_client: WebSocketClient,
+def verify_launched_at(
+    http_client: StandHttpClient,
     parser: WsMessageParser,
     tu_id: int,
     launch_checkpoint: datetime,
@@ -515,11 +489,8 @@ async def verify_launched_at(
     """
     tolerance = timedelta(seconds=LdsCfgConst.LAUNCHED_AT_TOLERANCE_SECONDS)
     with _step(f"Запрос GetTusInformation для tuId={tu_id}"):
-        payload = await t_utils.connect_and_get_msg(
-            ws_client,
-            LdsCfgConst.GET_TUS_INFORMATION_REQUEST,
-            {"tuIds": [tu_id]},
-        )
+        response = http_client.post_request(HttpConst.GET_TUS_INFORMATION_URL_PATH, {"tuIds": [tu_id]})
+        payload = t_utils.get_json_from_http_response(response)
         reply: GetTusInformationReply = parser.parse_get_tus_information_msg(payload)
         tus_info = reply.replyContent.tusInfo if reply.replyContent else []
         tu_info = next((item for item in tus_info if item.tuId == tu_id), None)
@@ -564,7 +535,8 @@ def get_admin_tu_status(admin_reply: GetBasicInfoAdminReply, tu_id: int) -> Opti
     """
     Возвращает статус СОУ из GetBasicInfoAdmin для указанного tuId.
     """
-    tu = next((item for item in get_admin_tus(admin_reply) if item.tuId == tu_id), None)
+    tus = admin_reply.replyContent.basicInfo.tus if admin_reply.replyContent else []
+    tu = next((item for item in tus if item.tuId == tu_id), None)
     if tu is None:
         return None
     try:

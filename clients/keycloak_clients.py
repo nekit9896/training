@@ -152,4 +152,3 @@ class KeycloakClient:
         if now >= issued_at + expires_in - self.token_leeway:
             return True
         return False
-    

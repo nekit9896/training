@@ -166,7 +166,7 @@ class StandSetupManager:
     def stop_imitator_wrapper(self) -> None:
         """
         Останавливает имитатор немедленно (без ожидания --stopTime).
-        В teardown может вызываться даже если имитатор не запущен.
+        В teardown может вызываться даже если имитатор не запущен
         """
         try:
             if not self._imitator_manager.imitator_process:
@@ -287,4 +287,3 @@ class StandSetupManager:
             error_msg = "[SETUP] [ERROR] Ошибка инициализации клиентов"
             logger.exception(error_msg)
             raise RuntimeError(error_msg) from error
-            

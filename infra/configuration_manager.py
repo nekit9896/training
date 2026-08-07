@@ -47,4 +47,3 @@ class ConfigurationManager:
                 raise OSError(error_msg) from error
         logger.exception(error_msg)
         raise OSError(error_msg)
-        

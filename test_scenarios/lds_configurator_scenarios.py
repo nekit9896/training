@@ -10,7 +10,9 @@ from typing import Any, Dict, Optional
 
 from pytest import fail
 
+from clients.http_client import StandHttpClient
 from clients.websocket_client import WebSocketClient
+from constants.architecture_constants import HTTPClientConstants as HttpConst
 from constants.enums import SouAdminStatus
 from constants.test_constants import LdsConfiguratorConstants as LdsCfgConst
 from test_config.models_for_tests import BaseSuiteConfig
@@ -43,7 +45,7 @@ def _save_pre_run_running_tus(
 
 
 async def lds_configurator_admin_setup(
-    ws_client: WebSocketClient,
+    http_client: StandHttpClient,
     cfg: BaseSuiteConfig,
     group_state: Optional[Dict[str, Any]] = None,
 ) -> None:
@@ -58,7 +60,7 @@ async def lds_configurator_admin_setup(
     tu_id: int
 
     logger.info("[SETUP] Получение ТУ '%s' из Администрирования", cfg.admin_tu_name)
-    admin_reply = await lds_utils.get_basic_info_admin_with_retry(ws_client, parser)
+    admin_reply = lds_utils.get_basic_info_admin_with_retry(http_client, parser)
     admin_tu = lds_utils.find_tu_by_name(admin_reply, cfg.admin_tu_name)
     lds_utils.validate_admin_tu(admin_tu)
     tu_id = admin_tu.tuId
@@ -76,12 +78,12 @@ async def lds_configurator_admin_setup(
     pre_run_snapshot = lds_utils.running_tus_to_snapshot(running_tus)
     _save_pre_run_running_tus(group_state, pre_run_snapshot)
     logger.info(
-        "[SETUP] Спсиок включённых ТУ на стенде: %s шт. %s",
+        "[SETUP] Список включённых ТУ на стенде: %s шт. %s",
         len(pre_run_snapshot),
         pre_run_snapshot,
     )
-    await lds_utils.stop_all_running_tus(ws_client, parser, running_tus)
-
+    await lds_utils.stop_all_running_tus(http_client, parser, running_tus)
+    logger.info("[SETUP] ТЕСТ УСПЕХ await lds_utils.stop_all_running_tus")
     launch_checkpoint = t_utils.moscow_now()
     logger.info(
         "[SETUP] Момент фиксации времени перед LaunchLds: %s",
@@ -89,37 +91,37 @@ async def lds_configurator_admin_setup(
     )
 
     logger.info("[SETUP] Холодный запуск СОУ (LaunchLdsRequest) для tuId=%s", tu_id)
-    await lds_utils.invoke_lds_command(ws_client, parser, LdsCfgConst.LAUNCH_LDS_REQUEST, tu_id)
+    lds_utils.run_lds_command(http_client, HttpConst.LAUNCH_LDS_URL_PATH, tu_id)
 
     logger.info("[SETUP] Ожидание включения СОУ в Администрировании")
-    if not await lds_utils.poll_admin_tu_status(ws_client, parser, tu_id, SouAdminStatus.RUNNING):
+    if not await lds_utils.poll_admin_tu_status(http_client, parser, tu_id, SouAdminStatus.RUNNING):
         fail(
             "Не удалось запустить СОУ: статус в Администрировании не стал 'включена' за 2 минуты",
             pytrace=False,
         )
 
     logger.info("[SETUP] Подтверждение времени запуска (GetTusInformation)")
-    await lds_utils.verify_launched_at(ws_client, parser, tu_id, launch_checkpoint)
+    lds_utils.verify_launched_at(http_client, parser, tu_id, launch_checkpoint)
 
 
 async def lds_configurator_verify_after_core(
     ws_client: WebSocketClient,
+    http_client: StandHttpClient,
     cfg: BaseSuiteConfig,
 ) -> None:
     """
     Проверка готовности стенда после запуска lds-core.
 
     1. Актуальный статус СОУ из Администрирования.
-    2. Ожидание согласованного состояния ТУ в BasicInfo (из общего запаса времени).
-       При RUNNING - VERIFY_UI_SYNC_TIME_SECONDS (300 с).
-    3. Ожидание согласованного состояния ТУ в MainPageInfoContent (остаток запаса времени).
+    2. Ожидание согласованного состояния ТУ на Состоянии МТ в BasicInfo из общего запаса времени.
+    3. Ожидание согласованного состояния ТУ на Состоянии МТ в MainPageInfoContent - остаток от общего запаса времени.
     4. Сверка статуса СОУ: Администрирование vs Состояние МТ.
     """
     tu_id = cfg.tu_id
     tu_name = cfg.tu_name
 
     logger.info("[SETUP] Получение актуального статуса СОУ для tuId=%s", tu_id)
-    admin_reply = await lds_utils.get_basic_info_admin_with_retry(ws_client, parser)
+    admin_reply = lds_utils.get_basic_info_admin_with_retry(http_client, parser)
     sou_status = lds_utils.get_admin_tu_status(admin_reply, tu_id)
     if sou_status is None:
         fail(
@@ -141,27 +143,22 @@ async def lds_configurator_verify_after_core(
     ui_sync_time_seconds = int(ui_sync_time_total)
     ui_sync_deadline = loop.time() + ui_sync_time_total
     basic_timeout = ui_sync_deadline - loop.time()
+
     logger.info(
-        "[SETUP] %s, запас времени UI-sync %s с; ожидание %s ТУ в BasicInfo (до %s с)",
+        "[SETUP] %s, запас времени %s с, ожидание %s ТУ в BasicInfo (до %s с)",
         admin_label,
         ui_sync_time_seconds,
         action,
         int(basic_timeout),
     )
-
     basic_info_poll_ok = await lds_utils.poll_basic_info_tu_presence(
-        ws_client,
-        parser,
-        tu_id,
-        tu_name,
-        expect_present=expect_enabled,
-        total_wait_seconds=basic_timeout,
+        http_client, parser, tu_id, tu_name, expect_present=expect_enabled, total_wait_seconds=basic_timeout
     )
     if not basic_info_poll_ok:
         if expect_enabled:
             fail(
-                f"СОУ не отображается на Состоянии МТ в BasicInfo: ТУ не появилась за {ui_sync_time_seconds} с "
-                "(запас времени UI-sync после запуска core)",
+                f"СОУ не отображается на Состоянии МТ в BasicInfo: ТУ не появилась за {ui_sync_time_seconds} c "
+                f"после запуска core",
                 pytrace=False,
             )
         fail(
@@ -172,27 +169,23 @@ async def lds_configurator_verify_after_core(
     main_timeout = ui_sync_deadline - loop.time()
     if main_timeout <= 0:
         fail(
-            f"Весь запас времени UI-sync {ui_sync_time_seconds} с израсходован на ожидание BasicInfo, "
-            "на MainPage времени не осталось",
-            pytrace=False,
+            f"Весь запас времени {ui_sync_time_seconds} для синхронизации подписок израсходован на ожидание BasicInfo"
+            "на MainPage времени не осталось"
         )
+
     logger.info(
         "[SETUP] Ожидание %s ТУ в Состоянии МТ (остаток запаса времени %s с)",
         action,
         int(main_timeout),
     )
-
     main_page_poll_ok = await lds_utils.poll_main_page_tu_presence(
-        ws_client,
-        tu_id,
-        expect_present=expect_enabled,
-        total_wait_seconds=main_timeout,
+        ws_client, tu_id, expect_present=expect_enabled, total_wait_seconds=main_timeout
     )
     if not main_page_poll_ok:
         if expect_enabled:
             fail(
-                f"СОУ не отображается в Состоянии МТ: ТУ не появилась в оставшееся время "
-                f"запаса UI-sync ({ui_sync_time_seconds} с после запуска core)",
+                "СОУ не отображается в Состоянии МТ: ТУ не появилась за оставшееся время запаса для синхронизации"
+                f"({ui_sync_time_seconds} c после запуска core)",
                 pytrace=False,
             )
         fail(
@@ -200,12 +193,13 @@ async def lds_configurator_verify_after_core(
             pytrace=False,
         )
 
-    logger.info("[SETUP] Сверка статуса СОУ: Администрирование vs BasicInfo vs Состояние МТ")
+    logger.info("[SETUP] Сверка статуса СОУ: Администрирование vs Состояние МТ")
     lds_utils.check_sou_status_sync(sou_status, expect_enabled, expect_enabled, tu_id, tu_name)
 
 
 async def lds_configurator_teardown(
     ws_client: WebSocketClient,
+    http_client: StandHttpClient,
     tu_id: int,
     admin_tu_name: str,
     pre_run_running_tus: Optional[list[Dict[str, Any]]] = None,
@@ -218,15 +212,15 @@ async def lds_configurator_teardown(
     try:
         logger.info("[TEARDOWN] Проверка статуса СОУ (tuId=%s, «%s»)", tu_id, admin_tu_name)
         ws_client.clear_queue()
-        admin_reply = await lds_utils.get_basic_info_admin_with_retry(ws_client, parser)
+        admin_reply = lds_utils.get_basic_info_admin_with_retry(http_client, parser)
 
         sou_status = lds_utils.get_admin_tu_status(admin_reply, tu_id)
         if sou_status == SouAdminStatus.RUNNING:
             logger.info("[TEARDOWN] Остановка СОУ (StopLdsRequest) для tuId=%s", tu_id)
-            await lds_utils.invoke_lds_command(ws_client, parser, LdsCfgConst.STOP_LDS_REQUEST, tu_id)
+            lds_utils.run_lds_command(http_client, HttpConst.STOP_LDS_URL_PATH, tu_id)
 
             logger.info("[TEARDOWN] Ожидание выключения СОУ в Администрировании")
-            if not await lds_utils.poll_admin_tu_status(ws_client, parser, tu_id, SouAdminStatus.STOPPED):
+            if not await lds_utils.poll_admin_tu_status(http_client, parser, tu_id, SouAdminStatus.STOPPED):
                 lds_utils.attach_allure_alert(
                     f"СОУ не выключилась за 2 минуты после StopLdsRequest. "
                     f"tuId={tu_id}, adminTuName={admin_tu_name!r}. Проверить вручную."
@@ -237,7 +231,7 @@ async def lds_configurator_teardown(
                 f"tuId={tu_id}, adminTuName='{admin_tu_name}'"
             )
 
-        await lds_utils.restore_pre_run_tus(ws_client, parser, snapshot, exclude_tu_id=tu_id)
+        await lds_utils.restore_pre_run_tus(http_client, parser, snapshot, exclude_tu_id=tu_id)
     except BaseException as error:
         logger.warning(
             "[TEARDOWN] [ALERT] LDS Configurator teardown: %s: %r. tuId=%s, adminTuName=%r",
@@ -250,3 +244,4 @@ async def lds_configurator_teardown(
             f"Ошибка LDS Configurator teardown: {type(error).__name__}: {error!r}. "
             f"tuId={tu_id}, adminTuName={admin_tu_name!r}"
         )
+        

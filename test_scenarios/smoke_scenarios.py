@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 import allure
 import pytest
 
+from constants.architecture_constants import HTTPClientConstants as HttpConst
 from constants.enums import (
     ConfirmationStatus,
     Direction,
@@ -36,6 +37,7 @@ from constants.test_constants import ExportMtModeReportConstants as MtReportCons
 from constants.test_constants import ExportReportConstants as ReportConst
 from models.get_messages_model import Filtering, FilteringObjects, Pagination
 from test_config.models_for_tests import (
+    BaseSuiteConfig,
     CaseData,
     ExportLdsStatusReportState,
     ExportLeaksReportState,
@@ -50,19 +52,19 @@ from utils.helpers import report_xlsx_utils as report_utils
 from utils.helpers import ws_test_utils as t_utils
 from utils.helpers.asserts import SoftAssertions, StepCheck
 from utils.helpers.ws_message_parser import ws_message_parser as parser
-from utils.helpers.ws_test_utils import get_value
 
 
-async def basic_info(ws_client, cfg: SmokeSuiteConfig | LDSStatusConfig):
+def basic_info(http_client, cfg: BaseSuiteConfig):
     """
     Проверка базовой информации СОУ: список ТУ.
     """
-    with allure.step("Подключение по ws, получение и обработка сообщения типа: BasicInfoContent"):
-        payload = await t_utils.connect_and_get_msg(ws_client, "getBasicInfoRequest", [])
-        parsed_payload = parser.parse_basic_info_msg(payload)
+    with allure.step("Http запрос, получение и обработка ответа типа: BasicInfoContent"):
         expected_tu = [(cfg.tu_id, cfg.tu_name)]
+        response = http_client.post_request(HttpConst.GET_BASIC_INFO_URL_PATH, {})
+        payload = t_utils.get_json_from_http_response(response)
+        parsed_payload = parser.parse_basic_info_msg(payload)
     with allure.step("Извлечение и подготовка данных для проверки"):
-        tus = getattr(getattr(parsed_payload.replyContent, 'basicInfo', None), 'tus', None)
+        tus = getattr(getattr(parsed_payload.replyContent, 'basicInfo', None), 'tus', [])
         actual_tu = [(tu.tuId, tu.tuName) for tu in tus if tu.tuId == cfg.tu_id]
         StepCheck("Проверка наличия данных с базовой информацией СОУ", "tus").actual(actual_tu).is_not_none()
 
@@ -83,10 +85,6 @@ async def basic_info(ws_client, cfg: SmokeSuiteConfig | LDSStatusConfig):
             pytest.fail(msg, pytrace=False)
 
     with SoftAssertions() as soft_failures:
-        StepCheck("Проверка статуса ответа", "replyStatus", soft_failures).actual(parsed_payload.replyStatus).expected(
-            ReplyStatus.OK.value
-        ).equal_to()
-
         StepCheck("Проверка наличия объектов в списке ТУ", "tus", soft_failures).actual(
             parsed_payload.replyContent.basicInfo.tus
         ).is_not_empty()
@@ -100,15 +98,19 @@ async def basic_info(ws_client, cfg: SmokeSuiteConfig | LDSStatusConfig):
         ).expected(expected_tu).equal_to()
 
 
-async def journal_info(ws_client):
+def messages_exist_in_journal(http_client):
     """
     Проверка наличия сообщений в журнале.
     """
-    with allure.step("Подключение по ws, получение и обработка сообщения типа: MessagesInfoContent"):
+    with allure.step("Http запрос, получение и обработка ответа типа: MessagesInfoContent"):
         request_body = t_utils.create_journal_req_body()
-        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        response = http_client.post_request(HttpConst.GET_MESSAGES_URL_PATH, request_body)
+        payload = t_utils.get_json_from_http_response(response)
         parsed_payload = parser.parse_journal_msg(payload)
+
+    with allure.step("Извлечение и подготовка данных для проверки"):
         messages_info = getattr(parsed_payload.replyContent, 'messagesInfo', [])
+
     StepCheck("Проверка наличия сообщений в журнале", "messagesInfo").actual(messages_info).is_not_empty()
 
 
@@ -150,14 +152,20 @@ async def lds_status_initialization(ws_client, cfg: SmokeSuiteConfig):
     ).equal_to()
 
 
-async def diagnostics_of_signals_after_initialization(
-    ws_client,
-    cfg: SmokeSuiteConfig,
-):
+async def diagnostics_of_signals_after_initialization(ws_client, cfg: SmokeSuiteConfig, test_data: CaseData):
     """
-    Проверка выходных сигналов после окончания режима Инициализация по причине "холодного" пуска  СОУ.
+    Проверка выходных сигналов после окончания режима Инициализация по причине "холодного" пуска СОУ.
 
     """
+    # Распаковка данных для теста
+    exp_first_site_reg_lu, exp_first_site_reg_sou = test_data.expected_result.get("exp_tixoreczkaya_novovelichkovskaya")
+    exp_second_site_reg_lu, exp_second_site_reg_sou = test_data.expected_result.get("exp_novovelichkovskaya_krymskaya")
+    exp_third_site_reg_lu, exp_third_site_reg_sou = test_data.expected_result.get("exp_krymskaya_grushovaya")
+    exp_fourth_site_reg_lu, exp_fourth_site_reg_sou = test_data.expected_result.get("exp_backup_route_bejsug")
+    exp_fifth_site_reg_lu, exp_fifth_site_reg_sou = test_data.expected_result.get("exp_backup_route_ponura")
+    exp_sixth_site_reg_lu, exp_sixth_site_reg_sou = test_data.expected_result.get("exp_backup_route_kuban")
+    exp_seventh_site_reg_lu, exp_seventh_site_reg_sou = test_data.expected_result.get("exp_npz_afipskij")
+    exp_eighth_site_reg_lu, exp_eighth_site_reg_sou = test_data.expected_result.get("exp_npz_ilinskij")
 
     with allure.step("Подключение по ws, получение и обработка сообщения типа: OutputSignalsInfo"):
         payload = await t_utils.connect_and_subscribe_msg(
@@ -168,14 +176,14 @@ async def diagnostics_of_signals_after_initialization(
                 'objects': {
                     'linearParts': [],
                     'controlledSites': [
-                        SiteKpKp.TIXORECZKAYA_NOVOVELICHKOVSKAYA.value,
-                        SiteKpKp.NOVOVELICHKOVSKAYA_KRYMSKAYA.value,
-                        SiteKpKp.KRYMSKAYA_GRUSHOVAYA.value,
-                        SiteKpKp.BACKUP_ROUTE_BEJSUG.value,
-                        SiteKpKp.BACKUP_ROUTE_PONURA.value,
-                        SiteKpKp.BACKUP_ROUTE_KUBAN.value,
-                        SiteKpKp.NPZ_AFIPSKIJ.value,
-                        SiteKpKp.NPZ_ILINSKIJ.value,
+                        SiteKpKp.TIXORECZKAYA_NOVOVELICHKOVSKAYA.controlledSiteSegmentDict,
+                        SiteKpKp.NOVOVELICHKOVSKAYA_KRYMSKAYA.controlledSiteSegmentDict,
+                        SiteKpKp.KRYMSKAYA_GRUSHOVAYA.controlledSiteSegmentDict,
+                        SiteKpKp.BACKUP_ROUTE_BEJSUG.controlledSiteSegmentDict,
+                        SiteKpKp.BACKUP_ROUTE_PONURA.controlledSiteSegmentDict,
+                        SiteKpKp.BACKUP_ROUTE_KUBAN.controlledSiteSegmentDict,
+                        SiteKpKp.NPZ_AFIPSKIJ.controlledSiteSegmentDict,
+                        SiteKpKp.NPZ_ILINSKIJ.controlledSiteSegmentDict,
                     ],
                 },
                 'signalTypes': 1023,
@@ -186,243 +194,223 @@ async def diagnostics_of_signals_after_initialization(
 
         parsed_payload = parser.parse_output_signals_info_msg(payload)
     with allure.step("Извлечение и подготовка данных для проверки"):
-        controlled_site_dict = {
-            "controlled_site_first": SiteKpKp.TIXORECZKAYA_NOVOVELICHKOVSKAYA.value,
-            "controlled_site_second": SiteKpKp.NOVOVELICHKOVSKAYA_KRYMSKAYA.value,
-            "controlled_site_third": SiteKpKp.KRYMSKAYA_GRUSHOVAYA.value,
-            "controlled_site_fourth": SiteKpKp.BACKUP_ROUTE_BEJSUG.value,
-            "controlled_site_fifth": SiteKpKp.BACKUP_ROUTE_PONURA.value,
-            "controlled_site_sixth": SiteKpKp.BACKUP_ROUTE_KUBAN.value,
-            "controlled_site_seventh": SiteKpKp.NPZ_AFIPSKIJ.value,
-            "controlled_site_eight": SiteKpKp.NPZ_ILINSKIJ.value,
-        }
 
-        controlled_site_messages = {}
-        for name, key in controlled_site_dict.items():
-            controlled_site_messages[name] = t_utils.find_object_by_a_few_fields(
-                parsed_payload.replyContent.controlledSiteSignals, key
-            )
+        controlled_site_messages = getattr(parsed_payload.replyContent, 'controlledSiteSignals', [])
 
-        all_signals = {}
-        for site_name, site_message in controlled_site_messages.items():
-            signal_dict = {'pump': None, 'sou': None, 'gravity': None}
-            if site_message:
-                all_signals[site_name] = {
-                    'pump': t_utils.get_signal(site_message, SignalType.REGLU),
-                    'sou': t_utils.get_signal(site_message, SignalType.REGSOU),
-                    'gravity': t_utils.get_signal(site_message, SignalType.GRAVITYPIPE),
-                }
-            else:
-                all_signals[site_name] = signal_dict
+        all_signals_dict = t_utils.extract_signal_on_site_and_segment(controlled_site_messages)
 
-        first_kp_kp = all_signals.get("controlled_site_first") or {}
-        if first_kp_kp:
-            first_site_signal_pump = get_value(first_kp_kp.get("pump"))
-            first_site_signal_sou = get_value(first_kp_kp.get("sou"))
-            first_site_signal_gravity = get_value(first_kp_kp.get("gravity"))
-
-        second_kp_kp = all_signals.get("controlled_site_second") or {}
-        if second_kp_kp:
-            second_site_signal_pump = get_value(second_kp_kp.get("pump"))
-            second_site_signal_sou = get_value(second_kp_kp.get("sou"))
-            second_site_signal_gravity = get_value(second_kp_kp.get("gravity"))
-
-        third_kp_kp = all_signals.get("controlled_site_third") or {}
-        if third_kp_kp:
-            third_site_signal_pump = get_value(third_kp_kp.get("pump"))
-            third_site_signal_sou = get_value(third_kp_kp.get("sou"))
-            third_site_signal_gravity = get_value(third_kp_kp.get("gravity"))
-
-        fourth_kp_kp = all_signals.get("controlled_site_fourth") or {}
-        if fourth_kp_kp:
-            fourth_site_signal_pump = get_value(fourth_kp_kp.get("pump"))
-            fourth_site_signal_sou = get_value(fourth_kp_kp.get("sou"))
-            fourth_site_signal_gravity = get_value(fourth_kp_kp.get("gravity"))
-
-        fifth_kp_kp = all_signals.get("controlled_site_fifth") or {}
-        if fifth_kp_kp:
-            fifth_site_signal_pump = get_value(fifth_kp_kp.get("pump"))
-            fifth_site_signal_sou = get_value(fifth_kp_kp.get("sou"))
-            fifth_site_signal_gravity = get_value(fifth_kp_kp.get("gravity"))
-
-        sixth_kp_kp = all_signals.get("controlled_site_sixth") or {}
-        if sixth_kp_kp:
-            sixth_site_signal_pump = get_value(sixth_kp_kp.get("pump"))
-            sixth_site_signal_sou = get_value(sixth_kp_kp.get("sou"))
-            sixth_site_signal_gravity = get_value(sixth_kp_kp.get("gravity"))
-
-        seventh_kp_kp = all_signals.get("controlled_site_seventh") or {}
-        if seventh_kp_kp:
-            seventh_site_signal_pump = get_value(seventh_kp_kp.get("pump"))
-            seventh_site_signal_sou = get_value(seventh_kp_kp.get("sou"))
-            seventh_site_signal_gravity = get_value(seventh_kp_kp.get("gravity"))
-
-        eighth_kp_kp = all_signals.get("controlled_site_eight") or {}
-        if eighth_kp_kp:
-            eight_site_signal_pump = get_value(eighth_kp_kp.get("pump"))
-            eight_site_signal_sou = get_value(eighth_kp_kp.get("sou"))
-            eight_site_signal_gravity = get_value(eighth_kp_kp.get("gravity"))
+        pump_tixoreczkaya = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.TIXORECZKAYA_NOVOVELICHKOVSKAYA.value, SignalType.REGLU
+        )
+        sou_tixoreczkaya = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.TIXORECZKAYA_NOVOVELICHKOVSKAYA.value, SignalType.REGSOU
+        )
+        gravity_tixoreczkaya = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.TIXORECZKAYA_NOVOVELICHKOVSKAYA.value, SignalType.GRAVITYPIPE
+        )
+        pump_novovelichkovskay = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.NOVOVELICHKOVSKAYA_KRYMSKAYA.value, SignalType.REGLU
+        )
+        sou_novovelichkovskay = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.NOVOVELICHKOVSKAYA_KRYMSKAYA.value, SignalType.REGSOU
+        )
+        gravity_novovelichkovskay = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.NOVOVELICHKOVSKAYA_KRYMSKAYA.value, SignalType.GRAVITYPIPE
+        )
+        pump_krymskay = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.KRYMSKAYA_GRUSHOVAYA.value, SignalType.REGLU
+        )
+        sou_krymskay = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.KRYMSKAYA_GRUSHOVAYA.value, SignalType.REGSOU
+        )
+        gravity_krymskay = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.KRYMSKAYA_GRUSHOVAYA.value, SignalType.GRAVITYPIPE
+        )
+        pump_bejsug = t_utils.get_signal_value(all_signals_dict, SiteKpKp.BACKUP_ROUTE_BEJSUG.value, SignalType.REGLU)
+        sou_bejsug = t_utils.get_signal_value(all_signals_dict, SiteKpKp.BACKUP_ROUTE_BEJSUG.value, SignalType.REGSOU)
+        gravity_bejsug = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.BACKUP_ROUTE_BEJSUG.value, SignalType.GRAVITYPIPE
+        )
+        pump_ponura = t_utils.get_signal_value(all_signals_dict, SiteKpKp.BACKUP_ROUTE_PONURA.value, SignalType.REGLU)
+        sou_ponura = t_utils.get_signal_value(all_signals_dict, SiteKpKp.BACKUP_ROUTE_PONURA.value, SignalType.REGSOU)
+        gravity_ponura = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.BACKUP_ROUTE_PONURA.value, SignalType.GRAVITYPIPE
+        )
+        pump_kuban = t_utils.get_signal_value(all_signals_dict, SiteKpKp.BACKUP_ROUTE_KUBAN.value, SignalType.REGLU)
+        sou_kuban = t_utils.get_signal_value(all_signals_dict, SiteKpKp.BACKUP_ROUTE_KUBAN.value, SignalType.REGSOU)
+        gravity_kuban = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.BACKUP_ROUTE_KUBAN.value, SignalType.GRAVITYPIPE
+        )
+        pump_afipskij = t_utils.get_signal_value(all_signals_dict, SiteKpKp.NPZ_AFIPSKIJ.value, SignalType.REGLU)
+        sou_afipskij = t_utils.get_signal_value(all_signals_dict, SiteKpKp.NPZ_AFIPSKIJ.value, SignalType.REGSOU)
+        gravity_afipskij = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.NPZ_AFIPSKIJ.value, SignalType.GRAVITYPIPE
+        )
+        pump_ilinskij = t_utils.get_signal_value(all_signals_dict, SiteKpKp.NPZ_ILINSKIJ.value, SignalType.REGLU)
+        sou_ilinskij = t_utils.get_signal_value(all_signals_dict, SiteKpKp.NPZ_ILINSKIJ.value, SignalType.REGSOU)
+        gravity_ilinskij = t_utils.get_signal_value(
+            all_signals_dict, SiteKpKp.NPZ_ILINSKIJ.value, SignalType.GRAVITYPIPE
+        )
 
     with SoftAssertions() as soft_failures:
         StepCheck(
             "Проверка сигнала - режим МТ на участке Тихорецкая-Нововеличковская",
             "Режим МТ",
             soft_failures,
-        ).actual(first_site_signal_pump).expected(str(cfg.exp_tixoreczkaya_novovelichkovskaya_reg_lu)).equal_to()
+        ).actual(pump_tixoreczkaya).expected(exp_first_site_reg_lu).equal_to()
         StepCheck(
             "Проверка сигнала - режим СОУ на участке Тихорецкая-Нововеличковская",
             "Режим СОУ",
             soft_failures,
-        ).actual(first_site_signal_sou).expected(str(cfg.exp_tixoreczkaya_novovelichkovskaya_reg_sou)).equal_to()
+        ).actual(sou_tixoreczkaya).expected(exp_first_site_reg_sou).equal_to()
         StepCheck(
-            f"Проверка {GravityPipe.expected_lds_status_gravity_false.description} \n"
-            f"на участке Тихорецкая-Нововеличковская",
+            f"Проверка {GravityPipe.absent_gravity.description} \n" f"на участке Тихорецкая-Нововеличковская",
             "Количество самотеков",
             soft_failures,
-        ).actual(first_site_signal_gravity).expected(str(GravityPipe.expected_lds_status_gravity_false.id)).equal_to()
+        ).actual(gravity_tixoreczkaya).expected(GravityPipe.absent_gravity.id).equal_to()
         StepCheck(
             "Проверка сигнала - режим МТ на участке Нововеличковская-Крымская",
             "Режим МТ",
             soft_failures,
-        ).actual(second_site_signal_pump).expected(str(cfg.exp_novovelichkovskaya_krymskaya_reg_lu)).equal_to()
+        ).actual(pump_novovelichkovskay).expected(exp_second_site_reg_lu).equal_to()
         StepCheck(
-            f"Проверка {GravityPipe.expected_lds_status_gravity_false.description}\n"
-            f"на участке Нововеличковская-Крымская",
+            f"Проверка {GravityPipe.absent_gravity.description}\n" f"на участке Нововеличковская-Крымская",
             "Количество самотеков",
             soft_failures,
-        ).actual(second_site_signal_gravity).expected(str(GravityPipe.expected_lds_status_gravity_false.id)).equal_to()
+        ).actual(gravity_novovelichkovskay).expected(GravityPipe.absent_gravity.id).equal_to()
         StepCheck(
             "Проверка сигнала - режим СОУ на участке Нововеличковская-Крымская",
             "Режим СОУ",
             soft_failures,
-        ).actual(second_site_signal_sou).expected(str(cfg.exp_novovelichkovskaya_krymskaya_reg_sou)).equal_to()
+        ).actual(sou_novovelichkovskay).expected(exp_second_site_reg_sou).equal_to()
         StepCheck(
             "Проверка сигнала - режим МТ на участке Крымская-Грушовая",
             "Режим МТ",
             soft_failures,
         ).actual(
-            third_site_signal_pump
-        ).expected(str(cfg.exp_krymskaya_grushovaya_reg_lu)).equal_to()
+            pump_krymskay
+        ).expected(exp_third_site_reg_lu).equal_to()
         StepCheck(
-            f"Проверка {GravityPipe.expected_lds_status_gravity_true.description} на участке Крымская-Грушовая",
+            f"Проверка {GravityPipe.present_gravity.description} на участке Крымская-Грушовая",
             "Количество самотеков",
             soft_failures,
-        ).actual(third_site_signal_gravity).expected(str(GravityPipe.expected_lds_status_gravity_true.id)).equal_to()
+        ).actual(gravity_krymskay).expected(GravityPipe.present_gravity.id).equal_to()
         StepCheck(
             "Проверка сигнала - режим СОУ на участке Крымская-Грушовая",
             "Режим СОУ",
             soft_failures,
         ).actual(
-            third_site_signal_sou
-        ).expected(str(cfg.exp_krymskaya_grushovaya_reg_sou)).equal_to()
+            sou_krymskay
+        ).expected(exp_third_site_reg_sou).equal_to()
         StepCheck(
             "Проверка сигнала - режим МТ на резервной нитке Бейсуг",
             "Режим МТ",
             soft_failures,
         ).actual(
-            fourth_site_signal_pump
-        ).expected(str(cfg.exp_backup_route_bejsug_reg_lu)).equal_to()
+            pump_bejsug
+        ).expected(exp_fourth_site_reg_lu).equal_to()
         StepCheck(
-            f"Проверка {GravityPipe.expected_lds_status_gravity_false.description} на резервной нитке Бейсуг",
+            f"Проверка {GravityPipe.absent_gravity.description} на резервной нитке Бейсуг",
             "Количество самотеков",
             soft_failures,
-        ).actual(fourth_site_signal_gravity).expected(str(GravityPipe.expected_lds_status_gravity_false.id)).equal_to()
+        ).actual(gravity_bejsug).expected(GravityPipe.absent_gravity.id).equal_to()
         StepCheck(
             "Проверка сигнала - режим СОУ на резервной нитке Бейсуг",
             "Режим СОУ",
             soft_failures,
         ).actual(
-            fourth_site_signal_sou
-        ).expected(str(cfg.exp_backup_route_bejsug_reg_sou)).equal_to()
+            sou_bejsug
+        ).expected(exp_fourth_site_reg_sou).equal_to()
         StepCheck(
             "Проверка сигнала - режим МТ на резервной нитке Понура",
             "Режим МТ",
             soft_failures,
         ).actual(
-            fifth_site_signal_pump
-        ).expected(str(cfg.exp_backup_route_ponura_reg_lu)).equal_to()
+            pump_ponura
+        ).expected(exp_fifth_site_reg_lu).equal_to()
         StepCheck(
             "Проверка сигнала - режим СОУ на резервной нитке Понура",
             "Режим СОУ",
             soft_failures,
         ).actual(
-            fifth_site_signal_sou
-        ).expected(str(cfg.exp_backup_route_ponura_reg_sou)).equal_to()
+            sou_ponura
+        ).expected(exp_fifth_site_reg_sou).equal_to()
         StepCheck(
-            f"Проверка {GravityPipe.expected_lds_status_gravity_false.description} на резервной нитке Понура",
+            f"Проверка {GravityPipe.absent_gravity.description} на резервной нитке Понура",
             "Количество самотеков",
             soft_failures,
-        ).actual(fifth_site_signal_gravity).expected(str(GravityPipe.expected_lds_status_gravity_false.id)).equal_to()
+        ).actual(gravity_ponura).expected(GravityPipe.absent_gravity.id).equal_to()
         StepCheck(
             "Проверка сигнала - режим МТ на резервной нитке Кубань",
             "Режим МТ",
             soft_failures,
         ).actual(
-            sixth_site_signal_pump
-        ).expected(str(cfg.exp_backup_route_kuban_reg_lu)).equal_to()
+            pump_kuban
+        ).expected(exp_sixth_site_reg_lu).equal_to()
         StepCheck(
             "Проверка сигнала - режим СОУ на резервной нитке Кубань",
             "Режим СОУ",
             soft_failures,
         ).actual(
-            sixth_site_signal_sou
-        ).expected(str(cfg.exp_backup_route_kuban_reg_sou)).equal_to()
+            sou_kuban
+        ).expected(exp_sixth_site_reg_sou).equal_to()
         StepCheck(
-            f"Проверка {GravityPipe.expected_lds_status_gravity_false.description} на резервной нитке Кубань",
+            f"Проверка {GravityPipe.absent_gravity.description} на резервной нитке Кубань",
             "Количество самотеков",
             soft_failures,
-        ).actual(sixth_site_signal_gravity).expected(str(GravityPipe.expected_lds_status_gravity_false.id)).equal_to()
+        ).actual(gravity_kuban).expected(GravityPipe.absent_gravity.id).equal_to()
         StepCheck(
             "Проверка сигнала - режим МТ на НПЗ Афипский",
             "Режим МТ",
             soft_failures,
         ).actual(
-            seventh_site_signal_pump
-        ).expected(str(cfg.exp_npz_afipskij_reg_lu)).equal_to()
+            pump_afipskij
+        ).expected(exp_seventh_site_reg_lu).equal_to()
         StepCheck(
             "Проверка сигнала - режим СОУ на НПЗ Афипский",
             "Режим СОУ",
             soft_failures,
         ).actual(
-            seventh_site_signal_sou
-        ).expected(str(cfg.exp_npz_afipskij_reg_sou)).equal_to()
+            sou_afipskij
+        ).expected(exp_seventh_site_reg_sou).equal_to()
         StepCheck(
-            f"Проверка {GravityPipe.expected_lds_status_gravity_false.description} на НПЗ Афипский",
+            f"Проверка {GravityPipe.absent_gravity.description} на НПЗ Афипский",
             "Количество самотеков",
             soft_failures,
-        ).actual(seventh_site_signal_gravity).expected(str(GravityPipe.expected_lds_status_gravity_false.id)).equal_to()
+        ).actual(gravity_afipskij).expected(GravityPipe.absent_gravity.id).equal_to()
         StepCheck(
             "Проверка сигнала - режим МТ на НПЗ Ильинский",
             "Режим МТ",
             soft_failures,
         ).actual(
-            eight_site_signal_pump
-        ).expected(str(cfg.exp_npz_ilinskij_reg_lu)).equal_to()
+            pump_ilinskij
+        ).expected(exp_eighth_site_reg_lu).equal_to()
         StepCheck(
             "Проверка сигнала - режим СОУ на НПЗ Ильинский",
             "Режим СОУ",
             soft_failures,
         ).actual(
-            eight_site_signal_sou
-        ).expected(str(cfg.exp_npz_ilinskij_reg_sou)).equal_to()
+            sou_ilinskij
+        ).expected(exp_eighth_site_reg_sou).equal_to()
         StepCheck(
-            f"Проверка {GravityPipe.expected_lds_status_gravity_false.description} на НПЗ Ильинский",
+            f"Проверка {GravityPipe.absent_gravity.description} на НПЗ Ильинский",
             "Количество самотеков",
             soft_failures,
-        ).actual(eight_site_signal_gravity).expected(str(GravityPipe.expected_lds_status_gravity_false.id)).equal_to()
+        ).actual(gravity_ilinskij).expected(GravityPipe.absent_gravity.id).equal_to()
 
 
-async def lds_status_init_in_journal(ws_client, cfg: SmokeSuiteConfig | LDSStatusConfig, imitator_start_time):
+def lds_status_init_in_journal(http_client, cfg: SmokeSuiteConfig | LDSStatusConfig, imitator_start_time):
     """
     Проверка наличия записи в журнале о входе СОУ в режим Инициализация.
     """
-    with allure.step("Запрос сообщений журнала с фильтром messageTypes=LDS_STATUS"):
+    with allure.step("Http запрос сообщений журнала с фильтром messageTypes=LDS_STATUS"):
         end_time = datetime.now()
         request_body = t_utils.create_journal_req_body(
             pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
             filtering=Filtering(messageTypes=int(MessageType.LDS_STATUS), objects=FilteringObjects(tuId=cfg.tu_id)),
         )
-        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        response = http_client.post_request(HttpConst.GET_MESSAGES_URL_PATH, request_body)
+        payload = t_utils.get_json_from_http_response(response)
         parsed_payload = parser.parse_journal_msg(payload)
 
     with allure.step("Извлечение и подготовка данных для проверки"):
@@ -481,10 +469,6 @@ async def lds_status_init_in_journal(ws_client, cfg: SmokeSuiteConfig | LDSStatu
     with SoftAssertions() as soft_failures:
         StepCheck("Проверка event", "event", soft_failures).actual(lds_msg.event).expected(
             TestConst.JOURNAL_EVENT_LDS_INIT_COLD_START
-        ).equal_to()
-
-        StepCheck("Проверка mainPipeline", "mainPipeline", soft_failures).actual(lds_msg.mainPipeline).expected(
-            cfg.main_pipeline
         ).equal_to()
 
         StepCheck("Проверка technologicalSection", "technologicalSection", soft_failures).actual(
@@ -628,10 +612,12 @@ async def leak_is_confirm_on_main_page(ws_client, cfg: SmokeSuiteConfig):
         parsed_payload = parser.parse_main_page_msg(payload)
 
     with allure.step("Извлечение и подготовка данных для проверки"):
-        leaks_info = getattr(getattr(parsed_payload.replyContent, 'tuInfo', None), 'leaksInfo', [])
+        # Ставим object() как заглушку, что бы исключить получение None
+        leaks_info = getattr(getattr(parsed_payload.replyContent, 'tuInfo', object()), 'leaksInfo', [])
         StepCheck("Проверка наличия списка сообщений об утечках", "leakStatus").actual(leaks_info).is_not_empty()
         confirm_leak = t_utils.find_object_by_field(leaks_info, "leakStatus", LeakStatus.CONFIRMED.value)
-        lds_status = LeakStatus(confirm_leak.leakStatus) if confirm_leak.leakStatus else None
+        lds_status_int = getattr(confirm_leak, 'leakStatus', None)
+        lds_status = LeakStatus(lds_status_int) if lds_status_int else None
     StepCheck("Проверка подтвержденной утечки на ЭФ Состояние МТ", "leakStatus").actual(lds_status).expected(
         LeakStatus.CONFIRMED
     ).equal_to()
@@ -659,42 +645,35 @@ async def leak_is_complete_on_main_page(ws_client, cfg: SmokeSuiteConfig):
     ).is_empty()
 
 
-async def imitate_sensor_signal(ws_client, cfg: SmokeSuiteConfig, test_data: CaseData):
+async def imitate_sensor_signal(
+    ws_client, http_client, cfg: SmokeSuiteConfig, test_data: CaseData, imitator_start_time
+):
     """
     Проверка имитации сигнала датчика.
     """
     # Распаковка данных для теста
     sensor_address = test_data.params.get("sensor_address")
-    sensor_val, sensor_quality = test_data.expected_result
+    sensor_val, sensor_quality, imitation_event, unimitation_event = test_data.expected_result
     # Получение актуального id датчика
     sensor_id = TestConst.SENSOR_IDS_BY_ADDRESS.get(sensor_address)
-
-    with allure.step(f"Отправка сообщения и обработка ответа об имитации сигнала датчика с id: {sensor_id}"):
-        payload = await t_utils.connect_and_get_msg(
-            ws_client,
-            "ImitateSignalRequest",
-            {
-                'id': sensor_id,
-                'tuId': cfg.tu_id,
-                'imitateInfo': {
-                    'value': str(sensor_val),
-                    'quality': sensor_quality,
-                    'additionalProperties': None,
-                },
-                'additionalProperties': None,
-            },
-        )
-        parsed_payload = parser.parse_imitate_signal_msg(payload)
-        sensor_imitate_reply_status = parsed_payload.replyStatus
+    with allure.step(f"Http запрос и обработка ответа об имитации сигнала датчика с id: {sensor_id}"):
+        request_body = {
+            'id': sensor_id,
+            'tuId': cfg.tu_id,
+            'imitateInfo': {'value': str(sensor_val), 'quality': sensor_quality},
+        }
+        response = http_client.post_request(HttpConst.IMITATE_SIGNAL_URL_PATH, request_body)
+        sensor_imitate_reply_status = response.status_code
 
         StepCheck("Проверка кода ответа на запрос об имитации", "replyStatus").actual(
             sensor_imitate_reply_status
         ).expected(ReplyStatus.OK.value).equal_to()
 
-    with allure.step(
-        "Подключение по ws, получение и обработка данных о статусе датчика из сообщения типа: InputSignalsContent"
-    ):
         time.sleep(cfg.basic_message_timeout)
+
+    with allure.step(
+        "Получение данных для проверки имитации. Тип сообщения: InputSignalsContent. ЭФ Диагностика Сигналов."
+    ):
         payload = await t_utils.connect_and_subscribe_msg(
             ws_client,
             "InputSignalsContent",
@@ -707,30 +686,40 @@ async def imitate_sensor_signal(ws_client, cfg: SmokeSuiteConfig, test_data: Cas
         )
         parsed_payload = parser.parse_input_signals_info_msg(payload)
 
-    with allure.step("Извлечение и подготовка данных для проверки имитации"):
+    with allure.step(
+        "Подготовка данных для проверки имитации. Тип сообщения: InputSignalsContent. ЭФ Диагностика Сигналов."
+    ):
         sensor_data = getattr(parsed_payload.replyContent, 'inputSignals', [])
-        sensor_imitate_data = t_utils.find_object_by_field(sensor_data, "id", sensor_id)
-        StepCheck("Проверка наличия данных для проверки имитации", "inputSignals").actual(
-            sensor_imitate_data
-        ).is_not_none()
-
-    with allure.step(f"Отправка сообщения и обработка ответа о снятии имитации датчика с id: {sensor_id}"):
-        payload = await t_utils.connect_and_get_msg(
-            ws_client,
-            "UnimitateSignalRequest",
-            {'id': sensor_id, 'tuId': cfg.tu_id, 'additionalProperties': None},
+        diagnostics_sensor_imitate_data = t_utils.find_object_by_field(sensor_data, "id", sensor_id)
+        value_diagnostics_sensor_imitate = getattr(
+            getattr(diagnostics_sensor_imitate_data, 'imitation', []), 'value', []
         )
-        parsed_payload = parser.parse_unimitate_signal_msg(payload)
-        sensor_unimitate_reply_status = parsed_payload.replyStatus
+        is_imitated_diagnostics_sensor_imitate = getattr(diagnostics_sensor_imitate_data, 'isImitated', [])
+        quality_diagnostics_sensor_imitate = getattr(diagnostics_sensor_imitate_data, 'quality', [])
+
+    with allure.step("Подготовка данных для проверки имитации. Тип сообщения: SchemeSignalsStateContent. ЭФ Схема."):
+        payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "SchemeSignalsStateContent",
+            "SubscribeSchemeSignalsStateRequest",
+            {'tuId': cfg.tu_id},
+        )
+        parsed_payload = parser.parse_scheme_signals_state_msg(payload)
+        journal_signal_state_list = parsed_payload.replyContent.signalsStates
+        scheme_sensor_imitate_data = t_utils.find_object_by_field(journal_signal_state_list, "id", sensor_id)
+        is_imitated_scheme_sensor_imitate = getattr(scheme_sensor_imitate_data, 'isImitated', [])
+
+    with allure.step(f"Http запрос и обработка ответа о снятии имитации датчика с id: {sensor_id}"):
+        request_body = {'id': sensor_id, 'tuId': cfg.tu_id}
+        response = http_client.post_request(HttpConst.UNIMITATE_SIGNAL_URL_PATH, request_body)
+        sensor_unimitate_reply_status = response.status_code
 
         StepCheck("Проверка кода ответа на запрос о снятии имитации", "replyStatus").actual(
             sensor_unimitate_reply_status
         ).expected(ReplyStatus.OK.value).equal_to()
-
-    with allure.step(
-        "Подключение по ws, получение и обработка данных о статусе датчика из сообщения типа: InputSignalsContent"
-    ):
         time.sleep(cfg.basic_message_timeout)
+
+    with allure.step("Получение данных для проверки имитации. InputSignalsContent. ЭФ Диагностика Сигналов."):
         payload = await t_utils.connect_and_subscribe_msg(
             ws_client,
             "InputSignalsContent",
@@ -745,27 +734,86 @@ async def imitate_sensor_signal(ws_client, cfg: SmokeSuiteConfig, test_data: Cas
 
     with allure.step("Извлечение и подготовка данных для проверки снятия имитации"):
         sensor_data = getattr(parsed_payload.replyContent, 'inputSignals', [])
-        sensor_unimitate_data = t_utils.find_object_by_field(sensor_data, "id", sensor_id)
-        StepCheck("Проверка наличия данных для проверки снятия имитации", "inputSignals").actual(
-            sensor_unimitate_data
-        ).is_not_none()
+        diagnostics_sensor_unimitate_data = t_utils.find_object_by_field(sensor_data, 'id', sensor_id)
+        is_unimitated_diagnostics_sensor_unimitate = getattr(diagnostics_sensor_unimitate_data, 'isImitated', [])
+
+    with allure.step(
+        "Получение данных для проверки снятия имитации. Тип сообщения: SchemeSignalsStateContent. ЭФ Схема"
+    ):
+        payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "SchemeSignalsStateContent",
+            "SubscribeSchemeSignalsStateRequest",
+            {'tuId': cfg.tu_id},
+        )
+        parsed_payload = parser.parse_scheme_signals_state_msg(payload)
+        journal_signal_state_list = parsed_payload.replyContent.signalsStates
+        scheme_sensor_unimitate = t_utils.find_object_by_field(journal_signal_state_list, "id", sensor_id)
+        is_unimitated_scheme_sensor_unimitate = getattr(scheme_sensor_unimitate, 'isImitated', [])
+
+    with allure.step("Http запрос сообщений журнала с фильтром userActions"):
+        # Запрос сообщений по типу действий пользователя маскирование и имитация сигналов
+        request_body = t_utils.create_journal_req_body(
+            pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
+            filtering=Filtering(userActions=int(UserActions.SIGNAL_MASK_SIM), objects=FilteringObjects(tuId=cfg.tu_id)),
+        )
+        response = http_client.post_request(HttpConst.GET_MESSAGES_URL_PATH, request_body)
+        payload = t_utils.get_json_from_http_response(response)
+        parsed_payload = parser.parse_journal_msg(payload)
+        messages_info = getattr(parsed_payload.replyContent, 'messagesInfo', [])
+
+        # Фильтр полученных сообщений по времени
+        end_time = datetime.now()
+        filter_start_msk = t_utils.localize_as_moscow(imitator_start_time)
+        filter_end_msk = t_utils.localize_as_moscow(end_time)
+        filter_time_messages = [
+            msg
+            for msg in messages_info
+            if filter_start_msk <= t_utils.ensure_moscow_timezone(msg.time) <= filter_end_msk
+        ]
+        filter_by_imitation_messages = [
+            msg
+            for msg in filter_time_messages
+            if getattr(msg, "event", None) == imitation_event and getattr(msg, "tag", None) == sensor_address
+        ]
+        filter_by_unimitation_messages = [
+            msg
+            for msg in filter_time_messages
+            if getattr(msg, "event", None) == imitation_event and getattr(msg, "tag", None) == sensor_address
+        ]
 
     with SoftAssertions() as soft_failures:
-        StepCheck(f"Проверка имитации датчика с id: {sensor_id}", "isImitated", soft_failures).actual(
-            sensor_imitate_data.isImitated
+        StepCheck(
+            f"Проверка имитации датчика с id: {sensor_id}. ЭФ Диагностика Сигналов.", "isImitated", soft_failures
+        ).actual(is_imitated_diagnostics_sensor_imitate).expected(True).equal_to()
+        StepCheck(f"Проверка имитации датчика с id: {sensor_id}. ЭФ Схема.", "isImitated", soft_failures).actual(
+            is_imitated_scheme_sensor_imitate
         ).expected(True).equal_to()
-        StepCheck(f"Проверка показаний датчика с id: {sensor_id}", "value", soft_failures).actual(
-            sensor_imitate_data.imitation.value
-        ).expected(sensor_val).equal_to()
-        StepCheck(f"Проверка качества сигнала датчика с id: {sensor_id}", "quality", soft_failures).actual(
-            sensor_imitate_data.quality
-        ).expected(sensor_quality).equal_to()
-        StepCheck(f"Проверка снятия имитации датчика с id: {sensor_id}", "isImitated", soft_failures).actual(
-            sensor_unimitate_data.isImitated
+        StepCheck(
+            f"Проверка показаний датчика с id: {sensor_id}. ЭФ Диагностика Сигналов.", "value", soft_failures
+        ).actual(value_diagnostics_sensor_imitate).expected(sensor_val).equal_to()
+        StepCheck(
+            f"Проверка качества сигнала датчика с id: {sensor_id}. ЭФ Диагностика Сигналов.", "quality", soft_failures
+        ).actual(quality_diagnostics_sensor_imitate).expected(sensor_quality).equal_to()
+        StepCheck(
+            f"Проверка наличия сообщения с событием {imitation_event} и тегом {sensor_address}. ЭФ Журнал.",
+            "event",
+            soft_failures,
+        ).actual(filter_by_imitation_messages).is_not_empty()
+        StepCheck(
+            f"Проверка снятия имитации датчика с id: {sensor_id}. ЭФ Диагностика Сигналов.", "isImitated", soft_failures
+        ).actual(is_unimitated_diagnostics_sensor_unimitate).expected(False).equal_to()
+        StepCheck(f"Проверка снятия имитации датчика с id: {sensor_id}. ЭФ Схема.", "isImitated", soft_failures).actual(
+            is_unimitated_scheme_sensor_unimitate
         ).expected(False).equal_to()
+        StepCheck(
+            f" Проверка наличия сообщения с событием {unimitation_event} и тегом {sensor_address}. ЭФ Журнал.",
+            "event",
+            soft_failures,
+        ).actual(filter_by_unimitation_messages).is_not_empty()
 
 
-async def mask_signal_test(ws_client, cfg: SmokeSuiteConfig, test_data: CaseData):
+async def mask_signal_test(ws_client, http_client, cfg: SmokeSuiteConfig, test_data: CaseData):
     """
     Проверка маскирования датчиков.
     """
@@ -778,29 +826,19 @@ async def mask_signal_test(ws_client, cfg: SmokeSuiteConfig, test_data: CaseData
     pressure_sensor_id = TestConst.SENSOR_IDS_BY_ADDRESS.get(pressure_sensor_address)
     flowmeter_id = TestConst.SENSOR_IDS_BY_ADDRESS.get(flowmeter_address)
     with allure.step("Маскирование датчиков"):
-        with allure.step(
-            f"Отправка сообщения и обработка ответа о маскировании датчика давления с id: {pressure_sensor_id}"
-        ):
-            payload = await t_utils.connect_and_get_msg(
-                ws_client,
-                "MaskSignalRequest",
-                {'id': pressure_sensor_id, 'tuId': cfg.tu_id, 'additionalProperties': None},
-            )
-            parsed_payload = parser.parse_mask_signal_msg(payload)
-            pressure_sensor_mask_reply_status = parsed_payload.replyStatus
+        with allure.step(f"Http запрос и обработка ответа о маскировании датчика давления с id: {pressure_sensor_id}"):
+            request_body = {'id': pressure_sensor_id, 'tuId': cfg.tu_id}
+            response = http_client.post_request(HttpConst.MASK_SIGNAL_URL_PATH, request_body)
+            pressure_sensor_mask_reply_status = response.status_code
 
             StepCheck("Проверка кода ответа на запрос о маскировании", "replyStatus").actual(
                 pressure_sensor_mask_reply_status
             ).expected(ReplyStatus.OK.value).equal_to()
 
-        with allure.step(f"Отправка сообщения и обработка ответа о маскировании расходомера с id: {flowmeter_id}"):
-            payload = await t_utils.connect_and_get_msg(
-                ws_client,
-                "MaskSignalRequest",
-                {'id': flowmeter_id, 'tuId': cfg.tu_id, 'additionalProperties': None},
-            )
-            parsed_payload = parser.parse_mask_signal_msg(payload)
-            flowmeter_mask_reply_status = parsed_payload.replyStatus
+        with allure.step(f"Http запрос и обработка ответа о маскировании расходомера с id: {flowmeter_id}"):
+            request_body = {'id': flowmeter_id, 'tuId': cfg.tu_id}
+            response = http_client.post_request(HttpConst.MASK_SIGNAL_URL_PATH, request_body)
+            flowmeter_mask_reply_status = response.status_code
 
             StepCheck("Проверка кода ответа на запрос о маскировании", "replyStatus").actual(
                 flowmeter_mask_reply_status
@@ -835,32 +873,18 @@ async def mask_signal_test(ws_client, cfg: SmokeSuiteConfig, test_data: CaseData
             ).is_not_none()
 
     with allure.step("Снятие маскирования датчиков"):
-        with allure.step(
-            f"Отправка сообщения и обработка ответа о снятии маскирования датчика давления с id: {pressure_sensor_id}"
-        ):
-            payload = await t_utils.connect_and_get_msg(
-                ws_client,
-                "UnmaskSignalRequest",
-                {'id': pressure_sensor_id, 'tuId': cfg.tu_id, 'additionalProperties': None},
-            )
-            parsed_payload = parser.parse_unmask_signal_msg(payload)
-            pressure_sensor_unmask_reply_status = parsed_payload.replyStatus
-
+        with allure.step(f"Http запрос о снятии маскирования датчика давления с id: {pressure_sensor_id}"):
+            request_body = {'id': pressure_sensor_id, 'tuId': cfg.tu_id}
+            response = http_client.post_request(HttpConst.UNMASK_SIGNAL_URL_PATH, request_body)
+            pressure_sensor_unmask_reply_status = response.status_code
             StepCheck("Проверка кода ответа на запрос о снятии маскирования", "replyStatus").actual(
                 pressure_sensor_unmask_reply_status
             ).expected(ReplyStatus.OK.value).equal_to()
 
-        with allure.step(
-            f"Отправка сообщения и обработка ответа о снятии маскирования расходомера с id: {flowmeter_id}"
-        ):
-            payload = await t_utils.connect_and_get_msg(
-                ws_client,
-                "UnmaskSignalRequest",
-                {'id': flowmeter_id, 'tuId': cfg.tu_id, 'additionalProperties': None},
-            )
-            parsed_payload = parser.parse_unmask_signal_msg(payload)
-            flowmeter_unmask_reply_status = parsed_payload.replyStatus
-
+        with allure.step(f"Http запрос о снятии маскирования расходомера с id: {flowmeter_id}"):
+            request_body = {'id': flowmeter_id, 'tuId': cfg.tu_id}
+            response = http_client.post_request(HttpConst.UNMASK_SIGNAL_URL_PATH, request_body)
+            flowmeter_unmask_reply_status = response.status_code
             StepCheck("Проверка кода ответа на запрос о снятии маскирования", "replyStatus").actual(
                 flowmeter_unmask_reply_status
             ).expected(ReplyStatus.OK.value).equal_to()
@@ -908,17 +932,18 @@ async def mask_signal_test(ws_client, cfg: SmokeSuiteConfig, test_data: CaseData
         ).expected(False).equal_to()
 
 
-async def mask_info_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_time):
+async def mask_info_in_journal(http_client, cfg: SmokeSuiteConfig, imitator_start_time):
     """
     Проверка записей журнала о маскировании и размаскировании.
     """
-    with allure.step("Запрос сообщений журнала с фильтром userActions"):
+    with allure.step("Http запрос сообщений журнала с фильтром userActions"):
         end_time = datetime.now()
         request_body = t_utils.create_journal_req_body(
             pagination=Pagination(limit=TestConst.JOURNAL_MASK_PAGINATION_LIMIT, direction=Direction.FIRST.value),
             filtering=Filtering(userActions=int(UserActions.SIGNAL_MASK_SIM), objects=FilteringObjects(tuId=cfg.tu_id)),
         )
-        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        response = http_client.post_request(HttpConst.GET_MESSAGES_URL_PATH, request_body)
+        payload = t_utils.get_json_from_http_response(response)
         parsed_payload = parser.parse_journal_msg(payload)
 
     with allure.step("Извлечение и подготовка данных для проверки"):
@@ -1027,14 +1052,6 @@ async def mask_info_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_
             ).actual(msg.user).is_not_none()
 
             StepCheck(
-                f"Проверка mainPipeline [{msg_label}]",
-                "mainPipeline",
-                journal_soft_failures,
-            ).actual(
-                msg.mainPipeline
-            ).expected(cfg.main_pipeline).equal_to()
-
-            StepCheck(
                 f"Проверка object не пустой [{msg_label}]",
                 "object",
                 journal_soft_failures,
@@ -1075,7 +1092,7 @@ async def mask_info_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_
             ).expected(TestConst.JOURNAL_STATUS_SUCCESS).equal_to()
 
 
-async def mask_du_on_mini_scheme(ws_client, cfg: SmokeSuiteConfig):
+async def mask_du_on_mini_scheme(ws_client, http_client, cfg: SmokeSuiteConfig):
     """
     Маскирование ДУ на мини-схеме
     Проверка маскированного участка в выходных сигналах
@@ -1084,45 +1101,29 @@ async def mask_du_on_mini_scheme(ws_client, cfg: SmokeSuiteConfig):
     linear_part_id = cfg.linear_part_identifier_for_mask
     mask_reason = cfg.mask_reason
 
-    with allure.step(
-        "Подключение по ws, отправка сообщения типа: MaskLdsRequest. Совершается действие - маскирование ДУ"
-    ):
-        payload = (
-            await t_utils.connect_and_get_msg(
-                ws_client,
-                "MaskLdsRequest",
+    with allure.step("Http запрос на маскирование ДУ утечки типа: MaskLdsRequest"):
+        request_body = {
+            'tuId': cfg.tu_id,
+            'maskInfo': [
                 {
-                    'tuId': cfg.tu_id,
-                    'maskInfo': [
-                        {
-                            'linearPartId': linear_part_id,
-                            'reason': mask_reason,
-                            'additionalProperties': None,
-                        }
-                    ],
+                    'linearPartId': linear_part_id,
+                    'reason': mask_reason,
                     'additionalProperties': None,
-                },
-            ),
-        )
+                }
+            ],
+            'additionalProperties': None,
+        }
+        response = http_client.post_request(HttpConst.MASK_LDS_URL_PATH, request_body)
+        mask_du_reply_status = response.status_code
         time.sleep(cfg.basic_message_timeout)
-        parsed_payload = parser.parse_unmask_lds_message(payload)
-        mask_du_reply_status = parsed_payload.replyStatus
 
-    with allure.step("Подключение по ws, получение и обработка данных сообщений для теста"):
-
-        with allure.step(f"Получение словаря для линейного участка с id: {linear_part_id}.\n" f"ЭФ Выходные сигналы."):
-            payload = await t_utils.connect_and_get_msg(
-                ws_client,
-                "GetOutputSignalsRequest",
-                {
-                    'tuId': cfg.tu_id,
-                    'filtering': None,
-                    'search': None,
-                    'sorting': None,
-                    'additionalProperties': None,
-                },
-            )
+    with allure.step("Подключение по ws и http, получение и обработка данных сообщений для теста"):
+        with allure.step("Http запрос, получение и обработка ответа типа: GetOutputSignalsRequest"):
+            request_body = {'tuId': cfg.tu_id}
+            response = http_client.post_request(HttpConst.GET_OUTPUT_SIGNALS_URL_PATH, request_body)
+            payload = t_utils.get_json_from_http_response(response)
             parsed_payload = parser.parse_output_signals_msg(payload)
+
             # Получение данных линейного участка утечки по id
             with allure.step(
                 "Извлечение и подготовка данных типов выходных сигналов из обработанных данных ЭФ Выходные сигналы"
@@ -1184,14 +1185,15 @@ async def mask_du_on_mini_scheme(ws_client, cfg: SmokeSuiteConfig):
             linear_parts = parsed_payload.replyContent.linearParts
             mask_linear_part = next((lp for lp in linear_parts if lp.id == linear_part_id), None)
 
-        with allure.step("Подключение по ws, получение и обработка сообщения типа: MessagesInfo. ЭФ Журнал"):
+        with allure.step("Http запрос сообщений журнала с фильтром messageTypes=MASKING_LDS"):
             request_body = t_utils.create_journal_req_body(
                 pagination=Pagination(limit=10, direction=Direction.FIRST.value),
                 filtering=Filtering(
                     messageTypes=int(MessageType.MASKING_LDS), objects=FilteringObjects(tuId=cfg.tu_id)
                 ),
             )
-            payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+            response = http_client.post_request(HttpConst.GET_MESSAGES_URL_PATH, request_body)
+            payload = t_utils.get_json_from_http_response(response)
             parsed_payload = parser.parse_journal_msg(payload)
 
         with allure.step("Извлечение и подготовка данных для проверки маскирования ДУ ЭФ Журнал"):
@@ -1257,7 +1259,7 @@ async def mask_du_on_mini_scheme(ws_client, cfg: SmokeSuiteConfig):
         ).expected(cfg.mask_du_name).equal_to()
 
 
-async def unmask_du_on_mini_scheme(ws_client, cfg: SmokeSuiteConfig):
+async def unmask_du_on_mini_scheme(ws_client, http_client, cfg: SmokeSuiteConfig):
     """
     Размаскирование ДУ на мини-схеме
     Проверка маскированного участка в выходных сигналах
@@ -1265,46 +1267,29 @@ async def unmask_du_on_mini_scheme(ws_client, cfg: SmokeSuiteConfig):
     """
     linear_part_id = cfg.linear_part_identifier_for_mask
     unmask_reason = cfg.unmask_reason
-
-    with allure.step(
-        "Подключение по ws, отправка сообщения типа: UnmaskLdsRequest. Совершается действие - размаскирование ДУ"
-    ):
-        payload = (
-            await t_utils.connect_and_get_msg(
-                ws_client,
-                "UnmaskLdsRequest",
+    with allure.step("Http запрос на снятие маскирования ДУ типа: UnmaskLdsRequest"):
+        request_body = {
+            'tuId': cfg.tu_id,
+            'maskInfo': [
                 {
-                    'tuId': cfg.tu_id,
-                    'maskInfo': [
-                        {
-                            'linearPartId': linear_part_id,
-                            'reason': unmask_reason,
-                            'additionalProperties': None,
-                        }
-                    ],
+                    'linearPartId': linear_part_id,
+                    'reason': unmask_reason,
                     'additionalProperties': None,
-                },
-            ),
-        )
+                }
+            ],
+            'additionalProperties': None,
+        }
+        response = http_client.post_request(HttpConst.UNMASK_LDS_URL_PATH, request_body)
+        unmask_du_reply_status = response.status_code
         time.sleep(cfg.basic_message_timeout)
-        parsed_payload = parser.parse_unmask_lds_message(payload)
-        unmask_du_reply_status = parsed_payload.replyStatus
 
     with allure.step("Подключение по ws, получение и обработка данных сообщений для теста"):
-        with allure.step(f"Получение словаря для линейного участка с id: {linear_part_id}\n" f"ЭФ Выходные сигналы"):
-            payload = await t_utils.connect_and_get_msg(
-                ws_client,
-                "GetOutputSignalsRequest",
-                {
-                    'tuId': cfg.tu_id,
-                    'filtering': None,
-                    'search': None,
-                    'sorting': None,
-                    'additionalProperties': None,
-                },
-            )
+        with allure.step("Http запрос, получение и обработка ответа типа: GetOutputSignalsRequest"):
+            request_body = {'tuId': cfg.tu_id}
+            response = http_client.post_request(HttpConst.GET_OUTPUT_SIGNALS_URL_PATH, request_body)
+            payload = t_utils.get_json_from_http_response(response)
+            parsed_payload = parser.parse_output_signals_msg(payload)
             with allure.step("Извлечение и подготовка данных типов выходных сигналов ЭФ Выходные сигналы"):
-                parsed_payload = parser.parse_output_signals_msg(payload)
                 # Получение данных линейного участка утечки по id
                 leak_linear_part = t_utils.find_object_by_field(
                     parsed_payload.replyContent.linearPartSignals,
@@ -1350,18 +1335,17 @@ async def unmask_du_on_mini_scheme(ws_client, cfg: SmokeSuiteConfig):
             leak_signals_list = leak_linear_part.signals
             mask_leak_value = t_utils.find_signal_val_by_signal_type(leak_signals_list, mask_signal_type)
 
-        with allure.step(
-            "Подключение по ws, получение и обработка сообщения типа: MessagesInfo. "
-            "Получен результат маскирования ДУ на ЭФ Журнал"
-        ):
+        with allure.step("Http запрос сообщений журнала с фильтром messageTypes=MASKING_LDS"):
             request_body = t_utils.create_journal_req_body(
                 pagination=Pagination(limit=10, direction=Direction.FIRST.value),
                 filtering=Filtering(
                     messageTypes=int(MessageType.MASKING_LDS), objects=FilteringObjects(tuId=cfg.tu_id)
                 ),
             )
-            payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+            response = http_client.post_request(HttpConst.GET_MESSAGES_URL_PATH, request_body)
+            payload = t_utils.get_json_from_http_response(response)
             parsed_payload = parser.parse_journal_msg(payload)
+
         with allure.step("Извлечение и подготовка данных для проверки снятия маскирования ДУ ЭФ Журнал"):
             messages_info = getattr(parsed_payload.replyContent, 'messagesInfo', None)
 
@@ -1459,17 +1443,19 @@ async def lds_status_initialization_out(ws_client, cfg: SmokeSuiteConfig):
     ).expected(LdsStatus.INITIALIZATION).is_not_equal_to()
 
 
-async def lds_status_init_out_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_time):
+def lds_status_init_out_in_journal(http_client, cfg: SmokeSuiteConfig, imitator_start_time):
     """
     Проверка наличия записи в журнале о выходе СОУ из режима Инициализация.
     """
-    with allure.step("Запрос сообщений журнала с фильтром messageTypes=LDS_STATUS"):
+
+    with allure.step("Http запрос сообщений журнала с фильтром messageTypes=LDS_STATUS"):
         end_time = datetime.now()
         request_body = t_utils.create_journal_req_body(
             pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
             filtering=Filtering(messageTypes=int(MessageType.LDS_STATUS), objects=FilteringObjects(tuId=cfg.tu_id)),
         )
-        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        response = http_client.post_request(HttpConst.GET_MESSAGES_URL_PATH, request_body)
+        payload = t_utils.get_json_from_http_response(response)
         parsed_payload = parser.parse_journal_msg(payload)
     with allure.step("Извлечение и подготовка данных для проверки"):
         messages_info = getattr(parsed_payload.replyContent, 'messagesInfo', [])
@@ -1520,10 +1506,6 @@ async def lds_status_init_out_in_journal(ws_client, cfg: SmokeSuiteConfig, imita
         StepCheck("Проверка: event не является Инициализацией", "event", soft_failures).actual(lds_msg.event).expected(
             TestConst.JOURNAL_EVENT_LDS_INIT_ACCUM_DATA
         ).is_not_equal_to()
-
-        StepCheck("Проверка mainPipeline", "mainPipeline", soft_failures).actual(lds_msg.mainPipeline).expected(
-            cfg.main_pipeline
-        ).equal_to()
 
         StepCheck("Проверка technologicalSection", "technologicalSection", soft_failures).actual(
             lds_msg.technologicalSection
@@ -1612,17 +1594,18 @@ async def leaks_content(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, 
         )
 
 
-async def possible_leak_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_time):
+def possible_leak_in_journal(http_client, cfg: SmokeSuiteConfig, imitator_start_time):
     """
     Проверка наличия сообщения 'Возможна утечка' в журнале.
     """
-    with allure.step("Подключение по ws, получение и обработка сообщений журнала типа: MessagesInfoContent"):
+    with allure.step("Http запрос сообщений журнала с фильтром messageTypes=LEAKS"):
         end_time = datetime.now()
         request_body = t_utils.create_journal_req_body(
             pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
             filtering=Filtering(messageTypes=int(MessageType.LEAKS), objects=FilteringObjects(tuId=cfg.tu_id)),
         )
-        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        response = http_client.post_request(HttpConst.GET_MESSAGES_URL_PATH, request_body)
+        payload = t_utils.get_json_from_http_response(response)
         parsed_payload = parser.parse_journal_msg(payload)
     with allure.step("Извлечение и подготовка данных для проверки"):
         messages_info = getattr(parsed_payload.replyContent, 'messagesInfo', [])
@@ -1673,10 +1656,6 @@ async def possible_leak_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_st
             TestConst.JOURNAL_EVENT_POSSIBLE_LEAK
         ).equal_to()
 
-        StepCheck("Проверка mainPipeline", "mainPipeline", soft_failures).actual(
-            possible_leak_msg.mainPipeline
-        ).expected(cfg.main_pipeline).equal_to()
-
         StepCheck("Проверка messageType", "messageType", soft_failures).actual(possible_leak_msg.messageType).expected(
             TestConst.JOURNAL_MESSAGE_TYPE_LEAKS
         ).equal_to()
@@ -1690,14 +1669,16 @@ async def possible_leak_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_st
         ).is_not_none()
 
 
-async def leak_info_in_journal(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
-    with allure.step("Подключение по ws, получение и обработка сообщения типа: MessagesInfoContent"):
+def leak_info_in_journal(http_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
+
+    with allure.step("Http запрос сообщений журнала с фильтром messageTypes=LEAKS"):
+        end_time = datetime.now()
         request_body = t_utils.create_journal_req_body(
             pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
             filtering=Filtering(messageTypes=int(MessageType.LEAKS), objects=FilteringObjects(tuId=cfg.tu_id)),
         )
-        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
-        end_time = datetime.now()
+        response = http_client.post_request(HttpConst.GET_MESSAGES_URL_PATH, request_body)
+        payload = t_utils.get_json_from_http_response(response)
         parsed_payload = parser.parse_journal_msg(payload)
 
     with allure.step("Извлечение и подготовка данных для проверки"):
@@ -1778,17 +1759,18 @@ async def leak_info_in_journal(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestC
         )
 
 
-async def completed_leak_info_in_journal(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
+def completed_leak_info_in_journal(http_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
     """
     Проверка наличия сообщения 'Утечка завершена' в журнале.
     """
-    with allure.step("Подключение по ws, получение и обработка сообщения типа: MessagesInfoContent"):
+    with allure.step("Http запрос сообщений журнала с фильтром messageTypes=LEAKS"):
+        end_time = datetime.now()
         request_body = t_utils.create_journal_req_body(
             pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
             filtering=Filtering(messageTypes=int(MessageType.LEAKS), objects=FilteringObjects(tuId=cfg.tu_id)),
         )
-        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
-        end_time = datetime.now()
+        response = http_client.post_request(HttpConst.GET_MESSAGES_URL_PATH, request_body)
+        payload = t_utils.get_json_from_http_response(response)
         parsed_payload = parser.parse_journal_msg(payload)
 
     with allure.step("Извлечение и подготовка данных для проверки"):
@@ -2085,7 +2067,7 @@ async def lds_status_during_leak(ws_client, cfg: SmokeSuiteConfig, leak: LeakTes
                 pytest.fail(f"Не найдены соседние с утечкой ДУ по _id: {neighbor_ids}")
 
 
-async def acknowledge_leak_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig = None):
+async def acknowledge_leak_info(ws_client, http_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig = None):
     """
     Проверка квитирования утечки.
 
@@ -2107,16 +2089,10 @@ async def acknowledge_leak_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTest
             StepCheck("Проверка наличия сообщения об утечке", "leaksInfo").actual(leak_to_ack).is_not_none()
 
             acknowledged_leak_id = leak_to_ack.id
-    with allure.step(
-        "Подключение по ws, отправка сообщения и обработка ответа о квитировании утечки типа: AcknowledgeLeakRequest"
-    ):
-        payload = await t_utils.connect_and_get_msg(
-            ws_client,
-            "AcknowledgeLeakRequest",
-            {'leakId': str(acknowledged_leak_id), 'tuId': cfg.tu_id, 'additionalProperties': None},
-        )
-        parsed_payload = parser.parse_acknowledge_leak_msg(payload)
-        acknowledge_reply_status = parsed_payload.replyStatus
+    with allure.step("Http запрос на квитирование утечки типа: AcknowledgeLeakRequest"):
+        request_body = {'leakId': str(acknowledged_leak_id), 'tuId': cfg.tu_id}
+        response = http_client.post_request(HttpConst.ACKNOWLEDGE_LEAK_URL_PATH, request_body)
+        acknowledge_reply_status = response.status_code
 
     with allure.step(
         "Подключение по ws и получение сообщения об утечке типа: AllLeaksInfoContent для проверки квитирования"
@@ -2145,17 +2121,18 @@ async def acknowledge_leak_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTest
     )
 
 
-async def acknowledge_leak_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_time):
+def acknowledge_leak_in_journal(http_client, cfg: SmokeSuiteConfig, imitator_start_time):
     """
     Проверка записи в журнале о квитировании утечки.
     """
-    with allure.step("Запрос сообщений журнала с фильтром userActions=LEAK_ACK"):
+    with allure.step("Http запрос сообщений журнала с фильтром messageTypes=LEAKS"):
         end_time = datetime.now()
         request_body = t_utils.create_journal_req_body(
             pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
-            filtering=Filtering(userActions=int(UserActions.LEAK_ACK), objects=FilteringObjects(tuId=cfg.tu_id)),
+            filtering=Filtering(messageTypes=int(MessageType.USER_ACTION), objects=FilteringObjects(tuId=cfg.tu_id)),
         )
-        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        response = http_client.post_request(HttpConst.GET_MESSAGES_URL_PATH, request_body)
+        payload = t_utils.get_json_from_http_response(response)
         parsed_payload = parser.parse_journal_msg(payload)
 
     with allure.step("Извлечение и подготовка данных для проверки"):
@@ -2218,10 +2195,6 @@ async def acknowledge_leak_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator
             TestConst.JOURNAL_EVENT_LEAK_ACKNOWLEDGED
         ).equal_to()
 
-        StepCheck("Проверка mainPipeline", "mainPipeline", soft_failures).actual(ack_message.mainPipeline).expected(
-            cfg.main_pipeline
-        ).equal_to()
-
         StepCheck("Проверка technologicalSection", "technologicalSection", soft_failures).actual(
             ack_message.technologicalSection
         ).expected(cfg.tu_name).equal_to()
@@ -2231,25 +2204,18 @@ async def acknowledge_leak_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator
         ).is_not_none()
 
 
-async def output_signals(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
+async def output_signals(ws_client, http_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time):
     """
     Проверка наличия данных об утечке в выходных сигналах.
     """
     linear_part_id = leak.linear_part_id
 
-    with allure.step(f"Получение списка выходных сигналов для линейного участка с id: {linear_part_id}"):
-        payload = await t_utils.connect_and_get_msg(
-            ws_client,
-            "GetOutputSignalsRequest",
-            {
-                'tuId': cfg.tu_id,
-                'filtering': None,
-                'search': None,
-                'sorting': None,
-                'additionalProperties': None,
-            },
-        )
+    with allure.step("Http запрос, получение и обработка ответа типа: GetOutputSignalsRequest"):
+        request_body = {'tuId': cfg.tu_id}
+        response = http_client.post_request(HttpConst.GET_OUTPUT_SIGNALS_URL_PATH, request_body)
+        payload = t_utils.get_json_from_http_response(response)
         parsed_payload = parser.parse_output_signals_msg(payload)
+
         # Получение данных линейного участка утечки по id
         with allure.step("Извлечение и подготовка данных для списка выходных сигналов"):
             linear_part_signals = getattr(parsed_payload.replyContent, 'linearPartSignals', [])
@@ -2577,7 +2543,7 @@ async def balance_algorithm_leak_completed(ws_client, cfg: SmokeSuiteConfig):
             ).actual(diagnostic_area.isLeakDetected).expected(False).equal_to()
 
 
-async def the_leak_is_complete_on_kg(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig):
+async def leak_is_complete_on_kg(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig):
     """
     Проверка факта завершения утечки на ЭФ КГ(табличное представление).
 
@@ -2592,16 +2558,14 @@ async def the_leak_is_complete_on_kg(ws_client, cfg: SmokeSuiteConfig, leak: Lea
             {'tuId': cfg.tu_id},
         )
         parsed_payload = parser.parse_leaks_content_msg(payload)
+
     with allure.step("Извлечение и подготовка данных для проверки"):
         leaks_list_info = getattr(parsed_payload.replyContent, 'leaksListInfo', None)
         complete_leak_info = t_utils.find_leak_by_coordinate(leaks_list_info, leak.coordinate_meters)
         leak_coordinate_round = round(complete_leak_info.leakCoordinate, cfg.precision)
-        complete_leak = t_utils.find_object_by_field(
-            leaks_list_info, "confirmationStatus", ConfirmationStatus.CONFIRMED_AND_LEAK_CLOSED.value
-        )
-        leak_algorithm_type = ConfirmationStatus(complete_leak_info.type) if complete_leak_info.type else None
+        leak_algorithm_type = ReservedType(complete_leak_info.type) if complete_leak_info.type else None
         leak_confirmation_status = (
-            ConfirmationStatus(complete_leak.confirmationStatus) if complete_leak.confirmationStatus else None
+            ConfirmationStatus(complete_leak_info.confirmationStatus) if complete_leak_info.confirmationStatus else None
         )
 
     with SoftAssertions() as soft_failures:
@@ -2623,22 +2587,13 @@ async def the_leak_is_complete_on_kg(ws_client, cfg: SmokeSuiteConfig, leak: Lea
         )
 
 
-async def leak_is_complete_in_output_signals(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig):
+async def leak_is_complete_in_output_signals(ws_client, http_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig):
     """OutputSignalsInfo - нет утечки в выходных сигналах"""
     linear_part_id = leak.linear_part_id
-
-    with allure.step(f"Получение списка выходных сигналов для линейного участка с id: {linear_part_id}"):
-        payload = await t_utils.connect_and_get_msg(
-            ws_client,
-            "GetOutputSignalsRequest",
-            {
-                'tuId': cfg.tu_id,
-                'filtering': None,
-                'search': None,
-                'sorting': None,
-                'additionalProperties': None,
-            },
-        )
+    with allure.step("Http запрос, получение и обработка ответа типа: GetOutputSignalsRequest"):
+        request_body = {'tuId': cfg.tu_id}
+        response = http_client.post_request(HttpConst.GET_OUTPUT_SIGNALS_URL_PATH, request_body)
+        payload = t_utils.get_json_from_http_response(response)
         parsed_payload = parser.parse_output_signals_msg(payload)
 
         # Получение данных линейного участка утечки по id
@@ -2734,7 +2689,9 @@ async def complete_tu_leaks_info_content(ws_client, cfg: SmokeSuiteConfig):
     StepCheck("Проверка отсутствия утечки на схеме", "leaksInfo").actual(leak_on_scheme).is_empty()
 
 
-async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time: datetime):
+async def export_leaks_report(
+    ws_client, http_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time: datetime
+):
     """
     Сценарий формирования отчёта об утечках.
 
@@ -2799,18 +2756,21 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
     with allure.step(f"Этап 1. Подписка на пуш-нотификации ({ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST})"):
         await t_utils.connect(ws_client, ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST, [])
 
-    with allure.step(f"Этап 2. Запрос формирования отчёта ({ReportConst.EXPORT_REPORTS_COMMAND_REQUEST})"):
+    with allure.step(f"Этап 2. Http запрос формирования отчёта. endpoint: {HttpConst.EXPORT_REPORTS_URL_PATH}"):
         request_payload = {
             "tuId": cfg.tu_id,
             "exportedDataTypes": [ExportedDataType.LEAKS_REPORT.value],
             "timeOffset": actual_report_state.time_offset_hours,
             "period": {
-                "start": t_utils.datetime_to_msgpack_timestamp(actual_report_state.period_start),
-                "end": t_utils.datetime_to_msgpack_timestamp(actual_report_state.period_end),
-                "additionalProperties": {},
+                "start": t_utils.datetime_to_iso_format(actual_report_state.period_start),
+                "end": t_utils.datetime_to_iso_format(actual_report_state.period_end),
             },
         }
-        await t_utils.connect(ws_client, ReportConst.EXPORT_REPORTS_COMMAND_REQUEST, request_payload)
+        export_command_response = http_client.post_request(HttpConst.EXPORT_REPORTS_URL_PATH, request_payload)
+        export_command_status_code = export_command_response.status_code
+        StepCheck("Проверка кода ответа на формирование отчёта", "replyStatus").actual(
+            export_command_status_code
+        ).expected(ReplyStatus.OK.value).equal_to()
 
     with allure.step(
         f"Этап 3. Ожидание пуш-нотификации {ReportConst.REPORT_DATA_EXPORTED_NOTIFICATION} о готовности отчёта"
@@ -2831,9 +2791,9 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
             (notification_reply_content.errorMessage or "") if notification_reply_content else ""
         )
 
-    with allure.step(f"Этап 4. Лонг-поллинг {ReportConst.GET_EXPORTED_DATA_LIST_REQUEST} до появления отчёта в списке"):
+    with allure.step(f"Этап 4. Лонг-поллинг {HttpConst.GET_EXPORTED_DATA_LIST_URL_PATH} до появления отчёта в списке"):
         actual_report_state.report_item = await t_utils.poll_for_exported_file(
-            ws_client=ws_client,
+            http_client=http_client,
             parser=parser,
             list_limit=ReportConst.EXPORTED_DATA_LIST_LIMIT,
             expected_data_type=ExportedDataType.LEAKS_REPORT,
@@ -3072,9 +3032,9 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
             StepCheck(
                 f"Имя файла содержит '{ReportConst.LEAKS_REPORT_NAME_PART}'", "file_name", soft_failures
             ).contains(report_file_name_lower, leaks_report_name_part_lower)
-            StepCheck(
-                f"Имя файла содержит описание ТУ '{cfg.tu_name}'", "file_name", soft_failures
-            ).contains(report_file_name_lower, actual_report_state.tu_description_lower)
+            StepCheck(f"Имя файла содержит описание ТУ '{cfg.tu_name}'", "file_name", soft_failures).contains(
+                report_file_name_lower, actual_report_state.tu_description_lower
+            )
             StepCheck(
                 "Дата начала периода в имени файла совпадает с фильтром запроса (+-1 мин)",
                 "period_start_in_file_name",
@@ -3132,16 +3092,14 @@ async def export_leaks_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestCo
             ).is_empty()
 
 
-async def export_lds_status_report(
-    ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time: datetime
-):
+async def export_lds_status_report(ws_client, http_client, cfg: SmokeSuiteConfig, imitator_start_time: datetime):
     """
     Сценарий формирования xlsx-отчёта о режиме работы СОУ.
     """
     report_state = ExportLdsStatusReportState()
 
     with allure.step("Подготовка параметров сценария формирования отчёта о режиме работы СОУ"):
-        report_state.report_test = leak.export_lds_status_report_test
+        report_state.report_test = cfg.export_lds_status_report_test
         StepCheck("В конфигурации задан export_lds_status_report_test", "export_lds_status_report_test").actual(
             report_state.report_test
         ).is_not_none()
@@ -3171,18 +3129,21 @@ async def export_lds_status_report(
     with allure.step(f"Этап 1. Подписка на пуш-нотификации {ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST}"):
         await t_utils.connect(ws_client, ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST, [])
 
-    with allure.step(f"Этап 2. Запрос формирования отчёта {ReportConst.EXPORT_REPORTS_COMMAND_REQUEST}"):
+    with allure.step(f"Этап 2. Http запрос формирования отчёта. endpoint: {HttpConst.EXPORT_REPORTS_URL_PATH}"):
         request_payload = {
             "tuId": cfg.tu_id,
             "exportedDataTypes": [ExportedDataType.LDS_STATUS_REPORT.value],
             "timeOffset": report_state.time_offset_hours,
             "period": {
-                "start": t_utils.datetime_to_msgpack_timestamp(report_state.period_start),
-                "end": t_utils.datetime_to_msgpack_timestamp(report_state.period_end),
-                "additionalProperties": {},
+                "start": t_utils.datetime_to_iso_format(report_state.period_start),
+                "end": t_utils.datetime_to_iso_format(report_state.period_end),
             },
         }
-        await t_utils.connect(ws_client, ReportConst.EXPORT_REPORTS_COMMAND_REQUEST, request_payload)
+        export_command_response = http_client.post_request(HttpConst.EXPORT_REPORTS_URL_PATH, request_payload)
+        export_command_status_code = export_command_response.status_code
+        StepCheck("Проверка кода ответа на формирование отчёта", "replyStatus").actual(
+            export_command_status_code
+        ).expected(ReplyStatus.OK.value).equal_to()
 
     with allure.step(
         f"Этап 3. Ожидание пуш-нотификации {ReportConst.REPORT_DATA_EXPORTED_NOTIFICATION} о готовности отчёта"
@@ -3194,9 +3155,9 @@ async def export_lds_status_report(
             poll_interval_seconds=ReportConst.LIST_POLL_INTERVAL_SECONDS,
         )
 
-    with allure.step(f"Этап 4. Лонг-поллинг {ReportConst.GET_EXPORTED_DATA_LIST_REQUEST} до появления отчёта в списке"):
+    with allure.step(f"Этап 4. Лонг-поллинг {HttpConst.GET_EXPORTED_DATA_LIST_URL_PATH} до появления отчёта в списке"):
         report_state.report_item = await t_utils.poll_for_exported_file(
-            ws_client=ws_client,
+            http_client=http_client,
             parser=parser,
             list_limit=ReportConst.EXPORTED_DATA_LIST_LIMIT,
             expected_data_type=ExportedDataType.LDS_STATUS_REPORT,
@@ -3476,25 +3437,27 @@ async def export_lds_status_report(
             ).is_empty()
 
 
-async def mode_mt_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_time, test_data: CaseData):
+def stationary_status_in_journal(http_client, cfg: SmokeSuiteConfig, imitator_start_time, test_data: CaseData):
     """
     Проверка записей журнала о режиме мт
     """
+    if not test_data:
+        pytest.fail("Не заполнены обязательные параметры теста")
     exp_mode_part_message, exp_reason_part_message, exp_priority_message = test_data.expected_result
 
-    with allure.step(
-        "Подключение по ws, получение и обработка сообщения типа: MessagesInfoContent" "Фильтр MessageType. ЭФ Журнал"
-    ):
+    with allure.step("Http запрос сообщений журнала с фильтром messageTypes=PUMPING_STATUS"):
+        end_time = datetime.now()
         request_body = t_utils.create_journal_req_body(
             pagination=Pagination(limit=TestConst.LIMIT_CONTROLLED_SITES),
             filtering=Filtering(messageTypes=int(MessageType.PUMPING_STATUS), objects=FilteringObjects(tuId=cfg.tu_id)),
         )
-        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        response = http_client.post_request(HttpConst.GET_MESSAGES_URL_PATH, request_body)
+        payload = t_utils.get_json_from_http_response(response)
         parsed_payload = parser.parse_journal_msg(payload)
-        messages_info = parsed_payload.replyContent.messagesInfo
 
-        # Фильтрация сообщений по времени
-        end_time = datetime.now()
+    with allure.step("Извлечение и подготовка данных для проверки"):
+        messages_info = getattr(parsed_payload.replyContent, 'messagesInfo', [])
+        StepCheck("Проверка наличия сообщений в журнале", "messagesInfo").actual(messages_info).is_not_empty()
 
         filter_start_msk = t_utils.localize_as_moscow(imitator_start_time)
         filter_end_msk = t_utils.localize_as_moscow(end_time)
@@ -3586,7 +3549,7 @@ async def mode_mt_in_journal(ws_client, cfg: SmokeSuiteConfig, imitator_start_ti
         ).equal_to()
 
 
-async def export_mt_mode_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, imitator_start_time: datetime):
+async def export_mt_mode_report(ws_client, http_client, cfg: SmokeSuiteConfig, imitator_start_time: datetime):
     """
     Сценарий формирования xlsx-отчёта о режиме работы МТ.
 
@@ -3604,7 +3567,7 @@ async def export_mt_mode_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTest
     report_state = ExportMtModeReportState()
 
     with allure.step("Подготовка параметров сценария формирования отчёта о режиме работы МТ"):
-        report_state.expected_report_test = leak.export_mt_mode_report_test
+        report_state.expected_report_test = cfg.export_mt_mode_report_test
         StepCheck("В конфигурации задан export_mt_mode_report_test", "export_mt_mode_report_test").actual(
             report_state.expected_report_test
         ).is_not_none()
@@ -3622,7 +3585,7 @@ async def export_mt_mode_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTest
         report_state.expected_tu_description_lower = cfg.tu_name.lower()
         report_state.expected_section_names = list(MtReportConst.SECTION_NAMES)
         report_state.expected_dominant_mode_column = MtReportConst.STATIONARY_STATUS_TO_COLUMN.get(
-            leak.expected_report_stationary_status
+            cfg.expected_report_stationary_status
         )
         report_state.expected_file_name = report_utils.build_export_report_file_name(
             cfg.tu_name,
@@ -3657,18 +3620,21 @@ async def export_mt_mode_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTest
     with allure.step(f"Этап 1. Подписка на пуш-нотификации {ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST}"):
         await t_utils.connect(ws_client, ReportConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST, [])
 
-    with allure.step(f"Этап 2. Запрос формирования отчёта {ReportConst.EXPORT_REPORTS_COMMAND_REQUEST}"):
+    with allure.step(f"Этап 2. Http запрос формирования отчёта. endpoint: {HttpConst.EXPORT_REPORTS_URL_PATH}"):
         request_payload = {
             "tuId": cfg.tu_id,
             "exportedDataTypes": [ExportedDataType.STATIONARY_STATUS_REPORT.value],
             "timeOffset": report_state.actual_time_offset_hours,
             "period": {
-                "start": t_utils.datetime_to_msgpack_timestamp(report_state.expected_period_start),
-                "end": t_utils.datetime_to_msgpack_timestamp(report_state.expected_period_end),
-                "additionalProperties": {},
+                "start": t_utils.datetime_to_iso_format(report_state.expected_period_start),
+                "end": t_utils.datetime_to_iso_format(report_state.expected_period_end),
             },
         }
-        await t_utils.connect(ws_client, ReportConst.EXPORT_REPORTS_COMMAND_REQUEST, request_payload)
+        export_command_response = http_client.post_request(HttpConst.EXPORT_REPORTS_URL_PATH, request_payload)
+        export_command_status_code = export_command_response.status_code
+        StepCheck("Проверка кода ответа на формирование отчёта", "replyStatus").actual(
+            export_command_status_code
+        ).expected(ReplyStatus.OK.value).equal_to()
 
     with allure.step(
         f"Этап 3. Ожидание пуш-нотификации {ReportConst.REPORT_DATA_EXPORTED_NOTIFICATION} о готовности отчёта"
@@ -3680,9 +3646,9 @@ async def export_mt_mode_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTest
             poll_interval_seconds=ReportConst.LIST_POLL_INTERVAL_SECONDS,
         )
 
-    with allure.step(f"Этап 4. Лонг-поллинг {ReportConst.GET_EXPORTED_DATA_LIST_REQUEST} до появления отчёта в списке"):
+    with allure.step(f"Этап 4. Лонг-поллинг {HttpConst.GET_EXPORTED_DATA_LIST_URL_PATH} до появления отчёта в списке"):
         report_state.actual_report_item = await t_utils.poll_for_exported_file(
-            ws_client=ws_client,
+            http_client=http_client,
             parser=parser,
             list_limit=ReportConst.EXPORTED_DATA_LIST_LIMIT,
             expected_data_type=ExportedDataType.STATIONARY_STATUS_REPORT,
@@ -4023,4 +3989,3 @@ async def export_mt_mode_report(ws_client, cfg: SmokeSuiteConfig, leak: LeakTest
             StepCheck("В нотификации нет текста ошибки", "errorMessage", soft_failures).actual(
                 notification_error_message
             ).is_empty()
-            

@@ -7,8 +7,9 @@
 - **в глубину**: добавляем новые проверки (scenarios) → расширяем набор контрактов/полей
 
 ## Документация (готово для Confluence/выступления)
-- Для пользователей (ручные тестировщики): `docs/confluence_users.md`
-- Для разработчиков автотестов: `docs/confluence_devs.md`
+- **Master (полная инструкция):** [`doca`](doca) в корне репозитория
+- Для пользователей: `docs/confluence_users.md` (краткая выжимка)
+- Для разработчиков: `docs/confluence_devs.md` (синхронизирован с `doca` по инфраструктуре)
 - План выступления на 45 минут + демо: `docs/presentation_45min.md`
 
 ## Быстрый старт (локально / для разработчиков)
@@ -84,18 +85,22 @@ pytest tests/test_smoke.py --suites=select_19_20 -k "test_leaks_content and leak
 - `Select_19_20_tn3_75_181km_649` — 2 утечки (multi‑leak)
 
 ## Как это работает (в общих чертах)
-1. `test_config/datasets` автодискаверится → формируется `ALL_CONFIGS`.
-2. `tests/test_smoke.py` параметризует suite‑level и leak‑level тесты по `ALL_CONFIGS`.
+1. `test_config/datasets` автодискаверится → `ALL_SMOKE_CONFIGS`, `ALL_LDS_STATUS_CONFIGS`, `ALL_IS_REJECTED_CONFIGS`.
+2. Тестовые модули параметризуются по соответствующему списку конфигов.
 3. `conftest.py` группирует тесты по `test_suite_name` и при смене suite:
-   - подготавливает стенд (контейнеры/redis)
+   - подготавливает стенд (контейнеры/redis/clickhouse)
    - (опционально) загружает данные из TestOps
+   - при `use_lds_configurator=True` — включает СОУ через Администрирование
    - стартует имитатор + core
-4. Сценарии (`test_scenarios/scenarios.py`) отправляют WS запросы (как фронт) и ассертят поля ответов.
-5. В конце сессии Allure результаты выгружаются в TestOps.
+   - при ошибке setup **одного** набора — skip набора, следующий набор продолжается
+4. Сценарии (`test_scenarios/`) отправляют WS запросы (как фронт) и ассертят поля ответов.
+5. В конце сессии: configurator teardown (если нужно), stop imitator, Allure → TestOps.
+
+Подробности: [`doca`](doca).
 
 ## Как добавить новый набор данных (покрытие “в ширину”)
 1. Создать `test_config/datasets/select_XX.py` по образцу:
    - 1 утечка → `select_6.py`
    - 2 утечки → `select_19_20.py`
-2. Экспортировать переменную `*_CONFIG` типа `SuiteConfig` (суффикс `_CONFIG` обязателен).
+2. Экспортировать переменную `*_CONFIG` типа `SmokeSuiteConfig` (суффикс `_CONFIG` обязателен).
 3. Запустить `pytest tests/test_smoke.py --suites=select_xx` и проверить отчёт в TestOps.

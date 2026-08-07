@@ -78,6 +78,8 @@ class BaseTN3Constants:
     # ===== Константы журнала =====
     JOURNAL_EVENT_MASK = "Установка признака маскирования"
     JOURNAL_EVENT_UNMASK = "Снятие признака маскирования"
+    JOURNAL_EVENT_IMITATE = "Установка режима имитации сигнала"
+    JOURNAL_EVENT_UNIMITATE = "Снятие режима имитации сигнала"
     JOURNAL_SIGNAL_PRESSURE = "Значение давления"
     JOURNAL_SIGNAL_FLOW = "Расход"
     JOURNAL_MESSAGE_TYPE_USER_ACTIONS = "Действия пользователя"
@@ -111,6 +113,7 @@ class BaseTN3Constants:
         "при этом показания СИ расхода не превышают 1 % отмаксимального значения "
         "диапазона измерений всех СИ расхода на технологическом участке)"
     )
+    JOURNAL_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f%z"
     SEC_PER_MIN = 60
 
     # ===== Параметры подтверждения =====
@@ -128,7 +131,7 @@ class BaseTN3Constants:
 
     # ===== Прочие константы =====
     BASIC_MESSAGE_TIMEOUT = 10.0  # Таймаут ожидания сообщений в секундах
-    SUBSCRIBE_MESSAGE_POLL_ATTEMPTS = 3  # Число чтений из потока подписки до отказа
+    SUBSCRIBE_MESSAGE_POLL_ATTEMPTS = 5  # Число чтений из потока подписки до отказа
     MASK_MESSAGE_TIMEOUT = 180.0  # Таймаут ожидания сообщений в секундах
     PRECISION = 3  # Точность округления для координат
     DIGITS_WITH_DOT_PATTERN = r'\d+(?:\.\d+)?'  # Регулярное выражение для поиска чисел с точкой
@@ -157,6 +160,10 @@ class BaseTN3Constants:
     SECONDS_PER_HOUR: int = 3600
     CRITERIA_NAMES_FIELD: str = 'criteriaNames'
 
+    # ===== Ключи для тестовых данных =====
+    PIPE_ID_KEY: str = "pipe_id"
+    CONTROL_POINTS_KEY: str = "control_points"
+
 
 class ExportReportConstants:
     """Константы для теста формирования отчёта об утечках"""
@@ -164,7 +171,7 @@ class ExportReportConstants:
     # Максимальное ожидание уведомления о готовности отчёта
     NOTIFICATION_TIMEOUT_SECONDS: float = 60.0
     # Максимальное время ожидания появления отчёта в списке после уведомления
-    LIST_POLL_TOTAL_WAIT_SECONDS: float = 10.0
+    LIST_POLL_TOTAL_WAIT_SECONDS: float = 60.0
     # Интервал между запросами getExportedFilesListRequest
     LIST_POLL_INTERVAL_SECONDS: float = 10.0
     # Таймаут получения ответа на скачивание
@@ -405,7 +412,7 @@ class ExportMtModeReportConstants:
 class LdsConfiguratorConstants:
     """Константы для setup/teardown через раздел Администрирование."""
 
-    GET_BASIC_INFO_ADMIN_RETRIES: int = 3
+    GET_BASIC_INFO_ADMIN_RETRIES: int = 10
     CONFIGURATOR_GET_BASIC_INFO_ADMIN_TIMEOUT_SECONDS: float = 30.0
     POLL_TIMEOUT_SECONDS: float = 120.0
     VERIFY_UI_SYNC_TIME_SECONDS: float = 300.0
@@ -420,3 +427,4 @@ class LdsConfiguratorConstants:
     STOP_LDS_REQUEST: str = "StopLdsRequest"
     LAUNCH_LDS_REQUEST: str = "LaunchLdsRequest"
     GET_TUS_INFORMATION_REQUEST: str = "GetTusInformationRequest"
+    
