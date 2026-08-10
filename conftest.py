@@ -21,7 +21,8 @@ from utils.helpers import lds_configurator_utils as lds_cfg_utils
 from utils.helpers.pytest_auth import (
     clear_suite_auth,
     ensure_auth_for_fixture,
-    ensure_suite_auth,
+    ensure_suite_token,
+    ensure_suite_x_user_id,
     init_http_stand_client,
     init_ws_stand_client,
 )
@@ -544,7 +545,7 @@ def pytest_runtest_setup(item):
         cfg["suite_infra_ready"] = False
         cfg["suite_setup_failure"] = None
         clear_suite_auth(cfg)
-        ensure_suite_auth(cfg, current_test_suite)
+        ensure_suite_token(cfg, current_test_suite)
 
         data_id = item.get_closest_marker("test_suite_data_id").args[0]
         test_data_name = item.get_closest_marker("test_data_name").args[0]
@@ -584,6 +585,10 @@ def pytest_runtest_setup(item):
             stand_manager.setup_stand_for_imitator_run()
         except Exception as error:
             _skip_current_suite_after_setup_failure(cfg, f"[SETUP] [ERROR] ошибка при подготовке стенда: {error}")
+        try:
+            ensure_suite_x_user_id(cfg)
+        except BaseException as error:
+            _skip_current_suite_after_setup_failure(cfg, f"[SETUP] [ERROR] не удалось получить x-user-id: {error}")
         try:
             _update_sensor_ids(stand_manager)
         except Exception as error:
@@ -760,7 +765,7 @@ async def ws_client(request):
     :return: Объект wss соединения
     """
     cfg = request.config.group_state
-    ensure_auth_for_fixture(cfg)
+    ensure_auth_for_fixture(cfg, require_x_user_id=True)
     ws_client = init_ws_stand_client(cfg)
     async with ws_client as client:
         yield client
