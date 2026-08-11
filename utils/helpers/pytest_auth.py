@@ -89,6 +89,7 @@ def get_token(max_retries: int = 12, backoff: float = 5.0, force_refresh: bool =
             token = keycloak.get_access_token()
             if not token:
                 raise KeycloakAuthError("Получен пустой access token")
+            logger.info("[AUTH] [OK] Получен access token")
             return token
 
         except KeycloakAuthError as e:
@@ -149,61 +150,34 @@ def _fetch_x_user_id(http_client: StandHttpClient, max_retries: int = 5, backoff
     pytest.fail(f"[AUTH][ERROR] Не удалось получить x-user-id после {max_retries} попыток: {last_exc}")
 
 
-def ensure_suite_token(group_state: dict, suite_name: str) -> None:
+def ensure_suite_auth(group_state: dict, suite_name: str) -> None:
     """
-    Один раз на dataset: stand_host + access token (Keycloak).
-    Выполняется до выключения и последующего поднятия Docker-контейнеров.
+    Один раз на dataset: access token (Keycloak) + x-user-id (/Ping).
+
+    Выполняется после старта api-gateway (Docker).
     """
     if (
         group_state.get("auth_suite") == suite_name
         and group_state.get("auth_token")
+        and group_state.get("x_user_id")
         and group_state.get("stand_host")
     ):
         return
 
     stand_host = build_stand_host()
     auth_token = get_token(force_refresh=True)
+    http_client = StandHttpClient(stand_host, auth_token)
+    x_user_id = _fetch_x_user_id(http_client)
 
     group_state["stand_host"] = stand_host
     group_state["auth_token"] = auth_token
+    group_state["x_user_id"] = x_user_id
     group_state["auth_suite"] = suite_name
 
-    logger.info("[AUTH] Инициализация token для dataset '%s'", suite_name)
+    logger.info("[AUTH] Инициализация auth для dataset '%s'", suite_name)
 
 
-def ensure_suite_x_user_id(group_state: dict) -> None:
-    """
-    Один раз на dataset: x-user-id через /Ping к api-gateway.
-    Выполняется после старта api-gateway (Docker).
-    """
-    if group_state.get("x_user_id"):
-        return
-
-    if not group_state.get("auth_token") or not group_state.get("stand_host"):
-        pytest.exit("[AUTH] auth_token не инициализирован - ожидается ensure_suite_token()")
-
-    http_client = StandHttpClient(group_state["stand_host"], group_state["auth_token"])
-    group_state["x_user_id"] = _fetch_x_user_id(http_client)
-
-    logger.info("[AUTH] Инициализация x-user-id для dataset '%s'", group_state.get("auth_suite"))
-
-
-def ensure_suite_auth(group_state: dict, suite_name: str) -> None:
-    """
-    Один раз на dataset: access token (Keycloak) + x-user-id (/Ping).
-    """
-    if (
-        group_state.get("auth_suite") == suite_name
-        and group_state.get("auth_token")
-        and group_state.get("x_user_id")
-    ):
-        return
-
-    ensure_suite_token(group_state, suite_name)
-    ensure_suite_x_user_id(group_state)
-
-
-def ensure_auth_for_fixture(group_state: dict, *, require_x_user_id: bool = False) -> None:
+def ensure_auth_for_fixture(group_state: dict) -> None:
     """
     Подстраховка для фикстур http_client / ws_client.
 
@@ -212,16 +186,14 @@ def ensure_auth_for_fixture(group_state: dict, *, require_x_user_id: bool = Fals
     выполняется инициализация по auth_suite или fallback '__default__'.
     """
     suite_name = group_state.get("current_suite") or group_state.get("auth_suite") or "__default__"
-    ensure_suite_token(group_state, suite_name)
-    if require_x_user_id:
-        ensure_suite_x_user_id(group_state)
+    ensure_suite_auth(group_state, suite_name)
 
 
 def _require_auth(group_state: dict, *, require_x_user_id: bool = False) -> None:
     if not group_state.get("auth_token") or not group_state.get("stand_host"):
-        pytest.exit("[AUTH] auth не инициализирован - ожидается ensure_suite_token()")
+        pytest.exit("[AUTH] auth не инициализирован - ожидается ensure_suite_auth()")
     if require_x_user_id and not group_state.get("x_user_id"):
-        pytest.exit("[AUTH] x_user_id не инициализирован - ожидается ensure_suite_x_user_id()")
+        pytest.exit("[AUTH] x_user_id не инициализирован - ожидается ensure_suite_auth()")
 
 
 def init_http_stand_client(group_state: dict) -> StandHttpClient:
