@@ -10,7 +10,6 @@ import pytest
 import pytest_asyncio
 
 from clients.testops_client import AllureResultsUploader, logger
-from constants.architecture_constants import EnvKeyConstants as EnvConst
 from constants.architecture_constants import ImitatorConstants as ImConst
 from constants.enums import RejectionSensorTag
 from constants.test_constants import BaseTN3Constants
@@ -486,7 +485,7 @@ def require_suite_infra(request):
         return
     cfg = request.config.group_state
     if cfg.get("current_suite") and not cfg.get("suite_infra_ready"):
-        pytest.skip("Набор пропущен: инфраструктура не готова")
+        pytest.skip("[SETUP] [ERROR] Набор пропущен: инфраструктура не готова")
 
 
 def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
@@ -498,7 +497,8 @@ def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
         allure.attach(message, name="Ошибка setup набора", attachment_type=allure.attachment_type.TEXT)
     except Exception:
         logger.debug("Не удалось прикрепить ошибку setup к Allure", exc_info=True)
-    logger.info("[TEARDOWN] LDS Configurator cleanup после ошибки setup набора")
+
+    logger.info("[TEARDOWN] LDS Configurator очистка после ошибки setup набора")
     _run_lds_configurator_teardown_if_needed(cfg)
     if stand_manager := cfg.get("stand_manager"):
         try:
@@ -693,14 +693,11 @@ def _run_lds_configurator_teardown_if_needed(cfg: dict) -> None:
     pre_run_running_tus = cfg.get("pre_run_running_tus") or []
 
     async def _teardown() -> None:
-        websocket_client = init_ws_stand_client(cfg)
         http_client = init_http_stand_client(cfg)
         http_client.suppress_recv_logging = True
-        async with websocket_client as ws_client:
-            ws_client.suppress_recv_logging = True
-            await lds_configurator_scenarios.lds_configurator_teardown(
-                ws_client, http_client, tu_id, admin_tu_name, pre_run_running_tus
-            )
+        await lds_configurator_scenarios.lds_configurator_teardown(
+            http_client, tu_id, admin_tu_name, pre_run_running_tus
+        )
 
     try:
         _run_lds_configurator_ws(_teardown)
@@ -838,3 +835,4 @@ def pytest_sessionfinish(session, exitstatus):
     else:
         for file in files_for_drop:
             os.remove(file)
+            
