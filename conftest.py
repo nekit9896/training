@@ -486,8 +486,7 @@ def require_suite_infra(request):
         return
     cfg = request.config.group_state
     if cfg.get("current_suite") and not cfg.get("suite_infra_ready"):
-        reason = cfg.get("suite_setup_failure") or "ошибка подготовки набора"
-        pytest.skip(f"[SETUP] [ERROR] Инфраструктура набора не готова: {reason}")
+        pytest.skip("Набор пропущен: инфраструктура не готова")
 
 
 def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
@@ -499,6 +498,7 @@ def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
         allure.attach(message, name="Ошибка setup набора", attachment_type=allure.attachment_type.TEXT)
     except Exception:
         logger.debug("Не удалось прикрепить ошибку setup к Allure", exc_info=True)
+    logger.info("[TEARDOWN] LDS Configurator cleanup после ошибки setup набора")
     _run_lds_configurator_teardown_if_needed(cfg)
     if stand_manager := cfg.get("stand_manager"):
         try:
@@ -507,7 +507,7 @@ def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
             logger.exception("[SETUP] Ошибка остановки имитатора после неудачного setup набора")
     cfg["suite_infra_ready"] = False
     cfg["suite_setup_failure"] = message
-    pytest.skip(message)
+    pytest.skip("Набор пропущен: ошибка подготовки инфраструктуры")
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -629,7 +629,6 @@ def pytest_runtest_setup(item):
             try:
                 _run_lds_verify_after_core(suite_config, cfg)
             except BaseException as error:
-                # Имитатор остановится в pytest_sessionfinish через stop_imitator_wrapper
                 _skip_current_suite_after_setup_failure(
                     cfg, f"[SETUP] [ERROR] LDS Configurator проверка после запуска ядра: {error}"
                 )
@@ -731,7 +730,8 @@ def pytest_runtest_teardown(item, nextitem):
 
     if next_suite != cfg["current_suite"]:
         if stand_manager := cfg["stand_manager"]:
-            stand_manager.stop_imitator_wrapper()
+            if cfg.get("suite_infra_ready"):
+                stand_manager.stop_imitator_wrapper()
             try:
                 stand_manager.restore_signal_unit_conversion_rules()
             except Exception:
