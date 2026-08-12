@@ -4,26 +4,27 @@ import os
 import shutil
 import threading
 import time
-from typing import Optional
 
 import allure
 import pytest
 import pytest_asyncio
 
-from clients.http_client import StandHttpClient
-from clients.keycloak_clients import KeycloakAuthError, KeycloakClient
 from clients.testops_client import AllureResultsUploader, logger
-from clients.websocket_client import WebSocketClient
 from constants.architecture_constants import EnvKeyConstants as EnvConst
-from constants.architecture_constants import HTTPClientConstants as HttpConst
 from constants.architecture_constants import ImitatorConstants as ImConst
-from constants.architecture_constants import WebSocketClientConstants as WSCliConst
 from constants.enums import RejectionSensorTag
 from constants.test_constants import BaseTN3Constants
 from infra.stand_setup_manager import StandSetupManager
 from test_config.datasets import get_config_by_name
 from test_scenarios import lds_configurator_scenarios
 from utils.helpers import lds_configurator_utils as lds_cfg_utils
+from utils.helpers.pytest_auth import (
+    clear_suite_auth,
+    ensure_auth_for_fixture,
+    ensure_suite_auth,
+    init_http_stand_client,
+    init_ws_stand_client,
+)
 from utils.helpers.ws_message_parser import ws_message_parser as lds_ws_parser
 
 
@@ -99,6 +100,10 @@ def pytest_configure(config):
         "pre_run_running_tus": None,
         "suite_infra_ready": False,
         "suite_setup_failure": None,
+        "stand_host": None,
+        "auth_token": None,
+        "x_user_id": None,
+        "auth_suite": None,
     }
 
 
@@ -481,8 +486,7 @@ def require_suite_infra(request):
         return
     cfg = request.config.group_state
     if cfg.get("current_suite") and not cfg.get("suite_infra_ready"):
-        reason = cfg.get("suite_setup_failure") or "ошибка подготовки набора"
-        pytest.skip(f"[SETUP] [ERROR] Инфраструктура набора не готова: {reason}")
+        pytest.skip("Набор пропущен: инфраструктура не готова")
 
 
 def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
@@ -494,6 +498,7 @@ def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
         allure.attach(message, name="Ошибка setup набора", attachment_type=allure.attachment_type.TEXT)
     except Exception:
         logger.debug("Не удалось прикрепить ошибку setup к Allure", exc_info=True)
+    logger.info("[TEARDOWN] LDS Configurator cleanup после ошибки setup набора")
     _run_lds_configurator_teardown_if_needed(cfg)
     if stand_manager := cfg.get("stand_manager"):
         try:
@@ -502,7 +507,7 @@ def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
             logger.exception("[SETUP] Ошибка остановки имитатора после неудачного setup набора")
     cfg["suite_infra_ready"] = False
     cfg["suite_setup_failure"] = message
-    pytest.skip(message)
+    pytest.skip("Набор пропущен: ошибка подготовки инфраструктуры")
 
 
 @pytest.hookimpl(hookwrapper=True)
@@ -538,6 +543,7 @@ def pytest_runtest_setup(item):
         cfg["suite_start_time"] = None
         cfg["suite_infra_ready"] = False
         cfg["suite_setup_failure"] = None
+        clear_suite_auth(cfg)
 
         data_id = item.get_closest_marker("test_suite_data_id").args[0]
         test_data_name = item.get_closest_marker("test_data_name").args[0]
@@ -578,6 +584,10 @@ def pytest_runtest_setup(item):
         except Exception as error:
             _skip_current_suite_after_setup_failure(cfg, f"[SETUP] [ERROR] ошибка при подготовке стенда: {error}")
         try:
+            ensure_suite_auth(cfg, current_test_suite)
+        except BaseException as error:
+            _skip_current_suite_after_setup_failure(cfg, f"[SETUP] [ERROR] не удалось инициализировать auth: {error}")
+        try:
             _update_sensor_ids(stand_manager)
         except Exception as error:
             _skip_current_suite_after_setup_failure(
@@ -617,9 +627,8 @@ def pytest_runtest_setup(item):
                     "при use_lds_configurator=True",
                 )
             try:
-                _run_lds_verify_after_core(suite_config)
+                _run_lds_verify_after_core(suite_config, cfg)
             except BaseException as error:
-                # Имитатор остановится в pytest_sessionfinish через stop_imitator_wrapper
                 _skip_current_suite_after_setup_failure(
                     cfg, f"[SETUP] [ERROR] LDS Configurator проверка после запуска ядра: {error}"
                 )
@@ -646,21 +655,21 @@ def _run_lds_admin_setup(suite_config, group_state: dict) -> None:
     """
 
     async def _admin_setup() -> None:
-        http_client = init_http_stand_client()
+        http_client = init_http_stand_client(group_state)
         http_client.suppress_recv_logging = True
         await lds_configurator_scenarios.lds_configurator_admin_setup(http_client, suite_config, group_state)
 
     _run_lds_configurator_ws(_admin_setup)
 
 
-def _run_lds_verify_after_core(suite_config) -> None:
+def _run_lds_verify_after_core(suite_config, group_state: dict) -> None:
     """
     WS-проверка готовности стенда после запуска lds-core.
     """
 
     async def _verify() -> None:
-        websocket_client = init_ws_stand_client()
-        http_client = init_http_stand_client()
+        websocket_client = init_ws_stand_client(group_state)
+        http_client = init_http_stand_client(group_state)
         http_client.suppress_recv_logging = True
         async with websocket_client as ws_client:
             ws_client.suppress_recv_logging = True
@@ -684,8 +693,8 @@ def _run_lds_configurator_teardown_if_needed(cfg: dict) -> None:
     pre_run_running_tus = cfg.get("pre_run_running_tus") or []
 
     async def _teardown() -> None:
-        websocket_client = init_ws_stand_client()
-        http_client = init_http_stand_client()
+        websocket_client = init_ws_stand_client(cfg)
+        http_client = init_http_stand_client(cfg)
         http_client.suppress_recv_logging = True
         async with websocket_client as ws_client:
             ws_client.suppress_recv_logging = True
@@ -721,7 +730,8 @@ def pytest_runtest_teardown(item, nextitem):
 
     if next_suite != cfg["current_suite"]:
         if stand_manager := cfg["stand_manager"]:
-            stand_manager.stop_imitator_wrapper()
+            if cfg.get("suite_infra_ready"):
+                stand_manager.stop_imitator_wrapper()
             try:
                 stand_manager.restore_signal_unit_conversion_rules()
             except Exception:
@@ -744,127 +754,32 @@ def pytest_runtest_teardown(item, nextitem):
                 logger.exception("Ошибка при join() фона имитатора")
 
 
-def get_instance() -> str:
-    """
-    Получает имя стенда
-    """
-    instance = os.environ.get(EnvConst.STAND_NAME)
-    if not instance:
-        pytest.exit(f"Переменная окружения {EnvConst.STAND_NAME} не задана в .env")
-    return instance
-
-
-def build_stand_host() -> str:
-    """
-    Создает URL для ws и http запросов к стенду
-    """
-    instance = get_instance()
-    ws_host = (
-        f"{WSCliConst.SERVICE_NAME}.{WSCliConst.COMPONENT}-{instance}.{WSCliConst.ROOT_DOMAIN}/"
-        f"{WSCliConst.API_GATEWAY_PATH_SEGMENT}"
-    )
-
-    return ws_host
-
-
-def get_token(max_retries: int = 10, backoff: float = 5.0) -> str:
-    """
-    :param max_retries: сколько всего попыток (включая первую)
-    :param backoff: время в секундах между попытками
-    """
-    last_exc = None
-    keycloak = KeycloakClient(
-        url=os.environ.get(EnvConst.KEYCLOAK_SZI_URL),
-        client_id=os.environ.get(EnvConst.KEYCLOAK_CLIENT_ID),
-        client_secret=os.environ.get(EnvConst.KEYCLOAK_SZI_CLIENT_SECRET),
-        username=os.environ.get(EnvConst.KEYCLOAK_USERNAME),
-        password=os.environ.get(EnvConst.KEYCLOAK_PASSWORD),
-    )
-    for attempt in range(1, max_retries + 1):
-        try:
-
-            token = keycloak.get_access_token()
-            if not token:
-                raise KeycloakAuthError("Получен пустой access token")
-            return token
-
-        except KeycloakAuthError as e:
-            last_exc = e
-            logger.warning(f"[{attempt}/{max_retries}] KeycloakAuthError: {e}. Повтор через {backoff} сек.")
-        except Exception as e:
-            last_exc = e
-            logger.warning(f"[{attempt}/{max_retries}] Неожиданная ошибка: {e}. Повтор через {backoff} сек.")
-
-        if attempt < max_retries:
-            time.sleep(backoff)
-
-    # все попытки исчерпаны
-    logger.error(f"[KEYCLOAK] [ERROR] Не удалось получить токен после {max_retries} попыток: {last_exc}")
-    pytest.fail(f"[KEYCLOAK][ERROR] Не удалось получить токен после {max_retries} попыток: {last_exc}")
-
-
-def get_connection_params() -> tuple:
-    """
-    Получает адрес стенда и токен авторизации
-    """
-    stand_host = build_stand_host()
-    auth_token = get_token()
-    return stand_host, auth_token
-
-
-def init_http_stand_client() -> StandHttpClient:
-    """
-    Создает экземпляр класса StandHttpClient для запросов к стенду
-    """
-    stand_host, auth_token = get_connection_params()
-    http_client = StandHttpClient(stand_host, auth_token)
-    return http_client
-
-
-def get_x_user_id() -> Optional[str]:
-    """
-    Получает x-user-id из headers Ping запроса
-    """
-    http_client = init_http_stand_client()
-    http_client.suppress_recv_logging = True
-    try:
-        response = http_client.post_request(HttpConst.PING_URL_PATH, {})
-        logger.info("[HTTP_CLIENT] [OK] Успешно получен x-user-id")
-        return response.headers.get(HttpConst.X_USER_ID_KEY)
-    except Exception as error:
-        logger.error(f"[HTTP_CLIENT] [ERROR] Не удалось получить x-user-id: {error}")
-        pytest.exit(f"[HTTP_CLIENT] [ERROR] Не удалось получить x-user-id: {error}")
-
-
-def init_ws_stand_client() -> WebSocketClient:
-    """
-    Создает экземпляр класса WebSocketClient для запросов к стенду
-    """
-    ws_host, token = get_connection_params()
-    x_user_id = get_x_user_id()
-    ws_client = WebSocketClient(ws_host, token, x_user_id)
-    return ws_client
-
-
 @pytest_asyncio.fixture
-async def ws_client():
+async def ws_client(request):
     """
-    Фикстура для работы с websocket клиентом
+    Фикстура для работы с websocket клиентом.
+
+    request - даёт доступ к request.config.group_state (общий кэш auth на dataset: stand_host, auth_token, x_user_id).
     :return: Объект wss соединения
     """
-    ws_client = init_ws_stand_client()
+    cfg = request.config.group_state
+    ensure_auth_for_fixture(cfg)
+    ws_client = init_ws_stand_client(cfg)
     async with ws_client as client:
         yield client
 
 
 @pytest.fixture
-def http_client():
+def http_client(request):
     """
-    Фикстура для работы с http клиентом
+    Фикстура для работы с http клиентом.
+
+    request - даёт доступ к request.config.group_state (общий кэш auth на dataset: stand_host, auth_token).
     :return: экземпляр класса для выполнения http запросов к стенду
     """
-    http_client = init_http_stand_client()
-    yield http_client
+    cfg = request.config.group_state
+    ensure_auth_for_fixture(cfg)
+    return init_http_stand_client(cfg)
 
 
 @pytest.fixture
