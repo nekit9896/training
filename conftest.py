@@ -415,6 +415,18 @@ def allure_tms_link(request):
 
 
 @pytest.fixture(autouse=True)
+def require_suite_infra(request):
+    """
+    Пропускает тесты набора, если infra-setup не завершился успешно.
+    """
+    if not request.node.get_closest_marker("test_suite_name"):
+        return
+    cfg = request.config.group_state
+    if cfg.get("current_suite") and not cfg.get("suite_infra_ready"):
+        pytest.skip("[SETUP] [ERROR] Набор пропущен: инфраструктура не готова")
+
+
+@pytest.fixture(autouse=True)
 def offset_wait(request):
     """
     Offset‑ожидание перед каждым тестом относительно фактического старта core
@@ -477,18 +489,6 @@ def compute_imitator_duration(item, current_test_suite: str) -> float:
             "Не удалось вычислить imitator_duration: в тестовом модуле одновременно отсутствуют "
             "и @pytest.mark.offset(), и pytest.mark.imitator_duration()"
         )
-
-
-@pytest.fixture(autouse=True)
-def require_suite_infra(request):
-    """
-    Пропускает тесты набора, если infra-setup не завершился успешно.
-    """
-    if not request.node.get_closest_marker("test_suite_name"):
-        return
-    cfg = request.config.group_state
-    if cfg.get("current_suite") and not cfg.get("suite_infra_ready"):
-        pytest.skip("[SETUP] [ERROR] Набор пропущен: инфраструктура не готова")
 
 
 def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
@@ -638,14 +638,6 @@ def pytest_runtest_setup(item):
                 )
 
         cfg["suite_infra_ready"] = True
-
-    if (
-        current_test_suite == cfg.get("current_suite")
-        and cfg.get("current_suite")
-        and not cfg.get("suite_infra_ready")
-    ):
-        reason = cfg.get("suite_setup_failure") or "[SETUP] [ERROR] Набор пропущен: инфраструктура не готова"
-        pytest.skip(reason)
 
     yield  # pytest продолжит выполнение теста
 
