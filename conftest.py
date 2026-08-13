@@ -419,6 +419,9 @@ def offset_wait(request):
     """
     Offset‑ожидание перед каждым тестом относительно фактического старта core
     """
+    cfg = request.config.group_state
+    if cfg.get("current_suite") and not cfg.get("suite_infra_ready"):
+        return
     if offset_marker := request.node.get_closest_marker("offset"):
         offset_sec = float(offset_marker.args[0]) * BaseTN3Constants.SEC_PER_MIN
         start = request.config.group_state["suite_start_time"] or 0
@@ -507,6 +510,7 @@ def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
             logger.exception("[SETUP] Ошибка остановки имитатора после неудачного setup набора")
     cfg["suite_infra_ready"] = False
     cfg["suite_setup_failure"] = message
+    cfg["suite_start_time"] = None
     pytest.skip("Набор пропущен: ошибка подготовки инфраструктуры")
 
 
@@ -634,6 +638,14 @@ def pytest_runtest_setup(item):
                 )
 
         cfg["suite_infra_ready"] = True
+
+    if (
+        current_test_suite == cfg.get("current_suite")
+        and cfg.get("current_suite")
+        and not cfg.get("suite_infra_ready")
+    ):
+        reason = cfg.get("suite_setup_failure") or "[SETUP] [ERROR] Набор пропущен: инфраструктура не готова"
+        pytest.skip(reason)
 
     yield  # pytest продолжит выполнение теста
 
@@ -835,4 +847,3 @@ def pytest_sessionfinish(session, exitstatus):
     else:
         for file in files_for_drop:
             os.remove(file)
-            
