@@ -155,6 +155,8 @@ class BaseTN3Constants:
         "Н-К.УП ИНПЗ.УЗР 4,3км - Н-К.ИНПЗ.УЗР СИКН 1019": (9992054914, (9992054911,)),
         "Т-Н-3.НПС«Крымская».УЗР вых Камеры пуска - Т-Н-3.«Грушовая».УЗР-700": (9992054915, (9992054912,)),
     }
+    DIAGNOSTIC_AREA_IDS_EXCLUDED_GRAVITY: list[int] = []
+    DIAGNOSTIC_AREA_IDS_EXCLUDED_NPS: list[int] = []
     REPRESENTATIVE_DIAGNOSTIC_AREA_IDS = [2, 3]  # Список показательных ДУ для определения режима СОУ
     ZONE_INFO: str = "Europe/Moscow"
     SECONDS_PER_HOUR: int = 3600

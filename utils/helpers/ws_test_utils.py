@@ -4,6 +4,7 @@ import asyncio
 import pprint
 import random
 import re
+from collections import Counter
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum, IntFlag
@@ -29,6 +30,7 @@ from constants.enums import (
     LeakStatus,
     ReplyStatus,
     SignalType,
+    SiteKpKp,
     StationaryReason,
     StationaryStatus,
     StoppedPumpingReason,
@@ -234,6 +236,70 @@ def get_longest_flow_area(flow_areas: List[FlowArea]) -> Optional[FlowArea]:
         return longest_flow_area
     except (TypeError, ValueError):
         return None
+
+
+def get_longest_flow_area_by_pipes(flow_areas: List[FlowArea]) -> Optional[FlowArea]:
+    """
+    Получает самый протяженный участок карты течения по количеству pipeIds
+    """
+    if not flow_areas:
+        return None
+    try:
+        return max(flow_areas, key=lambda flow_area: len(flow_area.pipesIds or []))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def filter_flow_areas_with_available_flow(flow_areas: List[FlowArea]) -> List[FlowArea]:
+    """
+    Оставляет только участки карты течения с доступным течением
+    """
+    return [flow_area for flow_area in flow_areas if getattr(flow_area, "isFlowAvailable", False)]
+
+
+def get_diagnostic_area_base_ids() -> list[int]:
+    """
+    Возвращает список id базовых диагностических участков из константы DIAGNOSTIC_AREA_BASE_IDS
+    """
+    return [pair[0] for pair in TestConst.DIAGNOSTIC_AREA_BASE_IDS.values()]
+
+
+def diagnostic_area_title(du_id: int) -> str:
+    """
+    Возвращает строковое представление ДУ: id и название из DIAGNOSTIC_AREA_BASE_IDS
+    """
+    for name, pair in TestConst.DIAGNOSTIC_AREA_BASE_IDS.items():
+        if pair[0] == du_id:
+            return f"{du_id} ({name})"
+    return str(du_id)
+
+
+def determine_stationary_status_by_majority(statuses: list[StationaryStatus]) -> Optional[StationaryStatus]:
+    """
+    Определяет общий режим МТ по правилу большинства ДУ в одном статусе.
+    При равенстве количества выбирается статус с максимальным значением enum.
+    """
+    if not statuses:
+        return None
+    counts = Counter(statuses)
+    max_count = max(counts.values())
+    candidates = [status for status, count in counts.items() if count == max_count]
+    return max(candidates, key=lambda status: status.value)
+
+
+def collect_mt_modes_from_output_signals(
+    controlled_site_signals: list,
+) -> list[tuple[SiteKpKp, StationaryStatus]]:
+    """
+    Собирает режимы МТ (SignalType.REGLU) по всем участкам КП-КП из OutputSignalsInfo
+    """
+    all_signals_dict = extract_signal_on_site_and_segment(controlled_site_signals)
+    site_modes = []
+    for site in SiteKpKp:
+        mt_mode = get_signal_value(all_signals_dict, site.site_key, SignalType.REGLU)
+        if mt_mode is not None:
+            site_modes.append((site, mt_mode))
+    return site_modes
 
 
 def determine_lds_status_by_priority(lds_status_set: Set[int]) -> Optional[int]:
@@ -469,7 +535,7 @@ def find_base_diagnostic_areas(flow_areas: List[FlowArea]) -> List[DiagnosticAre
     """
     Получает список базовых ДУ из списка flow_areas
     """
-    return find_diagnostic_areas_by_ids(flow_areas, TestConst.DIAGNOSTIC_AREA_BASE_IDS)
+    return find_diagnostic_areas_by_ids(flow_areas, get_diagnostic_area_base_ids())
 
 
 def find_leak_by_coordinate(

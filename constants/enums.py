@@ -80,10 +80,26 @@ class TU(Enum):
 
 
 class AdminTU(Enum):
-    """ТУ в Администрировании и WS-подписках (не legacy имитатор)."""
+    """ТУ в Администрировании и WS-подписках"""
 
     TIKHORETSK_NOVOROSSIYSK_3_AUTOTEST = (
-        "Тихорецк-Новороссийск-3-Автотест",
+        "ТН-3-Автотест",
+        TU.TIKHORETSK_NOVOROSSIYSK_3,
+    )
+    TIKHORETSK_NOVOROSSIYSK_3_AUTOTEST_REJECT = (
+        "ТН-3-Автотест-Отбраковки",
+        TU.TIKHORETSK_NOVOROSSIYSK_3,
+    )
+    TIKHORETSK_NOVOROSSIYSK_3_AUTOTEST_DATA_ABSENCE_FALSE = (
+        "ТН-3-Автотест-DATA-ABSENCE-FALSE",
+        TU.TIKHORETSK_NOVOROSSIYSK_3,
+    )
+    TIKHORETSK_NOVOROSSIYSK_3_AUTOTEST_DATA_ABSENCE_FALSE_BIK = (
+        "ТН-3-Автотест-DATA-ABSENCE-BIK",
+        TU.TIKHORETSK_NOVOROSSIYSK_3,
+    )
+    TIKHORETSK_NOVOROSSIYSK_3_AUTOTEST_DATA_ABSENCE_FALSE_SELECT = (
+        "ТН-3-Автотест-DATA-ABSENCE-SELECT",
         TU.TIKHORETSK_NOVOROSSIYSK_3,
     )
 
@@ -119,6 +135,7 @@ class ExportedDataType(IntEnum):
     LDS_STATUS_REPORT = 5
     LEAKS_REPORT = 4
     REJECTED_REPORT = 7
+    JOURNAL_REPORT = 1
 
     def to_download_name(self) -> str:
         """Строковый тип для DownloadExportedDataRequest.exportedDataType"""
@@ -162,9 +179,9 @@ class SouAdminStatus(BaseStrEnum):
 
 
 class StationaryStatus(BaseStrEnum):
-    UNSTATIONARY = (1, 'Нестационарный режим работы МТ')  # Нестационарный режим
-    STATIONARY = (2, 'Стационарный режим работы МТ')  # Стационарный режим
-    STOPPED = (3, 'МТ в режиме остановленной перекачки')  # Режим остановкленной перекачки
+    UNSTATIONARY = (1, 'Нестационарный режим работы МТ')
+    STATIONARY = (2, 'Стационарный режим работы МТ')
+    STOPPED = (3, 'МТ в режиме остановленной перекачки')
 
     def __new__(cls, value: int, report_text: str) -> "StationaryStatus":
         member = object.__new__(cls)
@@ -289,6 +306,7 @@ class ReservedType(BaseStrEnum):
 
 
 class MessageType(BaseStrIntFlag):
+    USER_ACTION = 0
     AUTHENTICATION = 1  # Вход в систему
     REJECTION = 1 << 2  # Отбраковка сигналов
     LDS_STATUS = 1 << 3  # Режим работы СОУ
@@ -362,57 +380,83 @@ class LdsStatusInitialization(BaseReasonEnum):
     USER_ACTION = (1 << 4, 'По команде пользователя')
 
 
-class StationaryReason(BaseStrEnum):
+class StationaryReason(BaseReasonEnum):
     """
     Причины режима работы МТ: Стационар для ЭФ Журнал
     """
 
-    # Отклонения давления и расхода не превышают допустимых отклонений
-    PRESSURE_AND_FLOW_MOVING_AVERAGES_MEET_CRITERIA = "Отклонения давления и расхода не превышают допустимых отклонений"
+    PRESSURE_AND_FLOW_MOVING_AVERAGES_MEET_CRITERIA = (
+        1 << 0,
+        'Отклонения давления и расхода не превышают допустимых отклонений',
+    )
+    ABSENCE_GRAVITY_SECTION_AND_TECHNOLOGICAL_SWITCHING = (
+        1 << 1,
+        'Окончание периода времени после технологических переключений и отсутствия самотечного участка',
+    )
 
 
-class UnStationaryReason(BaseStrIntFlag):
+class UnStationaryReason(BaseReasonEnum):
     """
     Причины режима работы МТ: Нестационар
     """
 
-    # Пуск/остановка трубопровода; включение/отключение магистрального насоса; включение/отключение НПС
-    CHANGING_EQUIPMENT_STATUS = 1 << 0
-    # Начало/окончание работы насосов откачки емкостей на НПС и ЛЧ технологического участка
-    CHANGING_WORKING_OF_PUMPING_OUT_PUMPS = 1 << 1
-    # Изменение частоты вращения в ручном режиме и/или изменение уставки регулирования в автоматическом режиме
-    # работы МНА с ЧРП
-    CHANGING_MAIN_PUMPS_ROTATION_SPEED = 1 << 2
-    CHANGING_BLOCK_VALVES_STATUS = 1 << 3  # Полное или частичное открытие/закрытие задвижки
-    SWITCHING_TANKS = 1 << 4  # Переключение резервуаров
-    CHANGING_ACCEPTANCE_OR_DELIVERY_STATE = 1 << 5  # Начало или прекращение приема/сдачи нефти/нефтепродуктов
-    TRIGGERING_EMERGENCY_RESET_OR_PWSS_OPERATION = 1 << 6  # Задействование аварийного сброса
-    SAFETY_VALVES_ACTUATION = 1 << 7  # Срабатывание предохранительных клапанов
-    # Изменение уставки регулирования по давлению узлов регулирования давления, работающих в автоматическом режиме
-    # управления
-    CHANGING_PRESSURE_SETTING = 1 << 8
-    # Изменение процента открытия/закрытия заслонки узлов регулирования давления, работающих в ручном режиме управления
-    CHANGING_OPENING_PERCENTAGE_VALVE = 1 << 9
-    CHANGING_ADDITIVE_INJECTOR_STATUS_OR_FLOW = 1 << 10  # Начало/окончание ввода ПТП или изменение расхода вводимой ПТП
-    LEAK_END = 1 << 11  # Окончание утечки
-    # Наличие сигнала статуса «Открывается»/»Закрывается» запорной арматуры (не в режиме имитации),
-    # расположенной в точке, гидравлически связанной с рассматриваемым ДУ
-    TO_OPEN_OR_TO_CLOSE_STATUS = 1 << 12
-    # Нестационарный режим работы/отсутствие сигнала о режиме работы смежного ТУ, работающего
-    # в единой гидравлической системе с защищаемым ТУ
-    ADJACENT_TU = 1 << 13
-    COLD_START = 1 << 14  # Одновременный «холодный» запуск нескольких серверов СОУ
+    CHANGING_EQUIPMENT_STATUS = (
+        1 << 0,
+        'Пуск/остановка трубопровода; включение/отключение магистрального насоса; включение/отключение НПС',
+    )
+    CHANGING_WORKING_OF_PUMPING_OUT_PUMPS = (
+        1 << 1,
+        'Начало/окончание работы насосов откачки емкостей на НПС и ЛЧ технологического участка',
+    )
+    CHANGING_MAIN_PUMPS_ROTATION_SPEED = (
+        1 << 2,
+        'Изменение частоты вращения в ручном режиме и/или изменение уставки регулирования '
+        'в автоматическом режиме работы МНА с ЧРП',
+    )
+    CHANGING_BLOCK_VALVES_STATUS = (1 << 3, 'Полное или частичное открытие/закрытие задвижки')
+    SWITCHING_TANKS = (1 << 4, 'Переключение резервуаров')
+    CHANGING_ACCEPTANCE_OR_DELIVERY_STATE = (1 << 5, 'Начало или прекращение приема/сдачи нефти/нефтепродуктов')
+    TRIGGERING_EMERGENCY_RESET_OR_PWSS_OPERATION = (1 << 6, 'Задействование аварийного сброса')
+    SAFETY_VALVES_ACTUATION = (1 << 7, 'Срабатывание предохранительных клапанов')
+    CHANGING_PRESSURE_SETTING = (
+        1 << 8,
+        'Изменение уставки регулирования по давлению узлов регулирования давления, '
+        'работающих в автоматическом режиме управления',
+    )
+    CHANGING_OPENING_PERCENTAGE_VALVE = (
+        1 << 9,
+        'Изменение процента открытия/закрытия заслонки узлов регулирования давления, '
+        'работающих в ручном режиме управления',
+    )
+    CHANGING_ADDITIVE_INJECTOR_STATUS_OR_FLOW = (
+        1 << 10,
+        'Начало/окончание ввода ПТП или изменение расхода вводимой ПТП',
+    )
+    LEAK_END = (1 << 11, 'Окончание утечки')
+    TO_OPEN_OR_TO_CLOSE_STATUS = (
+        1 << 12,
+        'Наличие сигнала статуса «Открывается»/»Закрывается» запорной арматуры (не в режиме имитации), '
+        'расположенной в точке, гидравлически связанной с рассматриваемым ДУ',
+    )
+    ADJACENT_TU = (
+        1 << 13,
+        'Нестационарный режим работы/отсутствие сигнала о режиме работы смежного ТУ, '
+        'работающего в единой гидравлической системе с защищаемым ТУ',
+    )
+    COLD_START = (1 << 14, 'Одновременный «холодный» запуск нескольких серверов СОУ')
 
 
-class StoppedPumpingReason(BaseStrIntFlag):
+class StoppedPumpingReason(BaseReasonEnum):
     """
     Причины режима работы МТ: Остановленный
     """
 
-    # На ДУ отсутствуют работающие НА, при этом показания СИ расхода не превышают 1 % от максимального значения
-    # диапазона измерений всех СИ расхода на технологическом участке
-    STOPPING_PUMPS = 1 << 0
-    CUTOFF_AREA = 1 << 1  # Участок отсечен запорной арматурой от подкачек/откачек
+    STOPPING_PUMPS = (
+        1 << 0,
+        'На ДУ отсутствуют работающие НА, при этом показания СИ расхода не превышают 1 % от максимального значения '
+        'диапазона измерений всех СИ расхода на технологическом участке',
+    )
+    CUTOFF_AREA = (1 << 1, 'Участок отсечен запорной арматурой от подкачек/откачек')
 
 
 class RejectionCriteria(IntFlag):
@@ -511,14 +555,30 @@ class UserActions(IntFlag):
 class SiteKpKp(Enum):
     """controlledSiteId, segmentId"""
 
-    TIXORECZKAYA_NOVOVELICHKOVSKAYA = {'controlledSiteId': 6012, 'segmentId': 6013}
-    NOVOVELICHKOVSKAYA_KRYMSKAYA = {'controlledSiteId': 6074, 'segmentId': 6075}
-    KRYMSKAYA_GRUSHOVAYA = {'controlledSiteId': 6220, 'segmentId': 6221}
-    BACKUP_ROUTE_BEJSUG = {'controlledSiteId': 6242, 'segmentId': 6243}
-    BACKUP_ROUTE_PONURA = {'controlledSiteId': 6076, 'segmentId': 6077}
-    BACKUP_ROUTE_KUBAN = {'controlledSiteId': 6088, 'segmentId': 6089}
-    NPZ_AFIPSKIJ = {'controlledSiteId': 6244, 'segmentId': 6245}
-    NPZ_ILINSKIJ = {'controlledSiteId': 6120, 'segmentId': 6121}
+    TIXORECZKAYA_NOVOVELICHKOVSKAYA = (6012, 6013)
+    NOVOVELICHKOVSKAYA_KRYMSKAYA = (6074, 6075)
+    KRYMSKAYA_GRUSHOVAYA = (6220, 6221)
+    BACKUP_ROUTE_BEJSUG = (6242, 6243)
+    BACKUP_ROUTE_PONURA = (6076, 6077)
+    BACKUP_ROUTE_KUBAN = (6088, 6089)
+    NPZ_AFIPSKIJ = (6244, 6245)
+    NPZ_ILINSKIJ = (6120, 6121)
+
+    @property
+    def controlledSiteId(self) -> int:
+        return self.value[0]
+
+    @property
+    def segmentId(self) -> int:
+        return self.value[1]
+
+    @property
+    def controlledSiteSegmentDict(self) -> dict:
+        return {'controlledSiteId': self.controlledSiteId, 'segmentId': self.segmentId}
+
+    @property
+    def site_key(self) -> tuple[int, int]:
+        return self.controlledSiteId, self.segmentId
 
 
 class SignalType(IntFlag):
@@ -550,8 +610,8 @@ class SignalType(IntFlag):
 
 
 class GravityPipe(Enum):
-    expected_lds_status_gravity_true = (1, "Наличие самотека")
-    expected_lds_status_gravity_false = (0, "Отсутствие самотека")
+    present_gravity = (1, "Наличие самотека")
+    absent_gravity = (0, "Отсутствие самотека")
 
     def __init__(self, status_id: int, description: str) -> None:
         self.id = status_id
