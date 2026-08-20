@@ -58,6 +58,11 @@ class StandSetupManager:
         self._final_cmd = self._cmd_generator.generate_final_imitator_cmd()
         # Экземпляр имитатор менеджера нужно создавать после генерации команды, отдельно от других клиентов
         self._imitator_manager = ImitatorManager(self._stand_client, self._final_cmd)
+        self._remote_data_uploaded = False
+
+    @property
+    def remote_data_uploaded(self) -> bool:
+        return self._remote_data_uploaded
 
     @property
     def start_time(self):
@@ -74,9 +79,8 @@ class StandSetupManager:
         Обертка, в которой проходит полная подготовка стенда
         """
         try:
-            if not os.environ.get("RUN_WITHOUT_TESTOPS", "False").lower() == "true":
-                # При запуске с TestOps загружает данные для прогона
-                self._uploader.upload_with_confirm()
+            self._uploader.upload_with_confirm()
+            self._remote_data_uploaded = True
 
             self.stop_all_containers()
             if self._signal_unit_conversion_manager is not None:
@@ -187,12 +191,14 @@ class StandSetupManager:
         if uploader is None:
             logger.info("[TEARDOWN] [SKIP] uploader не инициализирован, удаление данных со стенда пропущено")
             return
+        if not self._remote_data_uploaded:
+            logger.info("[TEARDOWN] [SKIP] данные на стенд не загружались, удаление пропущено")
+            return
         try:
             uploader.delete_with_confirm()
-        except Exception as error:
-            error_msg = "[TEARDOWN] [ERROR] Не удалось удалить данные с сервера"
-            logger.exception(error_msg)
-            raise RuntimeError(error_msg) from error
+            self._remote_data_uploaded = False
+        except Exception:
+            logger.exception("[TEARDOWN] [ALERT] Не удалось удалить данные с сервера")
 
     @staticmethod
     def _parse_opc_target() -> tuple[str, int]:
@@ -247,18 +253,14 @@ class StandSetupManager:
 
     def _choose_cmd_generator(self) -> ImitatorCmdGenerator:
         """
-        Выбирает вариант генерации команды запуска имитатора, в зависимости от типа запуска
+        Создаёт uploader и генератор команды запуска имитатора по данным из TestOps.
         """
         try:
-            if os.environ.get("RUN_WITHOUT_TESTOPS", "False").lower() == "true":
-                # Запуск без TestOps
-                return ImitatorCmdGenerator(self._test_data_name, self._stand_name, self._duration_m)
-            else:
-                self._uploader = ImitatorDataUploader(
-                    self._stand_client, self._test_data_id, self._test_data_name, self._tu_id
-                )
-                self._data_path = self._uploader.remote_temp_dir_path
-                return ImitatorCmdGenerator(self._data_path, self._stand_name, self._duration_m)
+            self._uploader = ImitatorDataUploader(
+                self._stand_client, self._test_data_id, self._test_data_name, self._tu_id
+            )
+            self._data_path = self._uploader.remote_temp_dir_path
+            return ImitatorCmdGenerator(self._data_path, self._stand_name, self._duration_m)
         except Exception as error:
             error_msg = "[SETUP] [ERROR] Ошибка при выборе варианта генерации команды запуска имитатора"
             logger.exception(error_msg)

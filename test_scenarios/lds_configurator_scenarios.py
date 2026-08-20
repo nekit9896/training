@@ -80,7 +80,6 @@ async def lds_configurator_admin_setup(
 
     if target_tu_status == SouAdminStatus.RUNNING.value:
         if len(running_tus) == 1:
-            _save_pre_run_running_tus(group_state, [])  # Сохраняет пустой список ТУ, для запрета перезапуска
             logger.info(
                 "[SETUP] Запущен ранее только целевой ТУ: tuId=%s, tuName=%r, status=%s (%s)",
                 target_tu_id,
@@ -236,7 +235,7 @@ async def lds_configurator_teardown(
         admin_reply = lds_utils.get_basic_info_admin_with_retry(http_client, parser)
 
         sou_status = lds_utils.get_admin_tu_status(admin_reply, tu_id)
-        if sou_status == SouAdminStatus.RUNNING and snapshot and running_tu not in snapshot:
+        if sou_status == SouAdminStatus.RUNNING and not (len(snapshot) == 1 and snapshot[0] == running_tu):
             logger.info("[TEARDOWN] Остановка СОУ (StopLdsRequest) для tuId=%s", tu_id)
             lds_utils.run_lds_command(http_client, HttpConst.STOP_LDS_URL_PATH, tu_id)
 

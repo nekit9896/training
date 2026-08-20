@@ -508,6 +508,7 @@ def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
             stand_manager.stop_imitator_wrapper()
         except Exception:
             logger.exception("[SETUP] Ошибка остановки имитатора после неудачного setup набора")
+        stand_manager.server_test_data_remover()
     cfg["suite_infra_ready"] = False
     cfg["suite_setup_failure"] = message
     cfg["suite_start_time"] = None
@@ -530,17 +531,18 @@ def pytest_runtest_setup(item):
         # stop old
         _run_lds_configurator_teardown_if_needed(cfg)
         if stand_manager := cfg["stand_manager"]:
-            stand_manager.stop_imitator_wrapper()
             try:
-                stand_manager.restore_signal_unit_conversion_rules()
-            except Exception:
-                logger.exception(
-                    "[ERROR] [SETUP] Ошибка при восстановлении signal_unit_conversion_rules.json "
-                    "перед запуском нового набора"
-                )
-            if not os.environ.get("RUN_WITHOUT_TESTOPS", "False").lower() == "true":
-                # При запуске с TestOps удаляет данные прогона
+                stand_manager.stop_imitator_wrapper()
+                try:
+                    stand_manager.restore_signal_unit_conversion_rules()
+                except Exception:
+                    logger.exception(
+                        "[ERROR] [SETUP] Ошибка при восстановлении signal_unit_conversion_rules.json "
+                        "перед запуском нового набора"
+                    )
                 stand_manager.server_test_data_remover()
+            finally:
+                cfg["stand_manager"] = None
 
         # start new
         cfg["current_suite"] = current_test_suite
@@ -731,16 +733,16 @@ def pytest_runtest_teardown(item, nextitem):
 
     if next_suite != cfg["current_suite"]:
         if stand_manager := cfg["stand_manager"]:
-            if cfg.get("suite_infra_ready"):
-                stand_manager.stop_imitator_wrapper()
             try:
-                stand_manager.restore_signal_unit_conversion_rules()
-            except Exception:
-                logger.exception("[ERROR] [TEARDOWN] Ошибка при восстановлении signal_unit_conversion_rules.json")
-            if not os.environ.get("RUN_WITHOUT_TESTOPS", "False").lower() == "true":
-                # При запуске с TestOps удаляет данные прогона
+                if cfg.get("suite_infra_ready"):
+                    stand_manager.stop_imitator_wrapper()
+                try:
+                    stand_manager.restore_signal_unit_conversion_rules()
+                except Exception:
+                    logger.exception("[ERROR] [TEARDOWN] Ошибка при восстановлении signal_unit_conversion_rules.json")
                 stand_manager.server_test_data_remover()
-            cfg["stand_manager"] = None
+            finally:
+                cfg["stand_manager"] = None
         cfg["current_suite"] = None
         cfg["suite_start_time"] = None
         cfg["imitator_start_time"] = None
