@@ -89,7 +89,6 @@ def get_token(max_retries: int = 12, backoff: float = 5.0, force_refresh: bool =
             token = keycloak.get_access_token()
             if not token:
                 raise KeycloakAuthError("Получен пустой access token")
-            logger.info("[AUTH] [OK] Получен access token")
             return token
 
         except KeycloakAuthError as e:
@@ -152,9 +151,11 @@ def _fetch_x_user_id(http_client: StandHttpClient, max_retries: int = 5, backoff
 
 def ensure_suite_auth(group_state: dict, suite_name: str) -> None:
     """
-    Один раз на dataset: access token (Keycloak) + x-user-id (/Ping).
+    Получает и кэширует credentials набора: stand_host, auth_token, x-user-id.
 
-    Выполняется после старта api-gateway (Docker).
+    Порядок: Keycloak token -> Ping к api-gateway (x-user-id). Оба запрашиваются
+    после setup_stand_for_imitator_run(), когда gateway уже доступен.
+    Повторный вызов для того же suite_name с валидным кэшем ничего не делает.
     """
     if (
         group_state.get("auth_suite") == suite_name
@@ -190,6 +191,10 @@ def ensure_auth_for_fixture(group_state: dict) -> None:
 
 
 def _require_auth(group_state: dict, *, require_x_user_id: bool = False) -> None:
+    """
+    Проверяет, что auth уже инициализирован в group_state.
+    При отсутствии stand_host/auth_token (и x_user_id для WS) завершает прогон через pytest.exit.
+    """
     if not group_state.get("auth_token") or not group_state.get("stand_host"):
         pytest.exit("[AUTH] auth не инициализирован - ожидается ensure_suite_auth()")
     if require_x_user_id and not group_state.get("x_user_id"):

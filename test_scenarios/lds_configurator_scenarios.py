@@ -17,7 +17,6 @@ from constants.enums import SouAdminStatus
 from constants.test_constants import LdsConfiguratorConstants as LdsCfgConst
 from test_config.models_for_tests import BaseSuiteConfig
 from utils.helpers import lds_configurator_utils as lds_utils
-from utils.helpers import ws_test_utils as t_utils
 from utils.helpers.ws_message_parser import ws_message_parser as parser
 
 logger = logging.getLogger(__name__)
@@ -57,51 +56,72 @@ async def lds_configurator_admin_setup(
     3. LaunchLdsRequest и ожидание status=включена.
     4. Подтвердить launchedAt в GetTusInformation.
     """
-    tu_id: int
+    target_tu_id: int
 
     logger.info("[SETUP] Получение ТУ '%s' из Администрирования", cfg.admin_tu_name)
     admin_reply = lds_utils.get_basic_info_admin_with_retry(http_client, parser)
-    admin_tu = lds_utils.find_tu_by_name(admin_reply, cfg.admin_tu_name)
-    lds_utils.validate_admin_tu(admin_tu)
-    tu_id = admin_tu.tuId
-    cfg.resolved_tu_id = tu_id
-    _save_group_state(group_state, cfg, tu_id)
-    logger.info(
-        "[SETUP] Найден ТУ: tuId=%s, tuName=%r, status=%s (%s)",
-        tu_id,
-        admin_tu.tuName,
-        SouAdminStatus(admin_tu.status),
-        SouAdminStatus.report_text_by_value(admin_tu.status),
-    )
-
+    target_tu = lds_utils.find_tu_by_name(admin_reply, cfg.admin_tu_name)
     running_tus = lds_utils.extract_running_tus(admin_reply)
+    lds_utils.validate_admin_tu(target_tu)
+    target_tu_id = target_tu.tuId
+    target_tu_name = target_tu.tuName
+    target_tu_status = target_tu.status
+    cfg.resolved_tu_id = target_tu_id
+    _save_group_state(group_state, cfg, target_tu_id)
+    logger.info(
+        "[SETUP] Найден целевой ТУ: tuId=%s, tuName=%r, status=%s (%s)",
+        target_tu_id,
+        target_tu_name,
+        SouAdminStatus(target_tu.status),
+        SouAdminStatus.report_text_by_value(target_tu.status),
+    )
     pre_run_snapshot = lds_utils.running_tus_to_snapshot(running_tus)
     _save_pre_run_running_tus(group_state, pre_run_snapshot)
-    logger.info(
-        "[SETUP] Список включённых ТУ на стенде: %s шт. %s",
-        len(pre_run_snapshot),
-        pre_run_snapshot,
-    )
-    await lds_utils.stop_all_running_tus(http_client, parser, running_tus)
-    logger.info("[SETUP] ТЕСТ УСПЕХ await lds_utils.stop_all_running_tus")
-    launch_checkpoint = t_utils.moscow_now()
-    logger.info(
-        "[SETUP] Момент фиксации времени перед LaunchLds: %s",
-        t_utils.format_datetime_moscow(launch_checkpoint),
-    )
 
-    logger.info("[SETUP] Холодный запуск СОУ (LaunchLdsRequest) для tuId=%s", tu_id)
-    lds_utils.run_lds_command(http_client, HttpConst.LAUNCH_LDS_URL_PATH, tu_id)
-
-    logger.info("[SETUP] Ожидание включения СОУ в Администрировании")
-    if not await lds_utils.poll_admin_tu_status(http_client, parser, tu_id, SouAdminStatus.RUNNING):
-        fail(
-            "Не удалось запустить СОУ: статус в Администрировании не стал 'включена' за 2 минуты",
-            pytrace=False,
+    if target_tu_status == SouAdminStatus.RUNNING.value:
+        if len(running_tus) == 1:
+            logger.info(
+                "[SETUP] Запущен ранее только целевой ТУ: tuId=%s, tuName=%r, status=%s (%s)",
+                target_tu_id,
+                target_tu_name,
+                SouAdminStatus(target_tu_status),
+                SouAdminStatus.report_text_by_value(target_tu_status),
+            )
+        else:
+            logger.info(
+                "[SETUP] Список включённых ТУ на стенде: %s шт. %s",
+                len(pre_run_snapshot),
+                pre_run_snapshot,
+            )
+            # Получает список запущенных ТУ, кроме целевого
+            extra_running_tus = [item for item in running_tus if item.tuId != target_tu_id]
+            await lds_utils.stop_running_tus(http_client, parser, extra_running_tus)
+            if not await lds_utils.poll_admin_tu_status(http_client, parser, target_tu_id, SouAdminStatus.RUNNING):
+                fail(
+                    f"Не удалось оставить только целевой ТУ tuId={target_tu_id} в статусе {SouAdminStatus.RUNNING} ",
+                    pytrace=False,
+                )
+    else:
+        logger.info(
+            "[SETUP] Список включённых ТУ на стенде: %s шт. %s",
+            len(pre_run_snapshot),
+            pre_run_snapshot,
         )
+        await lds_utils.stop_running_tus(http_client, parser, running_tus)
 
-    logger.info("[SETUP] Подтверждение времени запуска (GetTusInformation)")
-    lds_utils.verify_launched_at(http_client, parser, tu_id, launch_checkpoint)
+        logger.info("[SETUP] Холодный запуск СОУ (LaunchLdsRequest) для tuId=%s", target_tu_id)
+        lds_utils.run_lds_command(http_client, HttpConst.LAUNCH_LDS_URL_PATH, target_tu_id)
+
+        logger.info("[SETUP] Ожидание включения СОУ в Администрировании")
+        if not await lds_utils.poll_admin_tu_status(http_client, parser, target_tu_id, SouAdminStatus.RUNNING):
+            fail(
+                "Не удалось запустить целевой ТУ: статус в Администрировании не стал 'включена' за 2 минуты",
+                pytrace=False,
+            )
+
+    logger.info("[SETUP] Подтверждение наличия времени запуска (GetTusInformation)")
+    lds_utils.verify_get_tus_info(http_client, parser, target_tu_id)
+    logger.info("[LDS_CONFIGURATOR] [SETUP] [OK] Запуск СОУ через Администрирование до старта имитатора. Успех!")
 
 
 async def lds_configurator_verify_after_core(
@@ -195,10 +215,10 @@ async def lds_configurator_verify_after_core(
 
     logger.info("[SETUP] Сверка статуса СОУ: Администрирование vs Состояние МТ")
     lds_utils.check_sou_status_sync(sou_status, expect_enabled, expect_enabled, tu_id, tu_name)
+    logger.info("[LDS_CONFIGURATOR] [SETUP] [OK] Проверка готовности стенда после запуска lds-core. Успех!")
 
 
 async def lds_configurator_teardown(
-    ws_client: WebSocketClient,
     http_client: StandHttpClient,
     tu_id: int,
     admin_tu_name: str,
@@ -209,13 +229,13 @@ async def lds_configurator_teardown(
     Некритичные отклонения логируются без падения прогона.
     """
     snapshot = pre_run_running_tus or []
+    running_tu = {"tuId": tu_id, "tuName": admin_tu_name}
     try:
         logger.info("[TEARDOWN] Проверка статуса СОУ (tuId=%s, «%s»)", tu_id, admin_tu_name)
-        ws_client.clear_queue()
         admin_reply = lds_utils.get_basic_info_admin_with_retry(http_client, parser)
 
         sou_status = lds_utils.get_admin_tu_status(admin_reply, tu_id)
-        if sou_status == SouAdminStatus.RUNNING:
+        if sou_status == SouAdminStatus.RUNNING and not (len(snapshot) == 1 and snapshot[0] == running_tu):
             logger.info("[TEARDOWN] Остановка СОУ (StopLdsRequest) для tuId=%s", tu_id)
             lds_utils.run_lds_command(http_client, HttpConst.STOP_LDS_URL_PATH, tu_id)
 
@@ -227,11 +247,12 @@ async def lds_configurator_teardown(
                 )
         else:
             lds_utils.attach_allure_alert(
-                f"СОУ не в статусе 'включена' при teardown (status={sou_status}), остановка пропущена. "
-                f"tuId={tu_id}, adminTuName='{admin_tu_name}'"
+                f"[SKIP] tuId={tu_id}, adminTuName='{admin_tu_name} не в статусе 'включена' "
+                "или была включена до старта прогона. Остановка пропущена."
             )
-
-        await lds_utils.restore_pre_run_tus(http_client, parser, snapshot, exclude_tu_id=tu_id)
+        if snapshot:
+            await lds_utils.restore_pre_run_tus(http_client, parser, snapshot, tu_id)
+        logger.info("[LDS_CONFIGURATOR] [TEARDOWN] [OK] Восстановление ТУ. Успех!")
     except BaseException as error:
         logger.warning(
             "[TEARDOWN] [ALERT] LDS Configurator teardown: %s: %r. tuId=%s, adminTuName=%r",

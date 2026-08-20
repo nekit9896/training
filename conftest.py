@@ -10,7 +10,6 @@ import pytest
 import pytest_asyncio
 
 from clients.testops_client import AllureResultsUploader, logger
-from constants.architecture_constants import EnvKeyConstants as EnvConst
 from constants.architecture_constants import ImitatorConstants as ImConst
 from constants.enums import RejectionSensorTag
 from constants.test_constants import BaseTN3Constants
@@ -416,10 +415,25 @@ def allure_tms_link(request):
 
 
 @pytest.fixture(autouse=True)
+def require_suite_infra(request):
+    """
+    Пропускает тесты набора, если infra-setup не завершился успешно.
+    """
+    if not request.node.get_closest_marker("test_suite_name"):
+        return
+    cfg = request.config.group_state
+    if cfg.get("current_suite") and not cfg.get("suite_infra_ready"):
+        pytest.skip("[SETUP] [ERROR] Набор пропущен: инфраструктура не готова")
+
+
+@pytest.fixture(autouse=True)
 def offset_wait(request):
     """
     Offset‑ожидание перед каждым тестом относительно фактического старта core
     """
+    cfg = request.config.group_state
+    if cfg.get("current_suite") and not cfg.get("suite_infra_ready"):
+        return
     if offset_marker := request.node.get_closest_marker("offset"):
         offset_sec = float(offset_marker.args[0]) * BaseTN3Constants.SEC_PER_MIN
         start = request.config.group_state["suite_start_time"] or 0
@@ -477,18 +491,6 @@ def compute_imitator_duration(item, current_test_suite: str) -> float:
         )
 
 
-@pytest.fixture(autouse=True)
-def require_suite_infra(request):
-    """
-    Пропускает тесты набора, если infra-setup не завершился успешно.
-    """
-    if not request.node.get_closest_marker("test_suite_name"):
-        return
-    cfg = request.config.group_state
-    if cfg.get("current_suite") and not cfg.get("suite_infra_ready"):
-        pytest.skip("Набор пропущен: инфраструктура не готова")
-
-
 def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
     """
     Пропускает текущий набор после ошибки setup: cleanup частичной инфраструктуры и pytest.skip.
@@ -498,15 +500,18 @@ def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
         allure.attach(message, name="Ошибка setup набора", attachment_type=allure.attachment_type.TEXT)
     except Exception:
         logger.debug("Не удалось прикрепить ошибку setup к Allure", exc_info=True)
-    logger.info("[TEARDOWN] LDS Configurator cleanup после ошибки setup набора")
+
+    logger.info("[TEARDOWN] LDS Configurator очистка после ошибки setup набора")
     _run_lds_configurator_teardown_if_needed(cfg)
     if stand_manager := cfg.get("stand_manager"):
         try:
             stand_manager.stop_imitator_wrapper()
         except Exception:
             logger.exception("[SETUP] Ошибка остановки имитатора после неудачного setup набора")
+        stand_manager.server_test_data_remover()
     cfg["suite_infra_ready"] = False
     cfg["suite_setup_failure"] = message
+    cfg["suite_start_time"] = None
     pytest.skip("Набор пропущен: ошибка подготовки инфраструктуры")
 
 
@@ -526,17 +531,18 @@ def pytest_runtest_setup(item):
         # stop old
         _run_lds_configurator_teardown_if_needed(cfg)
         if stand_manager := cfg["stand_manager"]:
-            stand_manager.stop_imitator_wrapper()
             try:
-                stand_manager.restore_signal_unit_conversion_rules()
-            except Exception:
-                logger.exception(
-                    "[ERROR] [SETUP] Ошибка при восстановлении signal_unit_conversion_rules.json "
-                    "перед запуском нового набора"
-                )
-            if not os.environ.get("RUN_WITHOUT_TESTOPS", "False").lower() == "true":
-                # При запуске с TestOps удаляет данные прогона
+                stand_manager.stop_imitator_wrapper()
+                try:
+                    stand_manager.restore_signal_unit_conversion_rules()
+                except Exception:
+                    logger.exception(
+                        "[ERROR] [SETUP] Ошибка при восстановлении signal_unit_conversion_rules.json "
+                        "перед запуском нового набора"
+                    )
                 stand_manager.server_test_data_remover()
+            finally:
+                cfg["stand_manager"] = None
 
         # start new
         cfg["current_suite"] = current_test_suite
@@ -693,14 +699,11 @@ def _run_lds_configurator_teardown_if_needed(cfg: dict) -> None:
     pre_run_running_tus = cfg.get("pre_run_running_tus") or []
 
     async def _teardown() -> None:
-        websocket_client = init_ws_stand_client(cfg)
         http_client = init_http_stand_client(cfg)
         http_client.suppress_recv_logging = True
-        async with websocket_client as ws_client:
-            ws_client.suppress_recv_logging = True
-            await lds_configurator_scenarios.lds_configurator_teardown(
-                ws_client, http_client, tu_id, admin_tu_name, pre_run_running_tus
-            )
+        await lds_configurator_scenarios.lds_configurator_teardown(
+            http_client, tu_id, admin_tu_name, pre_run_running_tus
+        )
 
     try:
         _run_lds_configurator_ws(_teardown)
@@ -730,16 +733,16 @@ def pytest_runtest_teardown(item, nextitem):
 
     if next_suite != cfg["current_suite"]:
         if stand_manager := cfg["stand_manager"]:
-            if cfg.get("suite_infra_ready"):
-                stand_manager.stop_imitator_wrapper()
             try:
-                stand_manager.restore_signal_unit_conversion_rules()
-            except Exception:
-                logger.exception("[ERROR] [TEARDOWN] Ошибка при восстановлении signal_unit_conversion_rules.json")
-            if not os.environ.get("RUN_WITHOUT_TESTOPS", "False").lower() == "true":
-                # При запуске с TestOps удаляет данные прогона
+                if cfg.get("suite_infra_ready"):
+                    stand_manager.stop_imitator_wrapper()
+                try:
+                    stand_manager.restore_signal_unit_conversion_rules()
+                except Exception:
+                    logger.exception("[ERROR] [TEARDOWN] Ошибка при восстановлении signal_unit_conversion_rules.json")
                 stand_manager.server_test_data_remover()
-            cfg["stand_manager"] = None
+            finally:
+                cfg["stand_manager"] = None
         cfg["current_suite"] = None
         cfg["suite_start_time"] = None
         cfg["imitator_start_time"] = None

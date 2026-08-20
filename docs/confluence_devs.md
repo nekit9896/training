@@ -73,8 +73,10 @@
 
 ### 1.5 Ошибки setup → skip набора (не exit сессии)
 При ошибке подготовки набора (OPC, stand, admin, imitator, core, verify):
-- `_skip_current_suite_after_setup_failure` — cleanup + `pytest.skip`
-- `require_suite_infra` — skip остальных тестов того же набора
+- `_skip_current_suite_after_setup_failure` — cleanup + `pytest.skip` (первый тест набора)
+- `allure_suite_hierarchy` — выставляет `parent_suite` / `suite` до skip (дерево Allure для 2+ тестов)
+- `require_suite_infra` — `pytest.skip` для 2+ тестов того же набора, если `suite_infra_ready=False` (после Allure, до `offset_wait`)
+- `offset_wait` — не выполняет ожидание по offset при `suite_infra_ready=False` (страховка)
 - следующий `--suites` стартует при смене `test_suite_name`
 
 ### 1.6 Setup через LDS Configurator

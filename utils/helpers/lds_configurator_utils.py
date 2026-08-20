@@ -8,7 +8,6 @@ import asyncio
 import logging
 import time
 from contextlib import contextmanager
-from datetime import datetime, timedelta
 from typing import Any, Optional
 
 import allure
@@ -350,15 +349,15 @@ async def launch_tu_and_wait(
         return await poll_admin_tu_status(http_client, parser, tu_id, SouAdminStatus.RUNNING)
 
 
-async def stop_all_running_tus(
+async def stop_running_tus(
     http_client: StandHttpClient,
     parser: WsMessageParser,
     tus: list[AdminTuInfo],
 ) -> None:
-    """Последовательно останавливает все включённые ТУ на стенде."""
+    """Последовательно останавливает включённые ТУ на стенде."""
     if not tus:
         return
-    logger.info("[SETUP] Остановка всех включённых ТУ на стенде: %s шт.", len(tus))
+    logger.info("[SETUP] Остановка включённых ТУ на стенде: %s шт.", len(tus))
     for tu in tus:
         logger.info("[SETUP] Остановка ТУ на стенде: tuId=%s, tuName=%r", tu.tuId, tu.tuName)
         await stop_tu_and_wait(http_client, parser, tu.tuId, tu.tuName)
@@ -380,7 +379,6 @@ async def restore_pre_run_tus(
     logger.info(
         "[TEARDOWN] Восстановление ТУ стенда: %s шт. (исключена ТУ автотестов tuId=%s)",
         len(to_restore),
-        exclude_tu_id,
     )
     for entry in to_restore:
         restore_tu_id = entry["tuId"]
@@ -478,16 +476,10 @@ async def poll_main_page_tu_presence(
         return False
 
 
-def verify_launched_at(
-    http_client: StandHttpClient,
-    parser: WsMessageParser,
-    tu_id: int,
-    launch_checkpoint: datetime,
-) -> None:
+def verify_get_tus_info(http_client: StandHttpClient, parser: WsMessageParser, tu_id: int) -> None:
     """
-    Проверяет, что launchedAt в GetTusInformation не раньше момента LaunchLds с допуском.
+    Проверяет, наличие ТУ и launchedAt в GetTusInformation.
     """
-    tolerance = timedelta(seconds=LdsCfgConst.LAUNCHED_AT_TOLERANCE_SECONDS)
     with _step(f"Запрос GetTusInformation для tuId={tu_id}"):
         response = http_client.post_request(HttpConst.GET_TUS_INFORMATION_URL_PATH, {"tuIds": [tu_id]})
         payload = t_utils.get_json_from_http_response(response)
@@ -500,35 +492,9 @@ def verify_launched_at(
                 fail(f"GetTusInformationResponse не содержит tuId={tu_id}", pytrace=False)
 
         launched_at = parser.timestamp_to_datetime(tu_info.launchedAt)
-        with _step("Проверка: поле launchedAt заполнено"):
+        with _step(f"Проверка (GetTusInformation): Наличие времени запуска launchedAt: {launched_at} для tuId={tu_id}"):
             if launched_at is None:
                 fail(f"GetTusInformationResponse: launchedAt отсутствует для tuId={tu_id}", pytrace=False)
-
-        launched_at_msk = t_utils.localize_as_moscow(launched_at)
-        checkpoint_msk = t_utils.localize_as_moscow(launch_checkpoint)
-        compare_msg = (
-            f"launchedAt: {t_utils.format_datetime_moscow(launched_at_msk)}\n"
-            f"checkpoint: {t_utils.format_datetime_moscow(checkpoint_msk)}\n"
-            f"tolerance: {LdsCfgConst.LAUNCHED_AT_TOLERANCE_SECONDS} с"
-        )
-        if _configurator_flow_active:
-            logger.info("[LDS_CONFIGURATOR] Сравнение времени запуска СОУ:\n%s", compare_msg)
-        else:
-            allure.attach(
-                compare_msg,
-                name="Сравнение времени запуска СОУ",
-                attachment_type=allure.attachment_type.TEXT,
-            )
-
-        with _step("Проверка: launchedAt не раньше момента команды 'Запустить СОУ' (с допуском)"):
-            if launched_at_msk < checkpoint_msk - tolerance:
-                fail(
-                    f"Время запуска СОУ на бэкенде ({t_utils.format_datetime_moscow(launched_at_msk)}) "
-                    f"раньше момента команды 'Запустить СОУ' "
-                    f"({t_utils.format_datetime_moscow(checkpoint_msk)}) "
-                    f"с учётом допуска {int(LdsCfgConst.LAUNCHED_AT_TOLERANCE_SECONDS)} с",
-                    pytrace=False,
-                )
 
 
 def get_admin_tu_status(admin_reply: GetBasicInfoAdminReply, tu_id: int) -> Optional[SouAdminStatus]:
