@@ -179,9 +179,9 @@ class SouAdminStatus(BaseStrEnum):
 
 
 class StationaryStatus(BaseStrEnum):
-    UNSTATIONARY = (1, 'Нестационарный режим работы МТ')
-    STATIONARY = (2, 'Стационарный режим работы МТ')
-    STOPPED = (3, 'МТ в режиме остановленной перекачки')
+    UNSTATIONARY = (1, 'Нестационарный режим работы МТ')  # Нестационарный режим
+    STATIONARY = (2, 'Стационарный режим работы МТ')  # Стационарный режим
+    STOPPED = (3, 'МТ в режиме остановленной перекачки')  # Режим остановкленной перекачки
 
     def __new__(cls, value: int, report_text: str) -> "StationaryStatus":
         member = object.__new__(cls)

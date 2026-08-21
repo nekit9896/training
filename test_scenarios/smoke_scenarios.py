@@ -533,15 +533,22 @@ async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
         )
 
         controlled_site_signals = getattr(parsed_output_signals.replyContent, 'controlledSiteSignals', [])
-        output_signals_site_modes = t_utils.collect_mt_modes_from_output_signals(controlled_site_signals)
-        output_signals_mt_modes = [mode for _, mode in output_signals_site_modes]
+        output_signals_site_stationary_statuses = t_utils.collect_stationary_statuses_from_output_signals(
+            controlled_site_signals
+        )
+        output_signals_stationary_statuses = [
+            stationary_status for _, stationary_status in output_signals_site_stationary_statuses
+        ]
         StepCheck(
             "Проверка наличия режимов МТ в OutputSignalsInfo",
             "controlledSiteSignals",
-        ).actual(output_signals_mt_modes).is_not_empty()
-        output_signals_majority = t_utils.determine_stationary_status_by_majority(output_signals_mt_modes)
+        ).actual(output_signals_stationary_statuses).is_not_empty()
+        output_signals_majority = t_utils.determine_stationary_status_by_majority(
+            output_signals_stationary_statuses
+        )
         output_signals_details = "\n".join(
-            f"{site.name}: {mode}" for site, mode in output_signals_site_modes
+            f"{site.name}: {stationary_status}"
+            for site, stationary_status in output_signals_site_stationary_statuses
         )
         allure.attach(
             output_signals_details,
@@ -568,7 +575,7 @@ async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
         excluded_ids = set(TestConst.DIAGNOSTIC_AREA_IDS_EXCLUDED_GRAVITY) | set(
             TestConst.DIAGNOSTIC_AREA_IDS_EXCLUDED_NPS
         )
-        common_scheme_mt_modes = []
+        common_scheme_stationary_statuses = []
         common_scheme_details = []
         for diagnostic_area in diagnostic_areas:
             if diagnostic_area.id not in base_ids or diagnostic_area.id in excluded_ids:
@@ -577,15 +584,17 @@ async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
             if stationary_status_int is None:
                 continue
             stationary_status = StationaryStatus(stationary_status_int)
-            common_scheme_mt_modes.append(stationary_status)
+            common_scheme_stationary_statuses.append(stationary_status)
             common_scheme_details.append(
                 f"{t_utils.diagnostic_area_title(diagnostic_area.id)}: {stationary_status}"
             )
         StepCheck(
             "Проверка наличия режимов МТ на базовых ДУ CommonSchemeContent",
             "stationaryStatus",
-        ).actual(common_scheme_mt_modes).is_not_empty()
-        common_scheme_majority = t_utils.determine_stationary_status_by_majority(common_scheme_mt_modes)
+        ).actual(common_scheme_stationary_statuses).is_not_empty()
+        common_scheme_majority = t_utils.determine_stationary_status_by_majority(
+            common_scheme_stationary_statuses
+        )
         allure.attach(
             f"Самый длинный путь течения: {longest_flow_area}\n" + "\n".join(common_scheme_details),
             name="CommonSchemeContent: режимы МТ на базовых ДУ",
