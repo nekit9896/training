@@ -527,9 +527,18 @@ async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
 
     with allure.step("Извлечение и подготовка данных для проверки"):
         tu_info = getattr(parsed_main_page.replyContent, 'tuInfo', None)
-        StepCheck("Проверка наличия данных по ТУ", "tuInfo").actual(tu_info).is_not_none()
+        StepCheck("Проверка наличия данных по ТУ", "tuInfo").actual(tu_info is not None).is_true_with_details(
+            expected_text="tuInfo присутствует",
+            actual_text="tuInfo присутствует" if tu_info is not None else "tuInfo отсутствует",
+        )
+        if tu_info is not None:
+            allure.attach(
+                str(tu_info),
+                name="MainPageInfo: tuInfo",
+                attachment_type=allure.attachment_type.TEXT,
+            )
         main_pipeline_stationary_status = (
-            StationaryStatus(tu_info.stationaryStatus) if tu_info.stationaryStatus else None
+            StationaryStatus(tu_info.stationaryStatus) if tu_info and tu_info.stationaryStatus else None
         )
 
         controlled_site_signals = getattr(parsed_output_signals.replyContent, 'controlledSiteSignals', [])
@@ -564,22 +573,27 @@ async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
         ).is_not_empty()
         longest_flow_area = t_utils.get_longest_flow_area_by_pipes(flow_areas)
         StepCheck("Проверка наличия самого длинного пути течения", "longest_flow_area").actual(
-            longest_flow_area
-        ).is_not_none()
+            longest_flow_area is not None
+        ).is_true_with_details(
+            expected_text="longest_flow_area определён",
+            actual_text=(
+                "longest_flow_area определён" if longest_flow_area is not None else "longest_flow_area не определён"
+            ),
+        )
+        if longest_flow_area is not None:
+            allure.attach(
+                str(longest_flow_area),
+                name="CommonSchemeContent: самый длинный путь течения",
+                attachment_type=allure.attachment_type.TEXT,
+            )
         diagnostic_areas = getattr(longest_flow_area, 'diagnosticAreas', [])
         StepCheck("Проверка наличия данных диагностических участков", "diagnosticAreas").actual(
             diagnostic_areas
         ).is_not_empty()
 
-        base_ids = set(t_utils.get_diagnostic_area_base_ids())
-        excluded_ids = set(TestConst.DIAGNOSTIC_AREA_IDS_EXCLUDED_GRAVITY) | set(
-            TestConst.DIAGNOSTIC_AREA_IDS_EXCLUDED_NPS
-        )
         common_scheme_stationary_statuses = []
         common_scheme_details = []
         for diagnostic_area in diagnostic_areas:
-            if diagnostic_area.id not in base_ids or diagnostic_area.id in excluded_ids:
-                continue
             stationary_status_int = getattr(diagnostic_area, 'stationaryStatus', None)
             if stationary_status_int is None:
                 continue
@@ -589,17 +603,18 @@ async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
                 f"{t_utils.diagnostic_area_title(diagnostic_area.id)}: {stationary_status}"
             )
         StepCheck(
-            "Проверка наличия режимов МТ на базовых ДУ CommonSchemeContent",
+            "Проверка наличия режимов МТ на ДУ CommonSchemeContent",
             "stationaryStatus",
         ).actual(common_scheme_stationary_statuses).is_not_empty()
         common_scheme_majority = t_utils.determine_stationary_status_by_majority(
             common_scheme_stationary_statuses
         )
-        allure.attach(
-            f"Самый длинный путь течения: {longest_flow_area}\n" + "\n".join(common_scheme_details),
-            name="CommonSchemeContent: режимы МТ на базовых ДУ",
-            attachment_type=allure.attachment_type.TEXT,
-        )
+        if common_scheme_details:
+            allure.attach(
+                "\n".join(common_scheme_details),
+                name="CommonSchemeContent: режимы МТ на ДУ",
+                attachment_type=allure.attachment_type.TEXT,
+            )
 
     with allure.step("Проверка режима работы МТ"):
         with SoftAssertions() as soft_failures:
@@ -620,7 +635,7 @@ async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
             ).actual(output_signals_majority).expected(cfg.expected_stationary_status).equal_to()
 
             StepCheck(
-                "CommonSchemeContent: общий режим МТ по большинству базовых ДУ",
+                "CommonSchemeContent: общий режим МТ по большинству ДУ",
                 "stationaryStatus",
                 soft_failures,
             ).actual(common_scheme_majority).expected(cfg.expected_stationary_status).equal_to()
