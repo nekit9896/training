@@ -4,10 +4,11 @@ import asyncio
 import pprint
 import random
 import re
+from collections import Counter
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum, IntFlag
-from typing import Any, Callable, List, Optional, Set, Type, TypeVar
+from typing import Any, Callable, List, Optional, Protocol, Set, Type, TypeVar
 from zoneinfo import ZoneInfo
 
 import allure
@@ -29,6 +30,7 @@ from constants.enums import (
     LeakStatus,
     ReplyStatus,
     SignalType,
+    SiteKpKp,
     StationaryReason,
     StationaryStatus,
     StoppedPumpingReason,
@@ -49,6 +51,15 @@ ObjectType = TypeVar("ObjectType")  # создает типовую переме
 RandomObjectType = TypeVar("RandomObjectType")
 Event = TypeVar("Event")
 ParsedPayloadType = TypeVar("ParsedPayloadType")
+InputSignalType = TypeVar("InputSignalType")
+
+SiteSignalsMap = dict[tuple[int, int], dict[int, str]]
+
+
+class ControlledSiteSignalMessage(Protocol):
+    controlledSiteId: int
+    segmentId: int
+    signals: list
 
 
 def convert_leak_volume_m3(volume: float) -> float:
@@ -234,6 +245,70 @@ def get_longest_flow_area(flow_areas: List[FlowArea]) -> Optional[FlowArea]:
         return longest_flow_area
     except (TypeError, ValueError):
         return None
+    
+
+def get_longest_flow_area_by_pipes(flow_areas: List[FlowArea]) -> Optional[FlowArea]:
+    """
+    Получает самый протяженный участок карты течения по количеству pipesIds
+    """
+    if not flow_areas:
+        return None
+    try:
+        return max(flow_areas, key=lambda flow_area: len(flow_area.pipesIds or []))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def filter_flow_areas_with_available_flow(flow_areas: List[FlowArea]) -> List[FlowArea]:
+    """
+    Оставляет только участки карты течения с доступным течением
+    """
+    return [flow_area for flow_area in flow_areas if getattr(flow_area, "isFlowAvailable", False)]
+
+
+def get_diagnostic_area_base_ids() -> list[int]:
+    """
+    Возвращает список id базовых диагностических участков из константы DIAGNOSTIC_AREA_BASE_IDS
+    """
+    return [pair[0] for pair in TestConst.DIAGNOSTIC_AREA_BASE_IDS.values()]
+
+
+def diagnostic_area_title(du_id: int) -> str:
+    """
+    Возвращает строковое представление ДУ: id и название из DIAGNOSTIC_AREA_BASE_IDS
+    """
+    for name, pair in TestConst.DIAGNOSTIC_AREA_BASE_IDS.items():
+        if pair[0] == du_id:
+            return f"{du_id} ({name})"
+    return str(du_id)
+
+
+def determine_stationary_status_by_majority(statuses: list[StationaryStatus]) -> Optional[StationaryStatus]:
+    """
+    Определяет общий режим МТ по правилу большинства ДУ в одном статусе.
+    При равенстве количества выбирается статус с максимальным значением enum.
+    """
+    if not statuses:
+        return None
+    counts = Counter(statuses)
+    max_count = max(counts.values())
+    candidates = [status for status, count in counts.items() if count == max_count]
+    return max(candidates, key=lambda status: status.value)
+
+
+def collect_stationary_statuses_from_output_signals(
+    controlled_site_signals: list[ControlledSiteSignalMessage],
+) -> list[tuple[SiteKpKp, StationaryStatus]]:
+    """
+    Собирает stationaryStatus (SignalType.REGLU) по всем участкам КП-КП из OutputSignalsInfo
+    """
+    all_signals_dict = extract_signal_on_site_and_segment(controlled_site_signals)
+    site_stationary_statuses: list[tuple[SiteKpKp, StationaryStatus]] = []
+    for site in SiteKpKp:
+        stationary_status = get_signal_value(all_signals_dict, site.site_key, SignalType.REGLU)
+        if isinstance(stationary_status, StationaryStatus):
+            site_stationary_statuses.append((site, stationary_status))
+    return site_stationary_statuses
 
 
 def determine_lds_status_by_priority(lds_status_set: Set[int]) -> Optional[int]:
@@ -310,12 +385,14 @@ def find_object_by_few_fields(item_list: List[ObjectType], fields_dict: dict) ->
     )
 
 
-def extract_signal_on_site_and_segment(controlled_site_messages: dict) -> dict | None:
+def extract_signal_on_site_and_segment(
+    controlled_site_messages: list[ControlledSiteSignalMessage],
+) -> SiteSignalsMap:
     """
     Ищет сигналы для всех пар КП-КП
     """
 
-    result = {}
+    result: SiteSignalsMap = {}
     for site_obj in controlled_site_messages:
         key = (site_obj.controlledSiteId, site_obj.segmentId)
 
@@ -324,7 +401,11 @@ def extract_signal_on_site_and_segment(controlled_site_messages: dict) -> dict |
     return result
 
 
-def get_signal_value(all_signals_dict: dict, site_kp_kp: int, signals_id: int) -> Optional[int]:
+def get_signal_value(
+    all_signals_dict: SiteSignalsMap,
+    site_kp_kp: tuple[int, int],
+    signals_id: int,
+) -> StationaryStatus | LdsStatus | int | None:
     """
     Получает значение сигналов
     Приводит значение к типу инт
@@ -469,7 +550,7 @@ def find_base_diagnostic_areas(flow_areas: List[FlowArea]) -> List[DiagnosticAre
     """
     Получает список базовых ДУ из списка flow_areas
     """
-    return find_diagnostic_areas_by_ids(flow_areas, TestConst.DIAGNOSTIC_AREA_BASE_IDS)
+    return find_diagnostic_areas_by_ids(flow_areas, get_diagnostic_area_base_ids())
 
 
 def find_leak_by_coordinate(
@@ -1166,11 +1247,11 @@ async def connect_and_poll_subscribed_signal(
     sensor_id: int,
     sensor_description: str,
     parse_payload: Callable[[list], ParsedPayloadType],
-    extract_signals: Callable[[ParsedPayloadType], List[SignalType]],
+    extract_signals: Callable[[ParsedPayloadType], List[InputSignalType]],
     *,
     max_messages: int = TestConst.SUBSCRIBE_MESSAGE_POLL_ATTEMPTS,
     timeout: float = TestConst.BASIC_MESSAGE_TIMEOUT,
-) -> tuple[ParsedPayloadType, SignalType]:
+) -> tuple[ParsedPayloadType, InputSignalType]:
     """
     Подписывается один раз и читает до max_messages сообщений из потока,
     пока не найдёт сигнал с нужным id.
@@ -1305,4 +1386,3 @@ def get_leak_diagnostic_area_samples(
 def moscow_now() -> datetime:
     """Текущее время в часовом поясе Europe/Moscow."""
     return datetime.now(ZoneInfo(TestConst.ZONE_INFO))
-    

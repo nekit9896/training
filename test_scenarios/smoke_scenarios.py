@@ -488,35 +488,157 @@ def lds_status_init_in_journal(http_client, cfg: SmokeSuiteConfig | LDSStatusCon
 
 async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
     """
-    Проверка установки режима МТ.
+    Проверка установки режима МТ по MainPageInfo, OutputSignalsInfo и CommonSchemeContent.
     """
     with allure.step("Подключение по ws, получение и обработка сообщения типа: MainPageInfoContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        main_page_payload = await t_utils.connect_and_subscribe_msg(
             ws_client,
             "MainPageInfoContent",
             "subscribeMainPageInfoRequest",
             {'tuIds': [cfg.tu_id], 'additionalProperties': None},
         )
-        parsed_payload = parser.parse_main_page_msg(payload)
+        parsed_main_page = parser.parse_main_page_msg(main_page_payload)
+
+    with allure.step("Подключение по ws, получение и обработка сообщения типа: OutputSignalsInfo"):
+        output_signals_payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "OutputSignalsInfo",
+            "SubscribeOutputSignalsRequest",
+            {
+                'objects': {
+                    'linearParts': [],
+                    'controlledSites': [site.controlledSiteSegmentDict for site in SiteKpKp],
+                },
+                'signalTypes': 1023,
+                'tuId': cfg.tu_id,
+                'additionalProperties': None,
+            },
+        )
+        parsed_output_signals = parser.parse_output_signals_info_msg(output_signals_payload)
+
+    with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
+        common_scheme_payload = await t_utils.connect_and_subscribe_msg(
+            ws_client,
+            "CommonSchemeContent",
+            "SubscribeCommonSchemeRequest",
+            {'tuId': cfg.tu_id, 'additionalProperties': None},
+        )
+        parsed_common_scheme = parser.parse_common_scheme_info_msg(common_scheme_payload)
+
     with allure.step("Извлечение и подготовка данных для проверки"):
-        tu_info = getattr(parsed_payload.replyContent, 'tuInfo', None)
-        StepCheck("Проверка наличия данных по ТУ", "tuInfo").actual(tu_info).is_not_none()
+        tu_info = getattr(parsed_main_page.replyContent, 'tuInfo', None)
+        StepCheck("Проверка наличия данных по ТУ", "tuInfo").actual(tu_info is not None).is_true_with_details(
+            expected_text="tuInfo присутствует",
+            actual_text="tuInfo присутствует" if tu_info is not None else "tuInfo отсутствует",
+        )
+        if tu_info is not None:
+            allure.attach(
+                str(tu_info),
+                name="MainPageInfo: tuInfo",
+                attachment_type=allure.attachment_type.TEXT,
+            )
         main_pipeline_stationary_status = (
-            StationaryStatus(tu_info.stationaryStatus) if tu_info.stationaryStatus else None
+            StationaryStatus(tu_info.stationaryStatus) if tu_info and tu_info.stationaryStatus else None
         )
 
-    with SoftAssertions() as soft_failures:
-        StepCheck("Проверка id полученного ТУ", "tu_id", soft_failures).actual(
-            parsed_payload.replyContent.tuId
-        ).expected(cfg.tu_id).equal_to()
-
+        controlled_site_signals = getattr(parsed_output_signals.replyContent, 'controlledSiteSignals', [])
+        output_signals_site_stationary_statuses = t_utils.collect_stationary_statuses_from_output_signals(
+            controlled_site_signals
+        )
+        output_signals_stationary_statuses = [
+            stationary_status for _, stationary_status in output_signals_site_stationary_statuses
+        ]
         StepCheck(
-            f"Проверка установки стационара для ТУ {cfg.tu_name}",
+            "Проверка наличия режимов МТ в OutputSignalsInfo",
+            "controlledSiteSignals",
+        ).actual(output_signals_stationary_statuses).is_not_empty()
+        output_signals_majority = t_utils.determine_stationary_status_by_majority(
+            output_signals_stationary_statuses
+        )
+        output_signals_details = "\n".join(
+            f"{site.name}: {stationary_status}"
+            for site, stationary_status in output_signals_site_stationary_statuses
+        )
+        allure.attach(
+            output_signals_details,
+            name="OutputSignalsInfo: режимы МТ по участкам КП-КП",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+        flow_areas = t_utils.filter_flow_areas_with_available_flow(
+            getattr(parsed_common_scheme.replyContent, 'flowAreas', [])
+        )
+        StepCheck("Проверка наличия участков карты течения с доступным течением", "flowAreas").actual(
+            flow_areas
+        ).is_not_empty()
+        longest_flow_area = t_utils.get_longest_flow_area_by_pipes(flow_areas)
+        StepCheck("Проверка наличия самого длинного пути течения", "longest_flow_area").actual(
+            longest_flow_area is not None
+        ).is_true_with_details(
+            expected_text="longest_flow_area определён",
+            actual_text=(
+                "longest_flow_area определён" if longest_flow_area is not None else "longest_flow_area не определён"
+            ),
+        )
+        if longest_flow_area is not None:
+            allure.attach(
+                str(longest_flow_area),
+                name="CommonSchemeContent: самый длинный путь течения",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+        diagnostic_areas = getattr(longest_flow_area, 'diagnosticAreas', [])
+        StepCheck("Проверка наличия данных диагностических участков", "diagnosticAreas").actual(
+            diagnostic_areas
+        ).is_not_empty()
+
+        common_scheme_stationary_statuses = []
+        common_scheme_details = []
+        for diagnostic_area in diagnostic_areas:
+            stationary_status_int = getattr(diagnostic_area, 'stationaryStatus', None)
+            if stationary_status_int is None:
+                continue
+            stationary_status = StationaryStatus(stationary_status_int)
+            common_scheme_stationary_statuses.append(stationary_status)
+            common_scheme_details.append(
+                f"{t_utils.diagnostic_area_title(diagnostic_area.id)}: {stationary_status}"
+            )
+        StepCheck(
+            "Проверка наличия режимов МТ на ДУ CommonSchemeContent",
             "stationaryStatus",
-            soft_failures,
-        ).actual(
-            main_pipeline_stationary_status
-        ).expected(cfg.expected_stationary_status).equal_to()
+        ).actual(common_scheme_stationary_statuses).is_not_empty()
+        common_scheme_majority = t_utils.determine_stationary_status_by_majority(
+            common_scheme_stationary_statuses
+        )
+        if common_scheme_details:
+            allure.attach(
+                "\n".join(common_scheme_details),
+                name="CommonSchemeContent: режимы МТ на ДУ",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+
+    with allure.step("Проверка режима работы МТ"):
+        with SoftAssertions() as soft_failures:
+            StepCheck("Проверка id полученного ТУ", "tu_id", soft_failures).actual(
+                parsed_main_page.replyContent.tuId
+            ).expected(cfg.tu_id).equal_to()
+
+            StepCheck(
+                f"MainPageInfo: режим МТ для ТУ {cfg.tu_name}",
+                "stationaryStatus",
+                soft_failures,
+            ).actual(main_pipeline_stationary_status).expected(cfg.expected_stationary_status).equal_to()
+
+            StepCheck(
+                "OutputSignalsInfo: общий режим МТ по большинству участков",
+                "stationaryStatus",
+                soft_failures,
+            ).actual(output_signals_majority).expected(cfg.expected_stationary_status).equal_to()
+
+            StepCheck(
+                "CommonSchemeContent: общий режим МТ по большинству ДУ",
+                "stationaryStatus",
+                soft_failures,
+            ).actual(common_scheme_majority).expected(cfg.expected_stationary_status).equal_to()
 
 
 async def main_page_info_signals(ws_client, cfg: SmokeSuiteConfig):
