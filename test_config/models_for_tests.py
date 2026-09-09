@@ -118,6 +118,7 @@ class BaseSuiteConfig(SuiteTuIdentityMixin):
     """
 
     # ===== Метаданные набора =====
+    ost_name: str
     suite_name: str
     suite_data_id: int
     archive_name: str = ""  # Автоматически вычисляется из suite_name
@@ -129,6 +130,9 @@ class BaseSuiteConfig(SuiteTuIdentityMixin):
     use_lds_configurator: bool = False
     admin_tu: Optional[AdminTU] = None
     resolved_tu_id: Optional[int] = None
+
+    # ===== Название Магистрального Нефтепровода =====
+    main_pipeline: Optional[str] = None
 
     # ===== Правила конвертации единиц измерения давления на стенде =====
     measure_conversion_rules: Optional[MeasureConversionRule] = None
@@ -305,9 +309,6 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     expected_stationary_status: Any = StationaryStatus.STATIONARY
     expected_main_page_signals: dict = field(default_factory=lambda: asdict(SignalsInfo()))
 
-    # ===== Название Магистрального Нефтепровода =====
-    main_pipeline: Optional[str] = None
-
     # ===== Ожидаемые переменные при маскировании ДУ =====
     mask_reason: Optional[str] = None
     unmask_reason: Optional[str] = None
@@ -398,9 +399,6 @@ class LDSStatusConfig(BaseSuiteConfig):
     2. Тесты с маркерами
     """
 
-    # ===== Название Магистрального Нефтепровода =====
-    main_pipeline: Optional[str] = None
-
     # ===== Данные для тестов =====
     init_accumulation_data_test_data: Optional[CaseData] = None
     init_accumulation_data_in_journal_test_data: Optional[CaseData] = None
@@ -481,16 +479,15 @@ class LDSStatusConfig(BaseSuiteConfig):
 
 @dataclass
 class StationaryStatusConfig(BaseSuiteConfig):
-    # ===== Название Магистрального Нефтепровода =====
-    main_pipeline: Optional[str] = None
 
     # ===== Данные для тестов =====
-    stationary_status_check_with_reasons_test_data: Optional[CaseData] = None
-    stationary_status_in_journal_test_data: Optional[CaseData] = None
+    stationary_status_with_reason_test_data: Optional[CaseData] = None
+    stationary_status_journal_test_data: Optional[CaseData] = None
     # ===== Тесты =====
     stationary_status_basic_info_test: Optional[CaseMarkers] = None
-    stationary_status_in_journal_test: Optional[CaseMarkers] = None
-    stationary_status_check_with_reasons_test: Optional[CaseMarkers] = None
+    stationary_status_journal_test: Optional[CaseMarkers] = None
+    stationary_status_common_scheme_test: Optional[CaseMarkers] = None
+    stationary_status_main_page_info_test: Optional[CaseMarkers] = None
 
 
 @dataclass
@@ -541,7 +538,6 @@ class IsRejectedConfig(BaseSuiteConfig):
     2. Список случаев отбраковки (RejectionTestCase)
     """
 
-    main_pipeline: str = ""
     rejection_cases: list[RejectionTestCase] = field(default_factory=list)
     rejection_report_test: Optional[CaseMarkers] = None
 

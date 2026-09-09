@@ -37,6 +37,7 @@ def _get_suite_markers(config: LDSStatusConfig) -> List[pytest.MarkDecorator]:
         pytest.mark.test_suite_data_id(config.suite_data_id),
         pytest.mark.test_data_name(config.archive_name),
         pytest.mark.tu_id(config.technological_unit.id),
+        pytest.mark.ost_name(config.ost_name),
     ]
 
 
@@ -508,7 +509,7 @@ class TestSuiteScenarios:
 
     @pytest.mark.asyncio
     async def test_lds_status_degradation_pig_sensor_passage(
-        self, ws_client: WebSocketClient, config: LDSStatusConfig
+        self, ws_client: WebSocketClient, http_client: StandHttpClient, config: LDSStatusConfig
     ) -> None:
         """
         [CommonScheme] Проверка режима работы СОУ: Ухудшение характеристик
@@ -530,7 +531,7 @@ class TestSuiteScenarios:
             ),
         )
         test_data = config.deg_pig_sensor_passage_test_data
-        await scenarios.lds_status_check_degradation_pig_sensor_passage(ws_client, config, test_data)
+        await scenarios.lds_status_check_degradation_pig_sensor_passage(ws_client, http_client, config, test_data)
 
     @pytest.mark.asyncio
     async def test_lds_status_degradation_gravity_section_pumping(
@@ -1276,4 +1277,3 @@ class TestSuiteScenarios:
         )
         test_data = config.faulty_absence_min_pressure_sensors_in_journal_test_data
         scenarios.lds_status_in_journal(http_client, config, test_data)
-        
