@@ -27,7 +27,7 @@ async def lds_status_check_on_longest_flow_area(ws_client, cfg: LDSStatusConfig,
     # Распаковка данных для теста
     expected_lds_status, expected_lds_status_reasons = test_data.expected_result
     with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "CommonSchemeContent",
             "SubscribeCommonSchemeRequest",
@@ -44,18 +44,17 @@ async def lds_status_check_on_longest_flow_area(ws_client, cfg: LDSStatusConfig,
         StepCheck("Проверка наличия данных диагностических участков", "diagnosticAreas").actual(
             diagnostic_areas
         ).is_not_empty()
-    with SoftAssertions() as soft_failures:
-        for diagnostic_area in diagnostic_areas:
-            diagnostic_area_lds_status = LdsStatus(diagnostic_area.ldsStatus) if diagnostic_area.ldsStatus else None
-            StepCheck(f"Проверка режима работы СОУ на ДУ с id:{diagnostic_area.id}", "ldsStatus", soft_failures).actual(
-                diagnostic_area_lds_status
-            ).expected(expected_lds_status).equal_to()
-            lds_status_reasons = t_utils.parse_lds_status_reasons(
-                diagnostic_area.ldsStatus, diagnostic_area.ldsStatusReasons, soft_failures
-            )
-            StepCheck(
-                f"Проверка причины режима работы СОУ на ДУ с id:{diagnostic_area.id}", "ldsStatusReasons", soft_failures
-            ).contains(lds_status_reasons, expected_lds_status_reasons)
+    for diagnostic_area in diagnostic_areas:
+        diagnostic_area_lds_status = LdsStatus(diagnostic_area.ldsStatus) if diagnostic_area.ldsStatus else None
+        StepCheck(f"Проверка режима работы СОУ на ДУ с id:{diagnostic_area.id}", "ldsStatus").actual(
+            diagnostic_area_lds_status
+        ).expected(expected_lds_status).equal_to()
+        lds_status_reasons = t_utils.parse_lds_status_reasons(
+            diagnostic_area.ldsStatus, diagnostic_area.ldsStatusReasons
+        )
+        StepCheck(f"Проверка причины режима работы СОУ на ДУ с id:{diagnostic_area.id}", "ldsStatusReasons").contains(
+            lds_status_reasons, expected_lds_status_reasons
+        )
 
 
 async def lds_status_check_with_reasons(ws_client, cfg: SmokeSuiteConfig | LDSStatusConfig, test_data: CaseData):
@@ -66,7 +65,7 @@ async def lds_status_check_with_reasons(ws_client, cfg: SmokeSuiteConfig | LDSSt
     pipe_id = test_data.params.get("pipe_id")
     expected_lds_status, expected_lds_status_reasons = test_data.expected_result
     with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "CommonSchemeContent",
             "SubscribeCommonSchemeRequest",
@@ -102,7 +101,7 @@ async def lds_status_check_with_2_reasons(ws_client, cfg: SmokeSuiteConfig | LDS
     pipe_id = test_data.params.get("pipe_id")
     expected_lds_status, expected_lds_status_reason_1, expected_lds_status_reason_2 = test_data.expected_result
     with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "CommonSchemeContent",
             "SubscribeCommonSchemeRequest",
@@ -145,7 +144,7 @@ async def lds_status_check_on_multiple_diagnostic_areas(
     pipe_ids = test_data.params.get("pipe_ids")
     expected_result = test_data.expected_result
     with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "CommonSchemeContent",
             "SubscribeCommonSchemeRequest",
@@ -186,7 +185,7 @@ async def lds_and_stationary_status_check_with_reasons(
         expected_stationary_status_reasons,
     ) = test_data.expected_result
     with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "CommonSchemeContent",
             "SubscribeCommonSchemeRequest",
@@ -230,7 +229,7 @@ async def lds_and_stationary_status_check_with_reasons(
 
 
 async def lds_status_check_degradation_pig_sensor_passage(
-    ws_client, cfg: SmokeSuiteConfig | LDSStatusConfig, test_data: CaseData
+    ws_client, http_client, cfg: SmokeSuiteConfig | LDSStatusConfig, test_data: CaseData
 ):
     """
     Проверка режима работы и причины режима СОУ на заданном ДУ, с командой на включение СОД
@@ -240,18 +239,18 @@ async def lds_status_check_degradation_pig_sensor_passage(
     pig_trap_id = test_data.params.get("pig_trap_id")
     expected_lds_status, expected_lds_status_reasons = test_data.expected_result
 
-    with allure.step("Подключение по ws, отправка сообщения и обработка ответа о запуске СОД: LaunchPigRequest"):
-        payload = await t_utils.connect_and_get_msg(
-            ws_client,
-            "LaunchPigRequest",
-            {'pigTrapId': pig_trap_id, 'tuId': cfg.tu_id, 'timeToLaunch': 0, 'additionalProperties': None},
-        )
-        parsed_payload = parser.parse_launch_pig_msg(payload)
-        launch_pig_reply_status = parsed_payload.replyStatus
+    with allure.step("Http запрос, получение и обработка ответа о запуске СОД: LaunchPigRequest"):
+        request_body = {'pigTrapId': pig_trap_id, 'timeToLaunch': 0, 'tuId': cfg.tu_id}
+        response = http_client.post_request(HttpConst.LAUNCH_PIG_URL_PATH, request_body)
+        launch_pig_reply_status = response.status_code
+
+        StepCheck("Проверка кода ответа на запрос о запуске СОД", "replyStatus").actual(
+            launch_pig_reply_status
+        ).expected(ReplyStatus.OK.value).equal_to()
         time.sleep(cfg.basic_message_timeout)
 
     with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "CommonSchemeContent",
             "SubscribeCommonSchemeRequest",
@@ -275,9 +274,6 @@ async def lds_status_check_degradation_pig_sensor_passage(
     StepCheck(f"Проверка причины режима работы СОУ на ДУ с id:{diagnostic_area.id}", "ldsStatusReasons").contains(
         lds_status_reasons, expected_lds_status_reasons
     )
-    StepCheck("Проверка кода ответа на запрос о запуске СОД", "replyStatus").actual(launch_pig_reply_status).expected(
-        ReplyStatus.OK.value
-    ).equal_to()
 
 
 def lds_status_in_journal(http_client, cfg: LDSStatusConfig, test_data: CaseData):

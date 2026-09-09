@@ -93,6 +93,7 @@ def pytest_configure(config):
         "suite_start_time": None,
         "stand_manager": None,
         "imitator_start_time": None,  # datetime объект времени старта имитатора для расчёта интервалов утечек
+        "is_target_tu_active": False,
         "use_lds_configurator": True,
         "resolved_tu_id": None,
         "admin_tu_name": None,
@@ -227,8 +228,9 @@ LEAK_LEVEL_TEST_MAPPING = {
 
 STATIONARY_STATUS_SUITE_LEVEL_MAPPING = {
     'test_stationary_status_basic_info': 'stationary_status_basic_info_test',
-    'test_stationary_status_check_with_reasons': 'stationary_status_check_with_reasons_test',
-    'test_stationary_status_in_journal': 'stationary_status_in_journal_test',
+    'test_stationary_status_common_scheme': 'stationary_status_common_scheme_test',
+    'test_stationary_status_journal': 'stationary_status_journal_test',
+    'test_stationary_status_main_page_info': 'stationary_status_main_page_info_test',
 }
 
 # Тесты уровня отбраковки (маркеры из RejectionTestCase - параметр rejection_case)
@@ -529,7 +531,6 @@ def pytest_runtest_setup(item):
 
     if current_test_suite != cfg["current_suite"]:
         # stop old
-        _run_lds_configurator_teardown_if_needed(cfg)
         if stand_manager := cfg["stand_manager"]:
             try:
                 stand_manager.stop_imitator_wrapper()
@@ -555,6 +556,7 @@ def pytest_runtest_setup(item):
         test_data_name = item.get_closest_marker("test_data_name").args[0]
         # legacy: id из enum TU для имитатора (tn{id}_tags.txt), не resolved_tu_id из Администрирования
         tu_id = item.get_closest_marker("tu_id").args[0]
+        ost_name = item.get_closest_marker("ost_name").args[0]
 
         imitator_duration = compute_imitator_duration(item, current_test_suite)
 
@@ -573,6 +575,7 @@ def pytest_runtest_setup(item):
             test_data_id=data_id,
             test_data_name=test_data_name,
             tu_id=tu_id,
+            ost_name=ost_name,
             measure_conversion_rules=measure_conversion_rules,
         )
         cfg["stand_manager"] = stand_manager
@@ -702,7 +705,7 @@ def _run_lds_configurator_teardown_if_needed(cfg: dict) -> None:
         http_client = init_http_stand_client(cfg)
         http_client.suppress_recv_logging = True
         await lds_configurator_scenarios.lds_configurator_teardown(
-            http_client, tu_id, admin_tu_name, pre_run_running_tus
+            http_client, tu_id, admin_tu_name, cfg, pre_run_running_tus
         )
 
     try:
@@ -716,6 +719,7 @@ def _run_lds_configurator_teardown_if_needed(cfg: dict) -> None:
     finally:
         cfg["resolved_tu_id"] = None
         cfg["use_lds_configurator"] = False
+        cfg["is_target_tu_active"] = False
         cfg["admin_tu_name"] = None
         cfg["pre_run_running_tus"] = None
 
@@ -841,3 +845,4 @@ def pytest_sessionfinish(session, exitstatus):
     else:
         for file in files_for_drop:
             os.remove(file)
+            
