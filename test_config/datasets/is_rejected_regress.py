@@ -39,6 +39,7 @@ IS_REJECTED_REGRESS_CONFIG = IsRejectedConfig(
     technological_unit=TECHNOLOGICAL_UNIT,
     measure_conversion_rules=MeasureConversionRule.KG_CM_MEASURE,
     main_pipeline=MAIN_PIPELINE,
+    requires_process_empty_values_rejection=True,
     rejection_report_test=CaseMarkers(test_case_id="210", offset=70),
     rejection_cases=[
         # ===== emptyFilterSettings =====

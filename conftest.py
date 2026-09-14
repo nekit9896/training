@@ -24,6 +24,10 @@ from utils.helpers.pytest_auth import (
     init_http_stand_client,
     init_ws_stand_client,
 )
+from utils.helpers.vault_pytest_utils import (
+    configure_vault_for_suite,
+    reset_vault_process_empty_values_rejection,
+)
 from utils.helpers.ws_message_parser import ws_message_parser as lds_ws_parser
 
 
@@ -104,6 +108,7 @@ def pytest_configure(config):
         "auth_token": None,
         "x_user_id": None,
         "auth_suite": None,
+        "vault_rejection_enabled": False,
     }
 
 
@@ -186,20 +191,40 @@ LDS_STATUS_SUITE_LEVEL_MAPPING = {
     'test_lds_status_degradation_faulty_pressure_sensors_at_pump_station_in_journal': 'deg_faulty_pressure_sensors_at_pump_station_in_journal_test',  # noqa: E501
     'test_lds_status_degradation_gravity_section_pumping': 'deg_gravity_section_pumping_test',
     'test_lds_status_degradation_gravity_section_pumping_in_stopping': 'deg_gravity_section_pumping_in_stopping_test',
-    'test_lds_status_degradation_gravity_section_pumping_in_stopping_in_journal': 'deg_gravity_section_pumping_in_stopping_in_journal_test',  # noqa: E501
     'test_lds_status_degradation_pig_sensor_passage': 'deg_pig_sensor_passage_test',
     'test_lds_status_degradation_starting_pumping_out_pumps': 'deg_starting_pumping_out_pumps_test',
     'test_lds_status_degradation_exceeding_distance_between_flow_meters': 'deg_exceeding_distance_between_flow_meters_test',  # noqa: E501
+    # ===== ТЕСТЫ на схеме=====
     'test_lds_status_degradation_rejection_temperature_sensor_on_du_2': 'deg_rejection_temperature_sensor_on_du_2_test',
     'test_lds_status_degradation_rejection_temperature_sensor_on_du_3': 'deg_rejection_temperature_sensor_on_du_3_test',
     'test_lds_status_degradation_rejection_temperature_sensor_on_du_5': 'deg_rejection_temperature_sensor_on_du_5_test',
     'test_lds_status_degradation_rejection_density_and_viscosity_on_du_2': 'deg_rejection_density_and_viscosity_on_du_2_test',  # noqa: E501
     'test_lds_status_degradation_rejection_density_and_viscosity_on_du_3': 'deg_rejection_density_and_viscosity_on_du_3_test',  # noqa: E501
     'test_lds_status_degradation_rejection_density_and_viscosity_on_du_5': 'deg_rejection_density_and_viscosity_on_du_5_test',  # noqa: E501
+    # ===== ТЕСТЫ в журнале бики ДУ2=====
+    'test_degradation_temperature_du_2_in_journal': 'degradation_temperature_du_2_in_journal_test',
+    'test_degradation_density_du_2_in_journal': 'degradation_density_du_2_in_journal_test',
+    'test_degradation_viscosity_du_2_in_journal': 'degradation_viscosity_du_2_in_journal_test',
+    # ===== ТЕСТЫ в журнале бики ДУ3=====
+    'test_degradation_temperature_du_3_in_journal': 'degradation_temperature_du_3_in_journal_test',
+    'test_degradation_density_du_3_in_journal': 'degradation_density_du_3_in_journal_test',
+    'test_degradation_viscosity_du_3_in_journal': 'degradation_viscosity_du_3_in_journal_test',
+    # ===== ТЕСТЫ на схеме течение=====
+    'test_lds_status_degradation_gravity_section_pumping_in_stopping_in_journal': 'deg_gravity_section_pumping_in_stopping_in_journal_test',  # noqa: E501
+    'test_between_si_pressure_more_50_km_in_journal': 'between_si_pressure_more_50_km_in_journal_test',
+    'test_deg_gravity_section_pumping_in_journal': 'deg_gravity_section_pumping_in_journal_test',
+    'test_deg_absence_min_pressure_sensors_in_journal': 'deg_absence_min_pressure_sensors_in_journal_test',
+    'test_deg_starting_pumping_out_pumps_in_journal': 'deg_starting_pumping_out_pumps_in_journal_test',
+    'test_faulty_absence_min_flow_meters_in_journal': 'faulty_absence_min_flow_meters_in_journal_test',
+    'test_faulty_absence_min_flow_meters_continuous_in_journal': 'faulty_absence_min_flow_meters_continuous_in_journal_test',  # noqa: E501
+    'test_deg_exceeding_distance_between_flow_meters_in_journal': 'deg_exceeding_distance_between_flow_meters_in_journal_test',  # noqa: E501
+    'test_deg_pig_sensor_passage_in_journal': 'deg_pig_sensor_passage_in_journal_test',
+    'test_deg_additive_injectors_operation_in_journal': 'deg_additive_injectors_operation_in_journal_test',
+    'test_lds_status_faulty_absence_min_pressure_sensors_in_journal': 'faulty_absence_min_pressure_sensors_in_journal_test',  # noqa: E501
+    # ===== ТЕСТЫ на схеме течение=====
     'test_lds_status_faulty_absence_min_flow_meters_continuous': 'faulty_absence_min_flow_meters_continuous_test',
     'test_lds_status_faulty_absence_min_flow_meters': 'faulty_absence_min_flow_meters_test',
     'test_lds_status_faulty_absence_min_pressure_sensors': 'faulty_absence_min_pressure_sensors_test',
-    'test_lds_status_faulty_absence_min_pressure_sensors_in_journal': 'faulty_absence_min_pressure_sensors_in_journal_test',  # noqa: E501
 }
 
 # Тесты уровня утечки (маркеры из LeakTestConfig - параметр leak)
@@ -570,6 +595,15 @@ def pytest_runtest_setup(item):
                     "при use_lds_configurator=True"
                 )
 
+        try:
+            vault_rejection_enabled, vault_setup_error = configure_vault_for_suite(suite_config)
+            if vault_setup_error:
+                _skip_current_suite_after_setup_failure(cfg, vault_setup_error)
+            else:
+                cfg["vault_rejection_enabled"] = vault_rejection_enabled
+        except Exception as error:
+            _skip_current_suite_after_setup_failure(cfg, f"[SETUP] [ERROR] Vault: {error}")
+
         stand_manager = StandSetupManager(
             duration_m=imitator_duration,
             test_data_id=data_id,
@@ -736,6 +770,9 @@ def pytest_runtest_teardown(item, nextitem):
     next_suite = next_marker.args[0] if next_marker else None
 
     if next_suite != cfg["current_suite"]:
+        if cfg.get("vault_rejection_enabled"):
+            reset_vault_process_empty_values_rejection()
+            cfg["vault_rejection_enabled"] = False
         if stand_manager := cfg["stand_manager"]:
             try:
                 if cfg.get("suite_infra_ready"):
@@ -810,6 +847,9 @@ def pytest_sessionfinish(session, exitstatus):
     # 1) teardown стенда: LDS Configurator + остановка имитатора
     try:
         group_state = getattr(session.config, "group_state", {})
+        if group_state.get("vault_rejection_enabled"):
+            reset_vault_process_empty_values_rejection()
+            group_state["vault_rejection_enabled"] = False
         _run_lds_configurator_teardown_if_needed(group_state)
         stand_manager = group_state.get("stand_manager")
         if stand_manager:
