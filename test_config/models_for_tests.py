@@ -540,6 +540,7 @@ class IsRejectedConfig(BaseSuiteConfig):
 
     rejection_cases: list[RejectionTestCase] = field(default_factory=list)
     rejection_report_test: Optional[CaseMarkers] = None
+    requires_process_empty_values_rejection: bool = False
 
 
 @dataclass

@@ -197,3 +197,19 @@ class EnvKeyConstants:
     DATA_PATH: str = "DATA_PATH"
     OPC_URL: str = "OPC_URL"
     TU_ID: str = "TU_ID"
+
+
+class VaultConstants:
+    """Константы для интеграции с Vault"""
+
+    VAULT_ADDR: str = "VAULT_ADDR"
+    ROLE_ID: str = "LDS_AUTO_VAULT_ROLE"
+    SECRET_ID: str = "LDS_AUTO_VAULT_SECRET"
+    VAULT_SKIP_VERIFY: str = "true"
+
+    KV_MOUNT: str = "dotnet"
+    SECRET_PATH_TEMPLATE: str = "config/{environment}/481/{stand_name}/LayerBuilderReportInfoHandler"
+    ENVIRONMENT_TESTING: str = "Testing"
+    ENVIRONMENT_DEVELOPMENT: str = "Development"
+    PROCESS_EMPTY_VALUES_REJECTION_KEY: str = "ProcessEmptyValuesRejection"
+    VAULT_CMD_TIMEOUT_S: int = 30
