@@ -75,8 +75,7 @@ class VaultConfigManager:
         Формирует окружение subprocess для vault CLI: VAULT_SKIP_VERIFY и кэшированный токен.
         """
         env = os.environ.copy()
-        if not env.get(VaultConstants.VAULT_SKIP_VERIFY):
-            env[VaultConstants.VAULT_SKIP_VERIFY] = "true"
+        env["VAULT_SKIP_VERIFY"] = VaultConstants.VAULT_SKIP_VERIFY
         if self._vault_token:
             env["VAULT_TOKEN"] = self._vault_token
         return env
