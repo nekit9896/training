@@ -48,16 +48,40 @@ def prepare_rejection_report_case_checks(
     case_checks: List[RejectionReportCaseCheck] = []
 
     for rejection_case in rejection_cases:
-        report_event = expected_event_to_report_event(rejection_case.expected_event)
-        window_start, window_end = get_case_time_window(imitator_start_time, rejection_case)
-        case_label = f"события '{report_event}' - {rejection_case.sensor.description}"
-        expected_signal_suffix = report_signal_suffix_by_expected_name(rejection_case.expected_signal_name)
+        if rejection_case.expected_is_rejected:
+            report_event = expected_event_to_report_event(rejection_case.expected_event)
+            window_start, window_end = get_case_time_window(imitator_start_time, rejection_case)
+            case_label = f"события '{report_event}' - {rejection_case.sensor.description}"
+            expected_signal_suffix = report_signal_suffix_by_expected_name(rejection_case.expected_signal_name)
 
-        raw_case_rows = filter_rows_for_rejection_case(monitored_rows, rejection_case, imitator_start_time)
-        merged_case_rows = merge_rejection_rows(raw_case_rows)
-        primary_row = select_primary_merged_row(merged_case_rows)
+            raw_case_rows = filter_rows_for_rejection_case(monitored_rows, rejection_case, imitator_start_time)
+            merged_case_rows = merge_rejection_rows(raw_case_rows)
+            primary_row = select_primary_merged_row(merged_case_rows)
 
-        if primary_row is None:
+            if primary_row is None:
+                case_checks.append(
+                    RejectionReportCaseCheck(
+                        case_label=case_label,
+                        tag_description=rejection_case.sensor.description,
+                        report_event=report_event,
+                        window_start=window_start,
+                        window_end=window_end,
+                        row_found=False,
+                        found_row_summary="строка не найдена",
+                        expected_signal_suffix=expected_signal_suffix,
+                    )
+                )
+                continue
+
+            merge_key = build_merge_key(primary_row)
+            expected_duration_seconds = sum_duration_for_merge_key(raw_case_rows, merge_key)
+            pipe_section, actual_signal_suffix = split_object_column(primary_row.object_value)
+            datetime_in_window = is_datetime_within_closed_interval(
+                primary_row.datetime_value,
+                window_start,
+                window_end,
+            )
+
             case_checks.append(
                 RejectionReportCaseCheck(
                     case_label=case_label,
@@ -65,43 +89,20 @@ def prepare_rejection_report_case_checks(
                     report_event=report_event,
                     window_start=window_start,
                     window_end=window_end,
-                    row_found=False,
-                    found_row_summary="строка не найдена",
+                    row_found=True,
+                    found_row_summary=(
+                        f"{primary_row.tag_value} | {primary_row.event_value} | {primary_row.datetime_value}"
+                    ),
+                    datetime_in_window=datetime_in_window,
+                    datetime_actual_text=str(primary_row.datetime_value) if primary_row.datetime_value else "(пусто)",
+                    actual_duration_seconds=primary_row.duration_seconds,
+                    expected_duration_seconds=expected_duration_seconds,
+                    expected_duration_text=format_duration_seconds(expected_duration_seconds),
+                    pipe_section=pipe_section,
+                    actual_signal_suffix=actual_signal_suffix,
                     expected_signal_suffix=expected_signal_suffix,
                 )
             )
-            continue
-
-        merge_key = build_merge_key(primary_row)
-        expected_duration_seconds = sum_duration_for_merge_key(raw_case_rows, merge_key)
-        pipe_section, actual_signal_suffix = split_object_column(primary_row.object_value)
-        datetime_in_window = is_datetime_within_closed_interval(
-            primary_row.datetime_value,
-            window_start,
-            window_end,
-        )
-
-        case_checks.append(
-            RejectionReportCaseCheck(
-                case_label=case_label,
-                tag_description=rejection_case.sensor.description,
-                report_event=report_event,
-                window_start=window_start,
-                window_end=window_end,
-                row_found=True,
-                found_row_summary=(
-                    f"{primary_row.tag_value} | {primary_row.event_value} | {primary_row.datetime_value}"
-                ),
-                datetime_in_window=datetime_in_window,
-                datetime_actual_text=str(primary_row.datetime_value) if primary_row.datetime_value else "(пусто)",
-                actual_duration_seconds=primary_row.duration_seconds,
-                expected_duration_seconds=expected_duration_seconds,
-                expected_duration_text=format_duration_seconds(expected_duration_seconds),
-                pipe_section=pipe_section,
-                actual_signal_suffix=actual_signal_suffix,
-                expected_signal_suffix=expected_signal_suffix,
-            )
-        )
 
     return case_checks
 

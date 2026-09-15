@@ -1,0 +1,76 @@
+[tool.poetry]
+name = "training"
+version = "0.1.0"
+description = ""
+authors = ["nekit9896@gmail.com"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+python-dotenv = "^1.0.1"
+black = "24.2.0"
+isort = "5.13.2"
+flake8 = "6.0.0"
+structlog= "^23.2.0"
+confluent-kafka = {extras = ["avro", "protobuf"], version = "2.9.0"}
+cryptography = "45.0.2"
+charset-normalizer = "3.4.0"
+requests = "2.32.3"
+websockets = "15.0.1"
+allure-pytest = "2.13.5"
+asyncio = "^3.4.3"
+pytest-asyncio = "0.26.0"
+protobuf = "6.30.2"
+assertpy = "1.1"
+websocket-client = "1.8.0"
+msgpack = "1.0.2"
+pydantic-core = "2.27.1"
+pydantic = "2.10.1"
+pyyaml = "6.0.2"
+dacite = "1.9.2"
+tzdata = "2025.2"
+pygments = "2.19.1"
+openpyxl = "3.1.5"
+
+[tool.pytest.ini_options]
+addopts = [
+    "-v",
+    "-s",
+    "--alluredir=allure-results"
+]
+markers = [
+    "test_suite_name(name): привязка теста к набору данных",
+    "test_suite_data_id(id): id набора данных в TestOps для всей группы",
+    "imitator_duration(minutes): длительность работы имитатора для группы тестов на определнных данных",
+    "test_case_id(id): id тест кейса в TestOps",
+    "test_data_name: название набора данных",
+    "tu_id: id ТУ",
+    "ost_name: Имя ОСТ",
+    "offset(minutes): сколько ждать от старта имитатора перед проверкой"
+]
+asyncio_mode="auto"
+norecursedirs = [".*", ".git", ".env", ".env.example", "poetry.lock", "pyproject.toml", "clients", "models", "utils"]
+
+log_cli=true
+log_cli_level="INFO"
+log_cli_format="[%(levelname)s] %(asctime)s %(filename)s %(message)s"
+log_cli_date_format="%Y-%m-%d %H:%M:%S.%f"
+
+
+[tool.black]
+line-length = 120
+skip-string-normalization = true
+exclude = '/(\.git|\.venv|__pycache__|build|dist|migrations)/'
+
+[tool.isort]
+profile = "black"
+line_length = 120
+skip = [".git", ".venv", "__pycache__", "build", "dist", "migrations"]
+
+[tool.flake8]
+max-line-length = 120
+exclude = ".git,.venv,__pycache__,build,dist,*/migrations/*"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

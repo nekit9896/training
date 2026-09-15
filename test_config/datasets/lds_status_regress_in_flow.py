@@ -30,6 +30,9 @@ DIAGNOSTIC_AREA_2_PIPE_ID = 1463
 DIAGNOSTIC_AREA_3_PIPE_ID = 474
 DIAGNOSTIC_AREA_5_PIPE_ID = 1478
 PIG_TRAP_ID = 344
+DIAGNOSTIC_AREA_2_CONTROL_POINT = "ЗА 105-3 - ЗА 129-3"
+DIAGNOSTIC_AREA_3_CONTROL_POINT = "ЗА 180-3 - ЗА 207-3"
+DIAGNOSTIC_AREA_5_CONTROL_POINT = "ЗА 235-3-1 - ЗА 246-3-2"
 
 # Технологический участок
 TECHNOLOGICAL_UNIT = TU.TIKHORETSK_NOVOROSSIYSK_3
@@ -51,6 +54,7 @@ LDS_STATUS_INFLOW_CONFIG = LDSStatusConfig(
     # ===== LDS Configurator =====
     use_lds_configurator=True,
     admin_tu=AdminTU.TIKHORETSK_NOVOROSSIYSK_3_AUTOTEST_DATA_ABSENCE_FALSE,
+    # ===== Ожидания для сообщений о состоянии СОУ. ЭФ Схема =====
     init_cold_start_test_data=CaseData(
         expected_result=(LdsStatus.INITIALIZATION, LdsStatusInitialization.COLD_START_OF_SERVERS),
     ),
@@ -126,14 +130,93 @@ LDS_STATUS_INFLOW_CONFIG = LDSStatusConfig(
             LdsStatusDegradation.EXCEEDING_DISTANCE_BETWEEN_FLOW_METERS,
         ),
     ),
-    # ===== ТЕСТЫ =====
+    # ===== Ожидания для сообщений о состоянии СОУ. ЭФ Журнал =====
+    between_si_pressure_more_50_km_in_journal_test_data=CaseData(
+        params={"control_points": [DIAGNOSTIC_AREA_3_CONTROL_POINT]},
+        expected_result=(
+            LdsStatus.DEGRADATION.report_text,
+            LdsStatusDegradation.EXCEEDING_DISTANCE_BETWEEN_SERVICEABLE_PRESSURE_SENSORS.report_text,
+        ),
+    ),
+    deg_gravity_section_pumping_in_journal_test_data=CaseData(
+        params={"control_points": [DIAGNOSTIC_AREA_5_CONTROL_POINT]},
+        expected_result=(
+            LdsStatus.DEGRADATION.report_text,
+            LdsStatusDegradation.GRAVITY_SECTION_IN_PUMPING_MODE.report_text,
+        ),
+    ),
+    deg_absence_min_pressure_sensors_in_journal_test_data=CaseData(
+        params={"control_points": [DIAGNOSTIC_AREA_5_CONTROL_POINT]},
+        expected_result=(
+            LdsStatus.DEGRADATION.report_text,
+            LdsStatusDegradation.ABSENCE_MIN_PRESSURE_SENSORS_REQUIRED_NUMBER.report_text,
+        ),
+    ),
+    serviceable_after_deg_absence_min_pressure_sensors_in_journal_test_data=CaseData(
+        params={"control_points": [DIAGNOSTIC_AREA_5_CONTROL_POINT]},
+        expected_result=(LdsStatus.SERVICEABLE.report_text,),
+    ),
+    deg_starting_pumping_out_pumps_in_journal_test_data=CaseData(
+        params={"control_points": [DIAGNOSTIC_AREA_2_CONTROL_POINT]},
+        expected_result=(
+            LdsStatus.DEGRADATION.report_text,
+            LdsStatusDegradation.STARTING_PUMPING_OUT_PUMPS.report_text,
+        ),
+    ),
+    serviceable_after_deg_starting_pumping_out_pumps_in_journal_test_data=CaseData(
+        params={"control_points": [DIAGNOSTIC_AREA_2_CONTROL_POINT]},
+        expected_result=(LdsStatus.SERVICEABLE.report_text,),
+    ),
+    faulty_absence_min_flow_meters_in_journal_test_data=CaseData(
+        params={"control_points": [DIAGNOSTIC_AREA_5_CONTROL_POINT]},
+        expected_result=(
+            LdsStatus.FAULTY.report_text,
+            LdsStatusFaulty.ABSENCE_MIN_FLOW_METERS_REQUIRED_NUMBER.report_text,
+        ),
+    ),
+    serviceable_after_faulty_in_journal_test_data=CaseData(
+        params={"control_points": [DIAGNOSTIC_AREA_2_CONTROL_POINT]},
+        expected_result=(LdsStatus.SERVICEABLE.report_text,),
+    ),
+    deg_exceeding_distance_between_flow_meters_in_journal_test_data=CaseData(
+        params={"control_points": [DIAGNOSTIC_AREA_3_CONTROL_POINT]},
+        expected_result=(
+            LdsStatus.DEGRADATION.report_text,
+            LdsStatusDegradation.EXCEEDING_DISTANCE_BETWEEN_FLOW_METERS.report_text,
+        ),
+    ),
+    deg_faulty_pressure_sensors_at_pump_station_in_journal_test_data=CaseData(
+        params={"control_points": [DIAGNOSTIC_AREA_2_CONTROL_POINT]},
+        expected_result=(
+            LdsStatus.DEGRADATION.report_text,
+            LdsStatusDegradation.FAULTY_PRESSURE_SENSORS_AT_PUMP_STATION_NODES.report_text,
+        ),
+    ),
+    serviceable_after_deg_faulty_pressure_sensors_at_pump_in_journal_test_data=CaseData(
+        params={"control_points": [DIAGNOSTIC_AREA_2_CONTROL_POINT]},
+        expected_result=(LdsStatus.SERVICEABLE.report_text,),
+    ),
+    deg_additive_injectors_operation_in_journal_test_data=CaseData(
+        params={"control_points": [DIAGNOSTIC_AREA_3_CONTROL_POINT]},
+        expected_result=(
+            LdsStatus.DEGRADATION.report_text,
+            LdsStatusDegradation.ADDITIVE_INJECTORS_OPERATION.report_text,
+        ),
+    ),
+    deg_pig_sensor_passage_in_journal_test_data=CaseData(
+        params={"control_points": [DIAGNOSTIC_AREA_2_CONTROL_POINT]},
+        expected_result=(
+            LdsStatus.DEGRADATION.report_text,
+            LdsStatusDegradation.PIG_SENSOR_PASSAGE.report_text,
+        ),
+    ),
+    # ===== ТЕСТЫ состояния СОУ на схеме =====
     lds_status_basic_info_test=CaseMarkers(test_case_id="1", offset=5),
-    init_cold_start_test=CaseMarkers(test_case_id="17", offset=7),
-    init_cold_start_in_journal_test=CaseMarkers(test_case_id="228", offset=7),
+    init_cold_start_test=CaseMarkers(test_case_id="160", offset=7),
     serviceable_after_cold_start_test=CaseMarkers(test_case_id="186", offset=22),
     deg_exceeding_distance_between_pressure_sensors_test=CaseMarkers(test_case_id="164", offset=32),
     deg_gravity_section_pumping_test=CaseMarkers(test_case_id="167", offset=34),
-    deg_absence_min_pressure_sensors_test=CaseMarkers(test_case_id="166", offset=38.5),
+    deg_absence_min_pressure_sensors_test=CaseMarkers(test_case_id="166", offset=38),
     serviceable_after_deg_absence_min_pressure_sensors_test=CaseMarkers(test_case_id="186", offset=43),
     deg_starting_pumping_out_pumps_test=CaseMarkers(test_case_id="174", offset=46),
     serviceable_after_deg_starting_pumping_out_pumps_test=CaseMarkers(test_case_id="186", offset=52.5),
@@ -147,4 +230,18 @@ LDS_STATUS_INFLOW_CONFIG = LDSStatusConfig(
     serviceable_after_deg_faulty_pressure_sensors_at_pump_test=CaseMarkers(test_case_id="186", offset=126),
     deg_additive_injectors_operation_test=CaseMarkers(test_case_id="188", offset=132),
     deg_pig_sensor_passage_test=CaseMarkers(test_case_id="165", offset=140),
+    # ===== ТЕСТЫ состояния СОУ на схеме =====
+    init_cold_start_in_journal_test=CaseMarkers(test_case_id="228", offset=7),
+    between_si_pressure_more_50_km_in_journal_test=CaseMarkers(test_case_id="228", offset=35),
+    deg_gravity_section_pumping_in_journal_test=CaseMarkers(test_case_id="167", offset=34),
+    deg_absence_min_pressure_sensors_in_journal_test=CaseMarkers(test_case_id="166", offset=36),
+    serviceable_after_deg_absence_min_pressure_sensors_in_journal_test=CaseMarkers(test_case_id="186", offset=43),
+    deg_starting_pumping_out_pumps_in_journal_test=CaseMarkers(test_case_id="174", offset=46),
+    serviceable_after_deg_starting_pumping_out_pumps_in_journal_test=CaseMarkers(test_case_id="186", offset=53),
+    faulty_absence_min_flow_meters_in_journal_test=CaseMarkers(test_case_id="170", offset=57),
+    serviceable_after_faulty_in_journal_test=CaseMarkers(test_case_id="186", offset=76),
+    deg_exceeding_distance_between_flow_meters_in_journal_test=CaseMarkers(test_case_id="169", offset=107),  # 106
+    deg_faulty_pressure_sensors_at_pump_station_in_journal_test=CaseMarkers(test_case_id="184", offset=120),
+    deg_additive_injectors_operation_in_journal_test=CaseMarkers(test_case_id="188", offset=132),
+    deg_pig_sensor_passage_in_journal_test=CaseMarkers(test_case_id="165", offset=140),
 )

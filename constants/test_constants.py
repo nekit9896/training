@@ -6,6 +6,7 @@ from constants.enums import StationaryStatus
 
 
 class BaseTN3Constants:
+    CHTN_OST_NAME = "CHTN"
     # ===== Константы для запросов журнала =====
     COLUMN_SELECTION_DEF = [
         'Time',
@@ -80,8 +81,8 @@ class BaseTN3Constants:
     JOURNAL_EVENT_UNMASK = "Снятие признака маскирования"
     JOURNAL_EVENT_IMITATE = "Установка режима имитации сигнала"
     JOURNAL_EVENT_UNIMITATE = "Снятие режима имитации сигнала"
-    JOURNAL_SIGNAL_PRESSURE = "Значение давления"
-    JOURNAL_SIGNAL_FLOW = "Расход"
+    JOURNAL_SIGNAL_PRESSURE = "СИ давления"
+    JOURNAL_SIGNAL_FLOW = "СИ расхода. Расход"
     JOURNAL_MESSAGE_TYPE_USER_ACTIONS = "Действия пользователя"
     JOURNAL_STATUS_SUCCESS = "Успешно"
     JOURNAL_EXPECTED_MSG_COUNT_PER_SIGNAL = 2
@@ -131,7 +132,8 @@ class BaseTN3Constants:
 
     # ===== Прочие константы =====
     BASIC_MESSAGE_TIMEOUT = 10.0  # Таймаут ожидания сообщений в секундах
-    SUBSCRIBE_MESSAGE_POLL_ATTEMPTS = 5  # Число чтений из потока подписки до отказа
+    SUBSCRIBE_MESSAGE_POLL_ATTEMPTS = 7  # Число чтений из потока подписки до отказа
+    POLL_BY_TIMEOUT_SECONDS = 5.0  # Таймаут ожидания сообщения в секундах
     MASK_MESSAGE_TIMEOUT = 180.0  # Таймаут ожидания сообщений в секундах
     PRECISION = 3  # Точность округления для координат
     DIGITS_WITH_DOT_PATTERN = r'\d+(?:\.\d+)?'  # Регулярное выражение для поиска чисел с точкой
@@ -161,6 +163,8 @@ class BaseTN3Constants:
     ZONE_INFO: str = "Europe/Moscow"
     SECONDS_PER_HOUR: int = 3600
     CRITERIA_NAMES_FIELD: str = 'criteriaNames'
+    # Словарь вида: {segment.name: (controlledSiteId, segmentId)}, заполняется из файла конфигурации
+    CONTROLLED_SITE_SEGMENTS = {}
 
     # ===== Ключи для тестовых данных =====
     PIPE_ID_KEY: str = "pipe_id"
@@ -271,10 +275,10 @@ class ExportLdsStatusReportConstants:
     REPORT_DATA_FIRST_ROW: int = 3
 
     COL_SECTION: str = "Наименование участка"
-    COL_FAULTY: str = "Неисправность"
+    COL_FAULTY: str = "Неисправна"
     COL_DEGRADATION: str = "В ухудшенных характеристиках"
     COL_INITIALIZATION: str = "Инициализация"
-    COL_SERVICEABLE: str = "Исправность"
+    COL_SERVICEABLE: str = "Исправна"
 
     MODE_DURATION_COLUMNS: list = [
         COL_FAULTY,
@@ -415,6 +419,7 @@ class LdsConfiguratorConstants:
     """Константы для setup/teardown через раздел Администрирование."""
 
     GET_BASIC_INFO_ADMIN_RETRIES: int = 10
+    GET_BASIC_INFO_ADMIN_TIMEOUT_SECONDS: float = 2.0
     CONFIGURATOR_GET_BASIC_INFO_ADMIN_TIMEOUT_SECONDS: float = 30.0
     POLL_TIMEOUT_SECONDS: float = 120.0
     VERIFY_UI_SYNC_TIME_SECONDS: float = 300.0
@@ -429,4 +434,3 @@ class LdsConfiguratorConstants:
     STOP_LDS_REQUEST: str = "StopLdsRequest"
     LAUNCH_LDS_REQUEST: str = "LaunchLdsRequest"
     GET_TUS_INFORMATION_REQUEST: str = "GetTusInformationRequest"
-    

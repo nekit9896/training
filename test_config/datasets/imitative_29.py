@@ -1,11 +1,11 @@
 """
-Конфигурация тестового набора Imitative_17_tn3_5km_113
+Конфигурация тестового набора Imitative_29_tn3_56km_3156
+
 Особенности набора:
 - Режим МТ стационар, минимальный
-- Одна утечка на координате 5 км
-- Объём утечки 113 м³
-- Интенсивность утечки 3,6%
-- Отбор на участке между СИ давления на выходе головной НПС и СИ давления на следующем КП на ЛЧ (на входе первой ЗА ЛЧ)
+- Одна утечка на координате 56 км
+- Объём утечки 3156 м³
+- Интенсивность утечки 100%
 """
 
 from constants.enums import (
@@ -28,8 +28,8 @@ from test_config.models_for_tests import (
 )
 
 # ===== Константы набора =====
-SUITE_NAME = "Imitative_17_tn3_5km_113"
-SUITE_DATA_ID = 24
+SUITE_NAME = "Imitative_29_tn3_56km_3156"
+SUITE_DATA_ID = 33
 ARCHIVE_NAME = f"{SUITE_NAME}.tar.gz"
 
 # Технологический участок
@@ -39,10 +39,10 @@ TECHNOLOGICAL_UNIT = TU.TIKHORETSK_NOVOROSSIYSK_3
 MAIN_PIPELINE = "МН Тихорецк-Новороссийск-3"
 
 # Параметры утечки
-LEAK_COORDINATE_METERS = 5400.0
-LEAK_VOLUME_M3 = 113.0
-ALLOWED_TIME_DIFF_SECONDS = 1440  # 24 минуты
-LEAK_START_INTERVAL_SECONDS = 2100  # 35 минут
+LEAK_COORDINATE_METERS = 56000.0
+LEAK_VOLUME_M3 = 3156.0
+ALLOWED_TIME_DIFF_SECONDS = 360  # 6 мин
+LEAK_START_INTERVAL_SECONDS = 1800  # 30 минут
 FLOW_RATE_SETTINGS_THRESHOLD = 17
 
 # ID диагностических участков
@@ -55,7 +55,7 @@ DIAGNOSTIC_AREA_3_PIPE_ID = 1444  # OUT_NEIGHBOR_DIAGNOSTIC_AREA_PIPE_ID
 LINEAR_PART_ID = 407
 
 # ===== Конфигурация набора =====
-IMITATIVE_17_CONFIG = SmokeSuiteConfig(
+IMITATIVE_29_CONFIG = SmokeSuiteConfig(
     # ===== Метаданные =====
     ost_name=TestConst.CHTN_OST_NAME,
     suite_name=SUITE_NAME,
@@ -74,7 +74,7 @@ IMITATIVE_17_CONFIG = SmokeSuiteConfig(
     controlled_sites_with_segment=CaseData(
         expected_result={
             "exp_tixoreczkaya_novovelichkovskaya": (StationaryStatus.STATIONARY, LdsStatus.SERVICEABLE),
-            "exp_novovelichkovskaya_krymskaya": (StationaryStatus.STATIONARY, LdsStatus.SERVICEABLE),
+            "exp_novovelichkovskaya_krymskaya": (StationaryStatus.STATIONARY, LdsStatus.DEGRADATION),
             "exp_krymskaya_grushovaya": (StationaryStatus.STOPPED, LdsStatus.FAULTY),
             "exp_backup_route_bejsug": (StationaryStatus.STOPPED, LdsStatus.FAULTY),
             "exp_backup_route_ponura": (StationaryStatus.STOPPED, LdsStatus.FAULTY),
@@ -93,10 +93,10 @@ IMITATIVE_17_CONFIG = SmokeSuiteConfig(
     mask_info_in_journal_test=CaseMarkers(test_case_id="213", offset=9),
     diagnostics_of_signals_after_initialization_test=CaseMarkers(test_case_id="210", offset=25),
     lds_status_initialization_out_test=CaseMarkers(test_case_id="30", offset=30),
-    lds_status_init_out_in_journal_test=CaseMarkers(test_case_id="214", offset=31),
-    export_lds_status_report_test=CaseMarkers(test_case_id="235", offset=64),
-    export_mt_mode_report_test=CaseMarkers(test_case_id="240", offset=65),
-    # # ===== КОНФИГУРАЦИЯ УТЕЧКИ =====
+    lds_status_init_out_in_journal_test=CaseMarkers(test_case_id="214", offset=30),
+    export_lds_status_report_test=CaseMarkers(test_case_id="235", offset=42),
+    export_mt_mode_report_test=CaseMarkers(test_case_id="240", offset=43),
+    # ===== КОНФИГУРАЦИЯ УТЕЧКИ =====
     leak=LeakTestConfig(
         # ----- Конфигурация статусов СОУ во время утечки -----
         lds_status_during_leak_config=DiagnosticAreaStatusConfig(
@@ -122,35 +122,35 @@ IMITATIVE_17_CONFIG = SmokeSuiteConfig(
         leak_start_interval_seconds=LEAK_START_INTERVAL_SECONDS,
         allowed_time_diff_seconds=ALLOWED_TIME_DIFF_SECONDS,
         # ----- Ожидаемые статусы -----
-        expected_lds_status=LdsStatus.SERVICEABLE,
+        expected_lds_status=LdsStatus.DEGRADATION,
         expected_stationary_status=StationaryStatus.STATIONARY,
         expected_algorithm_type=ReservedType.STATIONARY_FLOW,
         expected_leak_status=ConfirmationStatus.CONFIRMED,
-        expected_lds_status_in_leaks_report=LdsStatus.SERVICEABLE.value,
+        expected_lds_status_in_leaks_report=LdsStatus.DEGRADATION.value,
         expected_report_stationary_status=StationaryStatus.STATIONARY.value,
         # ----- Тест BalanceAlgorithmResultsContent -----
-        balance_algorithm_leak_waiting_test=CaseMarkers(test_case_id="175", offset=47),  # Длительность теста 5 минут
-        balance_algorithm_leak_detected_test=CaseMarkers(test_case_id="177", offset=58),
-        possible_leak_in_journal_test=CaseMarkers(test_case_id="211", offset=52),
+        balance_algorithm_leak_waiting_test=CaseMarkers(test_case_id="175", offset=30),  # Длительность теста 5 минут
+        balance_algorithm_leak_detected_test=CaseMarkers(test_case_id="177", offset=36),
+        possible_leak_in_journal_test=CaseMarkers(test_case_id="211", offset=32),
         # ----- Тест AllLeaksInfo -----
-        all_leaks_info_test=CaseMarkers(test_case_id="24", offset=58),
+        all_leaks_info_test=CaseMarkers(test_case_id="33", offset=36),
         # ----- Тест LeakContent -----
-        leaks_content_test=CaseMarkers(test_case_id="91", offset=58),
+        leaks_content_test=CaseMarkers(test_case_id="91", offset=36),
         # ----- Тест TuLeaksInfo -----
-        tu_leaks_info_test=CaseMarkers(test_case_id="84", offset=58),
+        tu_leaks_info_test=CaseMarkers(test_case_id="84", offset=36),
         # ----- Тест MessageInfo -----
-        leak_info_in_journal=CaseMarkers(test_case_id="154", offset=58),
+        leak_info_in_journal=CaseMarkers(test_case_id="154", offset=36),
         # ----- Тест CommonSchemeContent -----
-        lds_status_during_leak_test=CaseMarkers(test_case_id="31", offset=58.5),
+        lds_status_during_leak_test=CaseMarkers(test_case_id="31", offset=36.5),
         # ----- Тест MainPageInfoContent -----
-        leak_is_confirm_on_main_page_test=CaseMarkers(test_case_id="182", offset=60),
-        lds_status_after_confirming_leak_test=CaseMarkers(test_case_id="201", offset=60),
+        leak_is_confirm_on_main_page_test=CaseMarkers(test_case_id="182", offset=38),
+        lds_status_after_confirming_leak_test=CaseMarkers(test_case_id="201", offset=38),
         # ----- Тест AcknowledgeLeak -----
-        acknowledge_leak_test=CaseMarkers(test_case_id="6", offset=60.5),
-        acknowledge_leak_in_journal_test=CaseMarkers(test_case_id="212", offset=61),
+        acknowledge_leak_test=CaseMarkers(test_case_id="6", offset=38.5),
+        acknowledge_leak_in_journal_test=CaseMarkers(test_case_id="212", offset=39),
         # ----- Тест OutputSignals -----
-        output_signals_test=CaseMarkers(test_case_id="158", offset=62),
+        output_signals_test=CaseMarkers(test_case_id="158", offset=40),
         # ----- Тест ExportReports -----
-        export_leaks_report_test=CaseMarkers(test_case_id="234", offset=63),
+        export_leaks_report_test=CaseMarkers(test_case_id="234", offset=41),
     ),
 )

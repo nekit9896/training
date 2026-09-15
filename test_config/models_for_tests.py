@@ -399,7 +399,7 @@ class LDSStatusConfig(BaseSuiteConfig):
     2. Тесты с маркерами
     """
 
-    # ===== Данные для тестов =====
+    # ===== Данные для тестов на схеме=====
     init_accumulation_data_test_data: Optional[CaseData] = None
     init_accumulation_data_in_journal_test_data: Optional[CaseData] = None
     init_cold_start_test_data: Optional[CaseData] = None
@@ -432,7 +432,31 @@ class LDSStatusConfig(BaseSuiteConfig):
     deg_rejection_density_and_viscosity_on_du_5_test_data: Optional[CaseData] = None
     faulty_absence_min_flow_meters_test_data: Optional[CaseData] = None
     faulty_absence_min_pressure_sensors_test_data: Optional[CaseData] = None
+
+    # ===== Данные для тестов  в журнале бики ДУ2=====
+    degradation_temperature_du_2_in_journal_test_data: Optional[CaseData] = None
+    degradation_density_du_2_in_journal_test_data: Optional[CaseData] = None
+    degradation_viscosity_du_2_in_journal_test_data: Optional[CaseData] = None
+
+    # ===== Данные для тестов  в журнале бики ДУ3=====
+    degradation_temperature_sensor_du_3_in_journal_test_data: Optional[CaseData] = None
+    degradation_density_du_3_in_journal_test_data: Optional[CaseData] = None
+    degradation_viscosity_du_3_in_journal_test_data: Optional[CaseData] = None
+
+    # ===== Данные для тестов  в журнале для набора данных "В течении"=====
+    between_si_pressure_more_50_km_in_journal_test_data: Optional[CaseData] = None
+    deg_gravity_section_pumping_in_journal_test_data: Optional[CaseData] = None
+    deg_absence_min_pressure_sensors_in_journal_test_data: Optional[CaseData] = None
+    serviceable_after_deg_absence_min_pressure_sensors_in_journal_test_data: Optional[CaseData] = None
+    deg_starting_pumping_out_pumps_in_journal_test_data: Optional[CaseData] = None
+    serviceable_after_faulty_in_journal_test_data: Optional[CaseData] = None
+    deg_additive_injectors_operation_in_journal_test_data: Optional[CaseData] = None
+    deg_pig_sensor_passage_in_journal_test_data: Optional[CaseData] = None
+    deg_exceeding_distance_between_flow_meters_in_journal_test_data: Optional[CaseData] = None
+    serviceable_after_deg_starting_pumping_out_pumps_in_journal_test_data: Optional[CaseData] = None
+    faulty_absence_min_flow_meters_in_journal_test_data: Optional[CaseData] = None
     faulty_absence_min_pressure_sensors_in_journal_test_data: Optional[CaseData] = None
+
     # ===== Тесты =====
     lds_status_basic_info_test: Optional[CaseMarkers] = None
     init_accumulation_data_test: Optional[CaseMarkers] = None
@@ -465,6 +489,8 @@ class LDSStatusConfig(BaseSuiteConfig):
     deg_pig_sensor_passage_test: Optional[CaseMarkers] = None
     deg_starting_pumping_out_pumps_test: Optional[CaseMarkers] = None
     deg_exceeding_distance_between_flow_meters_test: Optional[CaseMarkers] = None
+
+    # ===== ТЕСТЫ на схеме бики=====
     deg_rejection_temperature_sensor_on_du_2_test: Optional[CaseMarkers] = None
     deg_rejection_temperature_sensor_on_du_3_test: Optional[CaseMarkers] = None
     deg_rejection_temperature_sensor_on_du_5_test: Optional[CaseMarkers] = None
@@ -475,19 +501,70 @@ class LDSStatusConfig(BaseSuiteConfig):
     faulty_absence_min_flow_meters_continuous_test: Optional[CaseMarkers] = None
     faulty_absence_min_pressure_sensors_test: Optional[CaseMarkers] = None
     faulty_absence_min_pressure_sensors_in_journal_test: Optional[CaseMarkers] = None
+    # ===== ТЕСТЫ в журнале бики ДУ2=====
+    degradation_temperature_du_2_in_journal_test: Optional[CaseMarkers] = None
+    degradation_density_du_2_in_journal_test: Optional[CaseMarkers] = None
+    degradation_viscosity_du_2_in_journal_test: Optional[CaseMarkers] = None
+    # ===== ТЕСТЫ в журнале бики ДУ3=====
+    degradation_temperature_du_3_in_journal_test: Optional[CaseMarkers] = None
+    degradation_density_du_3_in_journal_test: Optional[CaseMarkers] = None
+    degradation_viscosity_du_3_in_journal_test: Optional[CaseMarkers] = None
+    # ===== ТЕСТЫ в журнале для набора данных "В течении"=====
+    between_si_pressure_more_50_km_in_journal_test: Optional[CaseMarkers] = None
+    deg_gravity_section_pumping_in_journal_test: Optional[CaseMarkers] = None
+    deg_absence_min_pressure_sensors_in_journal_test: Optional[CaseMarkers] = None
+    serviceable_after_deg_absence_min_pressure_sensors_in_journal_test: Optional[CaseMarkers] = None
+    deg_starting_pumping_out_pumps_in_journal_test: Optional[CaseMarkers] = None
+    serviceable_after_deg_starting_pumping_out_pumps_in_journal_test: Optional[CaseMarkers] = None
+    faulty_absence_min_flow_meters_in_journal_test: Optional[CaseMarkers] = None
+    serviceable_after_faulty_in_journal_test: Optional[CaseMarkers] = None
+    deg_exceeding_distance_between_flow_meters_in_journal_test: Optional[CaseMarkers] = None
+    deg_additive_injectors_operation_in_journal_test: Optional[CaseMarkers] = None
+    deg_pig_sensor_passage_in_journal_test: Optional[CaseMarkers] = None
 
 
 @dataclass
 class StationaryStatusConfig(BaseSuiteConfig):
-
     # ===== Данные для тестов =====
-    stationary_status_with_reason_test_data: Optional[CaseData] = None
-    stationary_status_journal_test_data: Optional[CaseData] = None
+    status_unstationary_cold_start_test_data: Optional[CaseData] = None
+    status_stationary_test_data: Optional[CaseData] = None
+    status_unstationary_switch_test_data: Optional[CaseData] = None
+    journal_unstationary_cold_start_test_data: Optional[CaseData] = None
+    journal_stationary_test_data: Optional[CaseData] = None
+    journal_unstationary_switch_test_data: Optional[CaseData] = None
+
     # ===== Тесты =====
     stationary_status_basic_info_test: Optional[CaseMarkers] = None
-    stationary_status_journal_test: Optional[CaseMarkers] = None
-    stationary_status_common_scheme_test: Optional[CaseMarkers] = None
-    stationary_status_main_page_info_test: Optional[CaseMarkers] = None
+
+    common_scheme_cold_start_test: Optional[CaseMarkers] = None
+    journal_cold_start_test: Optional[CaseMarkers] = None
+    main_page_info_cold_start_test: Optional[CaseMarkers] = None
+    output_signals_cold_start_test: Optional[CaseMarkers] = None
+
+    common_scheme_stationary_after_cold_test: Optional[CaseMarkers] = None
+    journal_stationary_after_cold_test: Optional[CaseMarkers] = None
+    main_page_info_stationary_after_cold_test: Optional[CaseMarkers] = None
+    output_signals_stationary_after_cold_test: Optional[CaseMarkers] = None
+
+    common_scheme_switch_on_test: Optional[CaseMarkers] = None
+    journal_switch_on_test: Optional[CaseMarkers] = None
+    main_page_info_switch_on_test: Optional[CaseMarkers] = None
+    output_signals_switch_on_test: Optional[CaseMarkers] = None
+
+    common_scheme_stationary_after_switch_on_test: Optional[CaseMarkers] = None
+    journal_stationary_after_switch_on_test: Optional[CaseMarkers] = None
+    main_page_info_stationary_after_switch_on_test: Optional[CaseMarkers] = None
+    output_signals_stationary_after_switch_on_test: Optional[CaseMarkers] = None
+
+    common_scheme_switch_off_test: Optional[CaseMarkers] = None
+    journal_switch_off_test: Optional[CaseMarkers] = None
+    main_page_info_switch_off_test: Optional[CaseMarkers] = None
+    output_signals_switch_off_test: Optional[CaseMarkers] = None
+
+    common_scheme_stationary_after_switch_off_test: Optional[CaseMarkers] = None
+    journal_stationary_after_switch_off_test: Optional[CaseMarkers] = None
+    main_page_info_stationary_after_switch_off_test: Optional[CaseMarkers] = None
+    output_signals_stationary_after_switch_off_test: Optional[CaseMarkers] = None
 
 
 @dataclass

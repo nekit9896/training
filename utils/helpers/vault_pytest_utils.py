@@ -17,8 +17,7 @@ from infra.vault_config_manager import VaultConfigManager
 logger = logging.getLogger(__name__)
 
 VAULT_CREDENTIALS_MISSING_MESSAGE = (
-    "[SETUP] [ERROR] Vault не настроен для набора отбраковки "
-    "(требуются VAULT_ADDR, ROLE_ID, SECRET_ID, STAND_NAME)"
+    "[SETUP] [ERROR] Vault не настроен для набора отбраковки (требуются VAULT_ADDR, ROLE_ID, SECRET_ID, STAND_NAME)"
 )
 
 
@@ -73,8 +72,6 @@ def reset_vault_process_empty_values_rejection() -> None:
         if not has_vault_credentials():
             return
         manager = VaultConfigManager()
-        if not manager.is_vault_setup_valid():
-            return
         manager.ensure_disabled()
         logger.info("[VAULT] ProcessEmptyValuesRejection сброшен в false")
     except Exception as error:

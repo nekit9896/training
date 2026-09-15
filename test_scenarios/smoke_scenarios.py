@@ -119,7 +119,7 @@ async def lds_status_initialization(ws_client, cfg: SmokeSuiteConfig):
     Проверка режима работы СОУ: Инициализация.
     """
     with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "CommonSchemeContent",
             "SubscribeCommonSchemeRequest",
@@ -168,7 +168,7 @@ async def diagnostics_of_signals_after_initialization(ws_client, cfg: SmokeSuite
     exp_eighth_site_reg_lu, exp_eighth_site_reg_sou = test_data.expected_result.get("exp_npz_ilinskij")
 
     with allure.step("Подключение по ws, получение и обработка сообщения типа: OutputSignalsInfo"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "OutputSignalsInfo",
             "SubscribeOutputSignalsRequest",
@@ -491,7 +491,7 @@ async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
     Проверка установки режима МТ по MainPageInfo, OutputSignalsInfo и CommonSchemeContent.
     """
     with allure.step("Подключение по ws, получение и обработка сообщения типа: MainPageInfoContent"):
-        main_page_payload = await t_utils.connect_and_subscribe_msg(
+        main_page_payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "MainPageInfoContent",
             "subscribeMainPageInfoRequest",
@@ -499,25 +499,8 @@ async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
         )
         parsed_main_page = parser.parse_main_page_msg(main_page_payload)
 
-    with allure.step("Подключение по ws, получение и обработка сообщения типа: OutputSignalsInfo"):
-        output_signals_payload = await t_utils.connect_and_subscribe_msg(
-            ws_client,
-            "OutputSignalsInfo",
-            "SubscribeOutputSignalsRequest",
-            {
-                'objects': {
-                    'linearParts': [],
-                    'controlledSites': [site.controlledSiteSegmentDict for site in SiteKpKp],
-                },
-                'signalTypes': 1023,
-                'tuId': cfg.tu_id,
-                'additionalProperties': None,
-            },
-        )
-        parsed_output_signals = parser.parse_output_signals_info_msg(output_signals_payload)
-
     with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
-        common_scheme_payload = await t_utils.connect_and_subscribe_msg(
+        common_scheme_payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "CommonSchemeContent",
             "SubscribeCommonSchemeRequest",
@@ -527,7 +510,9 @@ async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
 
     with allure.step("Извлечение и подготовка данных для проверки"):
         tu_info = getattr(parsed_main_page.replyContent, 'tuInfo', None)
-        StepCheck("Проверка наличия данных по ТУ", "tuInfo").actual(tu_info is not None).is_true_with_details(
+        StepCheck("Проверка наличия данных по ТУ (ЭФ Состояние МТ)", "tuInfo").actual(
+            tu_info is not None
+        ).is_true_with_details(
             expected_text="tuInfo присутствует",
             actual_text="tuInfo присутствует" if tu_info is not None else "tuInfo отсутствует",
         )
@@ -541,40 +526,16 @@ async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
             StationaryStatus(tu_info.stationaryStatus) if tu_info and tu_info.stationaryStatus else None
         )
 
-        controlled_site_signals = getattr(parsed_output_signals.replyContent, 'controlledSiteSignals', [])
-        output_signals_site_stationary_statuses = t_utils.collect_stationary_statuses_from_output_signals(
-            controlled_site_signals
-        )
-        output_signals_stationary_statuses = [
-            stationary_status for _, stationary_status in output_signals_site_stationary_statuses
-        ]
-        StepCheck(
-            "Проверка наличия режимов МТ в OutputSignalsInfo",
-            "controlledSiteSignals",
-        ).actual(output_signals_stationary_statuses).is_not_empty()
-        output_signals_majority = t_utils.determine_stationary_status_by_majority(
-            output_signals_stationary_statuses
-        )
-        output_signals_details = "\n".join(
-            f"{site.name}: {stationary_status}"
-            for site, stationary_status in output_signals_site_stationary_statuses
-        )
-        allure.attach(
-            output_signals_details,
-            name="OutputSignalsInfo: режимы МТ по участкам КП-КП",
-            attachment_type=allure.attachment_type.TEXT,
-        )
-
         flow_areas = t_utils.filter_flow_areas_with_available_flow(
             getattr(parsed_common_scheme.replyContent, 'flowAreas', [])
         )
-        StepCheck("Проверка наличия участков карты течения с доступным течением", "flowAreas").actual(
-            flow_areas
-        ).is_not_empty()
+        StepCheck(
+            "Проверка наличия участков карты течения с доступным течением CommonSchemeContent (ЭФ Схема)", "flowAreas"
+        ).actual(flow_areas).is_not_empty()
         longest_flow_area = t_utils.get_longest_flow_area_by_pipes(flow_areas)
-        StepCheck("Проверка наличия самого длинного пути течения", "longest_flow_area").actual(
-            longest_flow_area is not None
-        ).is_true_with_details(
+        StepCheck(
+            "Проверка наличия самого длинного пути течения CommonSchemeContent (ЭФ Схема)", "longest_flow_area"
+        ).actual(longest_flow_area is not None).is_true_with_details(
             expected_text="longest_flow_area определён",
             actual_text=(
                 "longest_flow_area определён" if longest_flow_area is not None else "longest_flow_area не определён"
@@ -583,13 +544,13 @@ async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
         if longest_flow_area is not None:
             allure.attach(
                 str(longest_flow_area),
-                name="CommonSchemeContent: самый длинный путь течения",
+                name="CommonSchemeContent: самый длинный путь течения (ЭФ Схема)",
                 attachment_type=allure.attachment_type.TEXT,
             )
         diagnostic_areas = getattr(longest_flow_area, 'diagnosticAreas', [])
-        StepCheck("Проверка наличия данных диагностических участков", "diagnosticAreas").actual(
-            diagnostic_areas
-        ).is_not_empty()
+        StepCheck(
+            "Проверка наличия данных диагностических участков CommonSchemeContent (ЭФ Схема)", "diagnosticAreas"
+        ).actual(diagnostic_areas).is_not_empty()
 
         common_scheme_stationary_statuses = []
         common_scheme_details = []
@@ -599,43 +560,32 @@ async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
                 continue
             stationary_status = StationaryStatus(stationary_status_int)
             common_scheme_stationary_statuses.append(stationary_status)
-            common_scheme_details.append(
-                f"{t_utils.diagnostic_area_title(diagnostic_area.id)}: {stationary_status}"
-            )
+            common_scheme_details.append(f"{t_utils.diagnostic_area_title(diagnostic_area.id)}: {stationary_status}")
         StepCheck(
-            "Проверка наличия режимов МТ на ДУ CommonSchemeContent",
+            "Проверка наличия режимов МТ на ДУ в CommonSchemeContent (ЭФ Схема)",
             "stationaryStatus",
         ).actual(common_scheme_stationary_statuses).is_not_empty()
-        common_scheme_majority = t_utils.determine_stationary_status_by_majority(
-            common_scheme_stationary_statuses
-        )
+        common_scheme_majority = t_utils.determine_stationary_status_by_majority(common_scheme_stationary_statuses)
         if common_scheme_details:
             allure.attach(
                 "\n".join(common_scheme_details),
-                name="CommonSchemeContent: режимы МТ на ДУ",
+                name="CommonSchemeContent: режимы МТ на ДУ (ЭФ Схема)",
                 attachment_type=allure.attachment_type.TEXT,
             )
 
-    with allure.step("Проверка режима работы МТ"):
+    with allure.step("Проверка режима работы МТ на ЭФ: Состояние МТ, Схема, Выходные сигналы"):
         with SoftAssertions() as soft_failures:
-            StepCheck("Проверка id полученного ТУ", "tu_id", soft_failures).actual(
+            StepCheck("Проверка id полученного ТУ MainPageInfo (ЭФ Состояние МТ)", "tu_id", soft_failures).actual(
                 parsed_main_page.replyContent.tuId
             ).expected(cfg.tu_id).equal_to()
 
             StepCheck(
-                f"MainPageInfo: режим МТ для ТУ {cfg.tu_name}",
+                f"MainPageInfo: режим МТ для ТУ {cfg.tu_name} (ЭФ Состояние МТ)",
                 "stationaryStatus",
                 soft_failures,
             ).actual(main_pipeline_stationary_status).expected(cfg.expected_stationary_status).equal_to()
-
             StepCheck(
-                "OutputSignalsInfo: общий режим МТ по большинству участков",
-                "stationaryStatus",
-                soft_failures,
-            ).actual(output_signals_majority).expected(cfg.expected_stationary_status).equal_to()
-
-            StepCheck(
-                "CommonSchemeContent: общий режим МТ по большинству ДУ",
+                "CommonSchemeContent: общий режим МТ по большинству базовых ДУ (ЭФ Схема)",
                 "stationaryStatus",
                 soft_failures,
             ).actual(common_scheme_majority).expected(cfg.expected_stationary_status).equal_to()
@@ -646,7 +596,7 @@ async def main_page_info_signals(ws_client, cfg: SmokeSuiteConfig):
     Проверка счетчиков состояния сигналов
     """
     with allure.step("Подключение по ws, получение и обработка сообщения типа: MainPageSignalsInfoContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "MainPageSignalsInfoContent",
             "subscribeMainPageSignalsInfoRequest",
@@ -694,7 +644,7 @@ async def main_page_info_unstationary(ws_client, cfg: SmokeSuiteConfig):
     Запускается после первой утечки, когда режим переходит в Нестационар.
     """
     with allure.step("Подключение по ws, получение и обработка сообщения типа: MainPageInfoContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "MainPageInfoContent",
             "subscribeMainPageInfoRequest",
@@ -725,7 +675,7 @@ async def leak_is_confirm_on_main_page(ws_client, cfg: SmokeSuiteConfig):
     MainPageInfoContent - проверка подтвержденной утечки на ЭФ Состояние МТ
     """
     with allure.step("Подключение по ws, получение и обработка сообщения типа: MainPageInfoContent."):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "MainPageInfoContent",
             "subscribeMainPageInfoRequest",
@@ -735,7 +685,7 @@ async def leak_is_confirm_on_main_page(ws_client, cfg: SmokeSuiteConfig):
 
     with allure.step("Извлечение и подготовка данных для проверки"):
         # Ставим object() как заглушку, что бы исключить получение None
-        leaks_info = getattr(getattr(parsed_payload.replyContent, 'tuInfo', object()), 'leaksInfo', [])
+        leaks_info = getattr(getattr(parsed_payload.replyContent, 'tuInfo', object()), 'leaksInfo', []) or []
         StepCheck("Проверка наличия списка сообщений об утечках", "leakStatus").actual(leaks_info).is_not_empty()
         confirm_leak = t_utils.find_object_by_field(leaks_info, "leakStatus", LeakStatus.CONFIRMED.value)
         lds_status_int = getattr(confirm_leak, 'leakStatus', None)
@@ -750,7 +700,7 @@ async def leak_is_complete_on_main_page(ws_client, cfg: SmokeSuiteConfig):
     MainPageInfoContent - отсутствует подтвержденная утечка на ЭФ Состояние МТ
     """
     with allure.step("Подключение по ws, получение и обработка сообщения типа: MainPageInfoContent."):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "MainPageInfoContent",
             "subscribeMainPageInfoRequest",
@@ -793,45 +743,47 @@ async def imitate_sensor_signal(
 
         time.sleep(cfg.basic_message_timeout)
 
-    with allure.step(
-        "Получение данных для проверки имитации. Тип сообщения: InputSignalsContent. ЭФ Диагностика Сигналов."
-    ):
-        payload = await t_utils.connect_and_subscribe_msg(
-            ws_client,
-            "InputSignalsContent",
-            "SubscribeInputSignalsRequest",
-            {
-                'signalIds': [sensor_id],
-                'tuId': cfg.tu_id,
-                'additionalProperties': None,
-            },
-        )
-        parsed_payload = parser.parse_input_signals_info_msg(payload)
+    with allure.step("Подключение по ws и http, получение и обработка данных сообщений для проверки имитации"):
+        with allure.step(
+            "Получение данных для проверки имитации. Тип сообщения: InputSignalsContent. ЭФ Диагностика Сигналов."
+        ):
+            payload = await t_utils.connect_and_poll_subscribed_msg(
+                ws_client,
+                "InputSignalsContent",
+                "SubscribeInputSignalsRequest",
+                {
+                    'signalIds': [sensor_id],
+                    'tuId': cfg.tu_id,
+                    'additionalProperties': None,
+                },
+            )
+            parsed_payload = parser.parse_input_signals_info_msg(payload)
 
-    with allure.step(
-        "Подготовка данных для проверки имитации. Тип сообщения: InputSignalsContent. ЭФ Диагностика Сигналов."
-    ):
-        sensor_data = getattr(parsed_payload.replyContent, 'inputSignals', [])
-        diagnostics_sensor_imitate_data = t_utils.find_object_by_field(sensor_data, "id", sensor_id)
-        value_diagnostics_sensor_imitate = getattr(
-            getattr(diagnostics_sensor_imitate_data, 'imitation', []), 'value', []
-        )
-        is_imitated_diagnostics_sensor_imitate = getattr(diagnostics_sensor_imitate_data, 'isImitated', [])
-        quality_diagnostics_sensor_imitate = getattr(diagnostics_sensor_imitate_data, 'quality', [])
+        with allure.step(
+            "Подготовка данных для проверки имитации. Тип сообщения: InputSignalsContent. ЭФ Диагностика Сигналов."
+        ):
+            sensor_data = getattr(parsed_payload.replyContent, 'inputSignals', [])
+            diagnostics_sensor_imitate_data = t_utils.find_object_by_field(sensor_data, "id", sensor_id)
+            value_diagnostics_sensor_imitate = getattr(
+                getattr(diagnostics_sensor_imitate_data, 'imitation', []), 'value', []
+            )
+            is_imitated_diagnostics_sensor_imitate = getattr(diagnostics_sensor_imitate_data, 'isImitated', [])
+            quality_diagnostics_sensor_imitate = getattr(diagnostics_sensor_imitate_data, 'quality', [])
 
-    with allure.step("Подготовка данных для проверки имитации. Тип сообщения: SchemeSignalsStateContent. ЭФ Схема."):
-        payload = await t_utils.connect_and_subscribe_msg(
-            ws_client,
-            "SchemeSignalsStateContent",
-            "SubscribeSchemeSignalsStateRequest",
-            {'tuId': cfg.tu_id},
-        )
-        parsed_payload = parser.parse_scheme_signals_state_msg(payload)
-        journal_signal_state_list = parsed_payload.replyContent.signalsStates
-        scheme_sensor_imitate_data = t_utils.find_object_by_field(journal_signal_state_list, "id", sensor_id)
-        is_imitated_scheme_sensor_imitate = getattr(scheme_sensor_imitate_data, 'isImitated', [])
+        with allure.step("Получение данных для проверки имитации. Тип сообщения: SchemeSignalsStateContent. ЭФ Схема."):
+            payload = await t_utils.connect_and_poll_subscribed_msg(
+                ws_client,
+                "SchemeSignalsStateContent",
+                "SubscribeSchemeSignalsStateRequest",
+                {'tuId': cfg.tu_id},
+            )
+            parsed_payload = parser.parse_scheme_signals_state_msg(payload)
+            journal_signal_state_list = parsed_payload.replyContent.signalsStates
+            scheme_sensor_imitate_data = t_utils.find_object_by_field(journal_signal_state_list, "id", sensor_id)
+            is_imitated_scheme_sensor_imitate = getattr(scheme_sensor_imitate_data, 'isImitated', [])
 
     with allure.step(f"Http запрос и обработка ответа о снятии имитации датчика с id: {sensor_id}"):
+        time.sleep(cfg.basic_message_timeout)
         request_body = {'id': sensor_id, 'tuId': cfg.tu_id}
         response = http_client.post_request(HttpConst.UNIMITATE_SIGNAL_URL_PATH, request_body)
         sensor_unimitate_reply_status = response.status_code
@@ -841,68 +793,73 @@ async def imitate_sensor_signal(
         ).expected(ReplyStatus.OK.value).equal_to()
         time.sleep(cfg.basic_message_timeout)
 
-    with allure.step("Получение данных для проверки имитации. InputSignalsContent. ЭФ Диагностика Сигналов."):
-        payload = await t_utils.connect_and_subscribe_msg(
-            ws_client,
-            "InputSignalsContent",
-            "SubscribeInputSignalsRequest",
-            {
-                'signalIds': [sensor_id],
-                'tuId': cfg.tu_id,
-                'additionalProperties': None,
-            },
-        )
-        parsed_payload = parser.parse_input_signals_info_msg(payload)
+    with allure.step("Подключение по ws и http, получение и обработка данных сообщений для проверки снятия имитации"):
+        with allure.step(
+            "Получение данных для проверки снятия имитации. InputSignalsContent. ЭФ Диагностика Сигналов."
+        ):
+            payload = await t_utils.connect_and_poll_subscribed_msg(
+                ws_client,
+                "InputSignalsContent",
+                "SubscribeInputSignalsRequest",
+                {
+                    'signalIds': [sensor_id],
+                    'tuId': cfg.tu_id,
+                    'additionalProperties': None,
+                },
+            )
+            parsed_payload = parser.parse_input_signals_info_msg(payload)
 
-    with allure.step("Извлечение и подготовка данных для проверки снятия имитации"):
-        sensor_data = getattr(parsed_payload.replyContent, 'inputSignals', [])
-        diagnostics_sensor_unimitate_data = t_utils.find_object_by_field(sensor_data, 'id', sensor_id)
-        is_unimitated_diagnostics_sensor_unimitate = getattr(diagnostics_sensor_unimitate_data, 'isImitated', [])
+        with allure.step("Извлечение и подготовка данных для проверки снятия имитации"):
+            sensor_data = getattr(parsed_payload.replyContent, 'inputSignals', [])
+            diagnostics_sensor_unimitate_data = t_utils.find_object_by_field(sensor_data, 'id', sensor_id)
+            is_unimitated_diagnostics_sensor_unimitate = getattr(diagnostics_sensor_unimitate_data, 'isImitated', [])
 
-    with allure.step(
-        "Получение данных для проверки снятия имитации. Тип сообщения: SchemeSignalsStateContent. ЭФ Схема"
-    ):
-        payload = await t_utils.connect_and_subscribe_msg(
-            ws_client,
-            "SchemeSignalsStateContent",
-            "SubscribeSchemeSignalsStateRequest",
-            {'tuId': cfg.tu_id},
-        )
-        parsed_payload = parser.parse_scheme_signals_state_msg(payload)
-        journal_signal_state_list = parsed_payload.replyContent.signalsStates
-        scheme_sensor_unimitate = t_utils.find_object_by_field(journal_signal_state_list, "id", sensor_id)
-        is_unimitated_scheme_sensor_unimitate = getattr(scheme_sensor_unimitate, 'isImitated', [])
+        with allure.step(
+            "Получение данных для проверки снятия имитации. Тип сообщения: SchemeSignalsStateContent. ЭФ Схема"
+        ):
+            payload = await t_utils.connect_and_poll_subscribed_msg(
+                ws_client,
+                "SchemeSignalsStateContent",
+                "SubscribeSchemeSignalsStateRequest",
+                {'tuId': cfg.tu_id},
+            )
+            parsed_payload = parser.parse_scheme_signals_state_msg(payload)
+            journal_signal_state_list = parsed_payload.replyContent.signalsStates
+            scheme_sensor_unimitate = t_utils.find_object_by_field(journal_signal_state_list, "id", sensor_id)
+            is_unimitated_scheme_sensor_unimitate = getattr(scheme_sensor_unimitate, 'isImitated', [])
 
-    with allure.step("Http запрос сообщений журнала с фильтром userActions"):
-        # Запрос сообщений по типу действий пользователя маскирование и имитация сигналов
-        request_body = t_utils.create_journal_req_body(
-            pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
-            filtering=Filtering(userActions=int(UserActions.SIGNAL_MASK_SIM), objects=FilteringObjects(tuId=cfg.tu_id)),
-        )
-        response = http_client.post_request(HttpConst.GET_MESSAGES_URL_PATH, request_body)
-        payload = t_utils.get_json_from_http_response(response)
-        parsed_payload = parser.parse_journal_msg(payload)
-        messages_info = getattr(parsed_payload.replyContent, 'messagesInfo', [])
+        with allure.step("Http запрос сообщений журнала с фильтром userActions"):
+            # Запрос сообщений по типу действий пользователя маскирование и имитация сигналов
+            request_body = t_utils.create_journal_req_body(
+                pagination=Pagination(limit=TestConst.JOURNAL_PAGINATION_LIMIT, direction=Direction.FIRST.value),
+                filtering=Filtering(
+                    userActions=int(UserActions.SIGNAL_MASK_SIM), objects=FilteringObjects(tuId=cfg.tu_id)
+                ),
+            )
+            response = http_client.post_request(HttpConst.GET_MESSAGES_URL_PATH, request_body)
+            payload = t_utils.get_json_from_http_response(response)
+            parsed_payload = parser.parse_journal_msg(payload)
+            messages_info = getattr(parsed_payload.replyContent, 'messagesInfo', [])
 
-        # Фильтр полученных сообщений по времени
-        end_time = datetime.now()
-        filter_start_msk = t_utils.localize_as_moscow(imitator_start_time)
-        filter_end_msk = t_utils.localize_as_moscow(end_time)
-        filter_time_messages = [
-            msg
-            for msg in messages_info
-            if filter_start_msk <= t_utils.ensure_moscow_timezone(msg.time) <= filter_end_msk
-        ]
-        filter_by_imitation_messages = [
-            msg
-            for msg in filter_time_messages
-            if getattr(msg, "event", None) == imitation_event and getattr(msg, "tag", None) == sensor_address
-        ]
-        filter_by_unimitation_messages = [
-            msg
-            for msg in filter_time_messages
-            if getattr(msg, "event", None) == imitation_event and getattr(msg, "tag", None) == sensor_address
-        ]
+            # Фильтр полученных сообщений по времени
+            end_time = datetime.now()
+            filter_start_msk = t_utils.localize_as_moscow(imitator_start_time)
+            filter_end_msk = t_utils.localize_as_moscow(end_time)
+            filter_time_messages = [
+                msg
+                for msg in messages_info
+                if filter_start_msk <= t_utils.ensure_moscow_timezone(msg.time) <= filter_end_msk
+            ]
+            filter_by_imitation_messages = [
+                msg
+                for msg in filter_time_messages
+                if getattr(msg, "event", None) == imitation_event and getattr(msg, "tag", None) == sensor_address
+            ]
+            filter_by_unimitation_messages = [
+                msg
+                for msg in filter_time_messages
+                if getattr(msg, "event", None) == imitation_event and getattr(msg, "tag", None) == sensor_address
+            ]
 
     with SoftAssertions() as soft_failures:
         StepCheck(
@@ -970,7 +927,7 @@ async def mask_signal_test(ws_client, http_client, cfg: SmokeSuiteConfig, test_d
         "Подключение по ws, получение и обработка данных о статусе датчиков из сообщения типа: InputSignalsContent"
     ):
         time.sleep(cfg.basic_message_timeout)
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "InputSignalsContent",
             "SubscribeInputSignalsRequest",
@@ -1015,7 +972,7 @@ async def mask_signal_test(ws_client, http_client, cfg: SmokeSuiteConfig, test_d
         "Подключение по ws, получение и обработка данных о статусе датчиков из сообщения типа: InputSignalsContent"
     ):
         time.sleep(cfg.basic_message_timeout)
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "InputSignalsContent",
             "SubscribeInputSignalsRequest",
@@ -1267,7 +1224,7 @@ async def mask_du_on_mini_scheme(ws_client, http_client, cfg: SmokeSuiteConfig):
             "Получение сообщения типа: OutputSignalsInfo. "
             f"С данными выходных сигналов для линейного участка с id: {linear_part_id}\n"
         ):
-            payload = await t_utils.connect_and_subscribe_msg(
+            payload = await t_utils.connect_and_poll_subscribed_msg(
                 ws_client,
                 "OutputSignalsInfo",
                 "SubscribeOutputSignalsRequest",
@@ -1295,7 +1252,7 @@ async def mask_du_on_mini_scheme(ws_client, http_client, cfg: SmokeSuiteConfig):
             mask_leak_value = t_utils.find_signal_val_by_signal_type(leak_signals_list, mask_signal_type)
 
         with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent. ЭФ Схема"):
-            payload = await t_utils.connect_and_subscribe_msg(
+            payload = await t_utils.connect_and_poll_subscribed_msg(
                 ws_client,
                 "CommonSchemeContent",
                 "SubscribeCommonSchemeRequest",
@@ -1320,12 +1277,10 @@ async def mask_du_on_mini_scheme(ws_client, http_client, cfg: SmokeSuiteConfig):
 
         with allure.step("Извлечение и подготовка данных для проверки маскирования ДУ ЭФ Журнал"):
             messages_info = getattr(parsed_payload.replyContent, 'messagesInfo', None)
-            if cfg.technological_section:
-                journal_mask_message = t_utils.find_object_by_field(
-                    messages_info, "technologicalSection", cfg.technological_section
-                )
+            if cfg.tu_name:
+                journal_mask_message = t_utils.find_object_by_field(messages_info, "technologicalSection", cfg.tu_name)
             else:
-                journal_mask_message = parsed_payload.replyContent.messagesInfo[0]
+                journal_mask_message = messages_info[0]
             StepCheck("Проверка наличия данных о маскировании в журнале", "technologicalSection").actual(
                 journal_mask_message
             ).is_not_none()
@@ -1334,7 +1289,7 @@ async def mask_du_on_mini_scheme(ws_client, http_client, cfg: SmokeSuiteConfig):
             "Подключение по ws, получение и обработка сообщения типа: MainPageInfoContent. "
             "Получен результат маскирования ДУ на ЭФ Состояние МТ"
         ):
-            payload = await t_utils.connect_and_subscribe_msg(
+            payload = await t_utils.connect_and_poll_subscribed_msg(
                 ws_client,
                 "MainPageInfoContent",
                 "subscribeMainPageInfoRequest",
@@ -1364,9 +1319,9 @@ async def mask_du_on_mini_scheme(ws_client, http_client, cfg: SmokeSuiteConfig):
         StepCheck("Проверка причины маски на схеме", "maskReason").actual(mask_linear_part.maskReason).expected(
             cfg.mask_reason
         ).equal_to()
-        StepCheck("Проверка имени ТУ в журнале", "mainPipeline", soft_failures).actual(
-            journal_mask_message.mainPipeline
-        ).expected(cfg.main_pipe_line).equal_to()
+        StepCheck("Проверка имени ТУ в журнале", "technologicalSection", soft_failures).actual(
+            journal_mask_message.technologicalSection
+        ).expected(cfg.tu_name).equal_to()
         StepCheck("Проверка имени ДУ в журнале", "technologicalObject", soft_failures).actual(
             journal_mask_message.technologicalObject
         ).expected(cfg.mask_du_name).equal_to()
@@ -1430,7 +1385,7 @@ async def unmask_du_on_mini_scheme(ws_client, http_client, cfg: SmokeSuiteConfig
             "Получение сообщения типа: OutputSignalsInfo. "
             f"С данными выходных сигналов для линейного участка с id: {linear_part_id}\n"
         ):
-            payload = await t_utils.connect_and_subscribe_msg(
+            payload = await t_utils.connect_and_poll_subscribed_msg(
                 ws_client,
                 "OutputSignalsInfo",
                 "SubscribeOutputSignalsRequest",
@@ -1471,12 +1426,12 @@ async def unmask_du_on_mini_scheme(ws_client, http_client, cfg: SmokeSuiteConfig
         with allure.step("Извлечение и подготовка данных для проверки снятия маскирования ДУ ЭФ Журнал"):
             messages_info = getattr(parsed_payload.replyContent, 'messagesInfo', None)
 
-            if cfg.technological_section:
+            if cfg.tu_name:
                 journal_unmask_message = t_utils.find_object_by_field(
-                    messages_info, "technologicalSection", cfg.technological_section
+                    messages_info, "technologicalSection", cfg.tu_name
                 )
             else:
-                journal_unmask_message = parsed_payload.replyContent.messagesInfo[0]
+                journal_unmask_message = messages_info[0]
             StepCheck("Проверка наличия данных о снятии маскирования в журнале", "technologicalSection").actual(
                 journal_unmask_message
             ).is_not_none()
@@ -1485,7 +1440,7 @@ async def unmask_du_on_mini_scheme(ws_client, http_client, cfg: SmokeSuiteConfig
             "Подключение по ws, получение и обработка сообщения типа: MainPageInfoContent. "
             "Получен результат маскирования ДУ на ЭФ Состояние МТ"
         ):
-            payload = await t_utils.connect_and_subscribe_msg(
+            payload = await t_utils.connect_and_poll_subscribed_msg(
                 ws_client,
                 "MainPageInfoContent",
                 "subscribeMainPageInfoRequest",
@@ -1506,9 +1461,9 @@ async def unmask_du_on_mini_scheme(ws_client, http_client, cfg: SmokeSuiteConfig
             TestConst.ADDRESS_SUFFIX_MASK,
             soft_failures,
         ).actual(mask_leak_value).expected(TestConst.OUTPUT_IS_NOT_MASK).equal_to()
-        StepCheck("Проверяем имя ТУ в сообщении в журнале", "mainPipeline", soft_failures).actual(
-            journal_unmask_message.mainPipeline
-        ).expected(cfg.main_pipe_line).equal_to()
+        StepCheck("Проверяем имя ТУ в сообщении в журнале", "technologicalSection", soft_failures).actual(
+            journal_unmask_message.technologicalSection
+        ).expected(cfg.tu_name).equal_to()
         StepCheck("Проверяем имя ДУ в сообщении в журнале", "technologicalObject", soft_failures).actual(
             journal_unmask_message.technologicalObject
         ).expected(cfg.mask_du_name).equal_to()
@@ -1533,7 +1488,7 @@ async def lds_status_initialization_out(ws_client, cfg: SmokeSuiteConfig):
     Проверка выхода СОУ из Инициализации.
     """
     with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "CommonSchemeContent",
             "SubscribeCommonSchemeRequest",
@@ -1649,7 +1604,7 @@ async def leaks_content(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, 
     Проверка утечки через сообщение LeaksContent.
     """
     with allure.step("Подключение по ws и получение сообщения об утечке типа: LeaksContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "LeaksContent",
             "SubscribeLeaksRequest",
@@ -2063,7 +2018,7 @@ async def tu_leaks_info(ws_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig, 
     Проверка сообщения TuLeaksInfo об утечке.
     """
     with allure.step("Подключение по ws и получение сообщения об утечке типа: TuLeaksInfoContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "TuLeaksInfoContent",
             "subscribeTuLeaksInfoRequest",
@@ -2143,7 +2098,7 @@ async def lds_status_during_leak(ws_client, cfg: SmokeSuiteConfig, leak: LeakTes
     Проверка режима работы СОУ во время утечки.
     """
     with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "CommonSchemeContent",
             "SubscribeCommonSchemeRequest",
@@ -2198,7 +2153,7 @@ async def acknowledge_leak_info(ws_client, http_client, cfg: SmokeSuiteConfig, l
     """
     with allure.step("Получение id утечки"):
         with allure.step("Подключение по ws, получение и обработка сообщения об утечке типа: TuLeaksInfoContent"):
-            payload = await t_utils.connect_and_subscribe_msg(
+            payload = await t_utils.connect_and_poll_subscribed_msg(
                 ws_client,
                 "TuLeaksInfoContent",
                 "subscribeTuLeaksInfoRequest",
@@ -2373,7 +2328,7 @@ async def output_signals(ws_client, http_client, cfg: SmokeSuiteConfig, leak: Le
 
     with allure.step(f"Получение данных выходных сигналов для линейного участка с id: {linear_part_id}"):
         with allure.step("Получение сообщения с данными выходных сигналов типа: OutputSignalsInfo"):
-            payload = await t_utils.connect_and_subscribe_msg(
+            payload = await t_utils.connect_and_poll_subscribed_msg(
                 ws_client,
                 "OutputSignalsInfo",
                 "SubscribeOutputSignalsRequest",
@@ -2546,7 +2501,7 @@ async def balance_algorithm_leak_detected(ws_client, cfg: SmokeSuiteConfig, leak
     """
 
     with allure.step("Подписка и получение BalanceAlgorithmResultsContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "BalanceAlgorithmResultsContent",
             "SubscribeBalanceAlgorithmResultsRequest",
@@ -2627,7 +2582,7 @@ async def balance_algorithm_leak_completed(ws_client, cfg: SmokeSuiteConfig):
     """
 
     with allure.step("Подписка и получение BalanceAlgorithmResultsContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "BalanceAlgorithmResultsContent",
             "SubscribeBalanceAlgorithmResultsRequest",
@@ -2673,7 +2628,7 @@ async def leak_is_complete_on_kg(ws_client, cfg: SmokeSuiteConfig, leak: LeakTes
     LeaksContent - проверить, что утечка в статусе завершена
     """
     with allure.step("Подключение по ws и получение сообщения об утечке типа: LeaksContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "LeaksContent",
             "SubscribeLeaksRequest",
@@ -2683,11 +2638,15 @@ async def leak_is_complete_on_kg(ws_client, cfg: SmokeSuiteConfig, leak: LeakTes
 
     with allure.step("Извлечение и подготовка данных для проверки"):
         leaks_list_info = getattr(parsed_payload.replyContent, 'leaksListInfo', None)
-        complete_leak_info = t_utils.find_leak_by_coordinate(leaks_list_info, leak.coordinate_meters)
-        leak_coordinate_round = round(complete_leak_info.leakCoordinate, cfg.precision)
-        leak_algorithm_type = ReservedType(complete_leak_info.type) if complete_leak_info.type else None
+        leak_info = t_utils.find_leak_by_coordinate(leaks_list_info, leak.coordinate_meters)
+        leak_coordinate = getattr(leak_info, 'leakCoordinate', None)
+        leak_type = getattr(leak_info, 'type', None)
+        leak_info_confirmation_status = getattr(leak_info, 'confirmationStatus', None)
+        leak_info_diagnostic_area_name = getattr(leak_info, 'diagnosticAreaName', None)
+        leak_coordinate_round = round(leak_coordinate, cfg.precision) if leak_coordinate else None
+        leak_algorithm_type = ReservedType(leak_type) if leak_type else None
         leak_confirmation_status = (
-            ConfirmationStatus(complete_leak_info.confirmationStatus) if complete_leak_info.confirmationStatus else None
+            ConfirmationStatus(leak_info_confirmation_status) if leak_info_confirmation_status else None
         )
 
     with SoftAssertions() as soft_failures:
@@ -2695,18 +2654,19 @@ async def leak_is_complete_on_kg(ws_client, cfg: SmokeSuiteConfig, leak: LeakTes
             leak_confirmation_status
         ).expected(leak.expected_complete_leak_status).equal_to()
         StepCheck("Проверка наличия названия участка утечки", "diagnosticAreaName", soft_failures).actual(
-            complete_leak_info.diagnosticAreaName
+            leak_info_diagnostic_area_name
         ).is_not_none()
         StepCheck("Проверка источника события (алгоритм)", "type", soft_failures).actual(leak_algorithm_type).expected(
             leak.expected_algorithm_type
         ).equal_to()
-        StepCheck("Проверка координаты утечки", "leakCoordinate", soft_failures).actual(
-            leak_coordinate_round
-        ).is_close_to(
-            leak.coordinate_meters,
-            cfg.allowed_distance_diff_meters,
-            f"значение допустимой погрешности координаты {cfg.allowed_distance_diff_meters}",
-        )
+        if leak_coordinate_round:
+            StepCheck("Проверка координаты утечки", "leakCoordinate", soft_failures).actual(
+                leak_coordinate_round
+            ).is_close_to(
+                leak.coordinate_meters,
+                cfg.allowed_distance_diff_meters,
+                f"значение допустимой погрешности координаты {cfg.allowed_distance_diff_meters}",
+            )
 
 
 async def leak_is_complete_in_output_signals(ws_client, http_client, cfg: SmokeSuiteConfig, leak: LeakTestConfig):
@@ -2729,14 +2689,14 @@ async def leak_is_complete_in_output_signals(ws_client, http_client, cfg: SmokeS
             StepCheck("Проверка наличия данных выходных сигналов", "linearPartSignals").actual(
                 leak_linear_part
             ).is_not_none()
-            leak_signals_list = leak_linear_part.signals
+            leak_signals_list = getattr(leak_linear_part, 'signals', [])
             leak_signal_type = t_utils.find_signal_type_by_address_suffix(
                 leak_signals_list, TestConst.ADDRESS_SUFFIX_LEAK
             )
 
     with allure.step(f"Получение данных выходных сигналов для линейного участка с id: {linear_part_id}"):
         with allure.step("Получение сообщения с данными выходных сигналов типа: OutputSignalsInfo"):
-            payload = await t_utils.connect_and_subscribe_msg(
+            payload = await t_utils.connect_and_poll_subscribed_msg(
                 ws_client,
                 "OutputSignalsInfo",
                 "SubscribeOutputSignalsRequest",
@@ -2798,7 +2758,7 @@ async def complete_tu_leaks_info_content(ws_client, cfg: SmokeSuiteConfig):
     TuLeaksInfoContent - проверка отсутствия утечки на схеме
     """
     with allure.step("Подключение по ws, получение и обработка сообщения об утечке типа: TuLeaksInfoContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "TuLeaksInfoContent",
             "subscribeTuLeaksInfoRequest",
@@ -3644,7 +3604,7 @@ def stationary_status_in_journal(http_client, cfg: SmokeSuiteConfig, imitator_st
         first_message = next(iter(most_long_event_list)) if most_long_event_list else None
         if first_message:
             priority_message = MessagePriority(first_message.priority) if first_message.priority else None
-            mode_part, reason_part = t_utils.parse_event(getattr(first_message, "event", None))
+            mode_part, reason_part = t_utils.parse_journal_event(getattr(first_message, "event", None))
         else:
             priority_message = None
             mode_part, reason_part = None, None

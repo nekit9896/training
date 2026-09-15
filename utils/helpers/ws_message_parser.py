@@ -14,7 +14,7 @@ from pytest import fail
 import models.subscribe_scheme_signals_state_model as signals_state_model
 from constants.architecture_constants import WebSocketClientConstants as WS_Const
 from constants.enums import ExportedDataType, ExportStatus, ReplyStatus
-from constants.test_constants import BaseTN3Constants as TestConst
+from constants.test_constants import BaseTN3Constants as Base_const
 from models.acknowledge_leak_model import AcknowledgeLeakReply
 from models.basic_info_model import BasicInfoReply
 from models.export_reports_model import ReportDataExportedNotification
@@ -81,7 +81,8 @@ class WsMessageParser:
                 try:
                     return datetime.fromisoformat(value)
                 except ValueError:
-                    return datetime.strptime(value.replace("Z", "+00:00"), TestConst.JOURNAL_TIME_FORMAT)
+                    return datetime.strptime(value.replace("Z", "+00:00"), Base_const.JOURNAL_TIME_FORMAT)
+
         except (AttributeError, TypeError, ValueError) as error:
             fail(f"Ошибка конвертации времени: {error}")
 

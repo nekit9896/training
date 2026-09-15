@@ -88,12 +88,12 @@ class WebSocketClient:
 
         raise TimeoutError("Handshake timeout: не получили сообщение с разделителем RS за указанное время")
 
-    async def _connect_loop(self) -> None:
+    async def _connect_loop(self, timeout: float = WS_Const.WS_CONNECT_TIMEOUT_SECONDS) -> None:
         """
         Цикл подключения с повторными попытками до наступления stop_event
         или истечения WS_CONNECT_TIMEOUT_SECONDS.
         """
-        deadline = time.monotonic() + WS_Const.WS_CONNECT_TIMEOUT_SECONDS
+        deadline = time.monotonic() + timeout
         attempt = 0
         transient_errors = (ConnectionError, OSError, asyncio.TimeoutError, InvalidStatus)
 
@@ -210,7 +210,7 @@ class WebSocketClient:
         packet = encode_with_varint_prefix(payload)
         await self._ws.send(packet)
 
-    async def receive_by_type(self, message_type: str, timeout: WS_Const.FILTERING_TIMEOUT) -> List[Any]:
+    async def receive_by_type(self, message_type: str, timeout: float = WS_Const.FILTERING_TIMEOUT) -> List[Any]:
         """
         Фильтрует сообщения по message_type
         """
@@ -255,4 +255,24 @@ class WebSocketClient:
             # 5) Фильтрация по filter_func
             if isinstance(msg, list) and filter_func(msg):
                 return msg
-                
+
+    async def reconnect(self):
+        """
+        Переподключение websocket соединения
+        """
+        try:
+            if self._recv_task:
+                try:
+                    self._recv_task.cancel()
+                    await self._recv_task
+                except asyncio.CancelledError:
+                    pass
+                self._recv_task = None
+
+            if self._ws:
+                await self._ws.close()
+                self._ws = None
+            await self._connect_loop(WS_Const.WS_RECONNECT_TIMEOUT_SECONDS)
+            return self
+        except (asyncio.TimeoutError, ConnectionError, ConnectionResetError, OSError) as error:
+            raise RuntimeError(f"Ошибка при попытке переподключения {error}")
