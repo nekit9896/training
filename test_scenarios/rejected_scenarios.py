@@ -76,7 +76,7 @@ async def rejection_input_signals(ws_client, cfg: IsRejectedConfig, rejection_ca
             ).actual(criteria).expected(rejection_case.expected_criteria_names).equal_to()
 
 
-async def rejection_journal(ws_client, cfg: IsRejectedConfig, rejection_case: RejectionTestCase, imitator_start_time):
+async def rejection_journal(http_client, cfg: IsRejectedConfig, rejection_case: RejectionTestCase, imitator_start_time):
     """
     Проверка наличия записи об отбраковке в журнале по GetMessagesRequest.
     """
@@ -95,9 +95,9 @@ async def rejection_journal(ws_client, cfg: IsRejectedConfig, rejection_case: Re
             start_seconds=rejection_case.time_range_start_s,
             reserve_seconds=TestConst.SEC_PER_MIN,
         )
-
     with allure.step("Получение сообщений журнала с фильтром messageTypes=REJECTION"):
-        payload = await t_utils.connect_and_get_msg(ws_client, "GetMessagesRequest", request_body)
+        response = http_client.post_request(HttpConst.GET_MESSAGES_URL_PATH, request_body)
+        payload = t_utils.get_json_from_http_response(response)
         parsed_payload = parser.parse_journal_msg(payload)
         messages_info = parsed_payload.replyContent.messagesInfo
 
@@ -174,7 +174,7 @@ async def rejection_main_page(ws_client, cfg: IsRejectedConfig):
     Проверка numberOfRejectedSignals > 0 по подписке subscribeMainPageSignalsInfoRequest.
     """
     with allure.step("Подключение по ws, получение и обработка сообщения типа: MainPageSignalsInfoContent"):
-        payload = await t_utils.connect_and_subscribe_msg(
+        payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
             "MainPageSignalsInfoContent",
             "subscribeMainPageSignalsInfoRequest",
@@ -345,8 +345,8 @@ async def export_rejection_report(ws_client, http_client, cfg: IsRejectedConfig,
             parser=parser,
             list_limit=ReportConst.EXPORTED_DATA_LIST_LIMIT,
             expected_data_type=ExportedDataType.REJECTED_REPORT,
-            name_substring=RejectedReportConst.REJECTED_REPORT_NAME_PART,
-            tu_name_substring=cfg.technological_unit.description,
+            name_substring=RejectedReportConst.REJECTED_REPORT_NAME_PART_ALT,
+            tu_name_substring=cfg.tu_name,
             period_start=report_state.expected_period_start,
             period_end=report_state.expected_period_end,
             total_wait_seconds=ReportConst.LIST_POLL_TOTAL_WAIT_SECONDS,
@@ -406,10 +406,9 @@ async def export_rejection_report(ws_client, http_client, cfg: IsRejectedConfig,
         with allure.step("Извлечение данных ответа на скачивание"):
             download_reply = report_state.actual_download_reply
             download_reply_status = download_reply.replyStatus
-            has_download_reply_content = download_reply.replyContent is not None
-            report_state.actual_file_bytes = (
-                download_reply.replyContent.fileChunk if has_download_reply_content else None
-            )
+            download_reply_content = getattr(download_reply, "replyContent", None)
+            file_chunk = getattr(download_reply_content, "fileChunk", None)
+            report_state.actual_file_bytes = file_chunk
             is_xlsx_signature = (
                 report_utils.is_xlsx_file_bytes(report_state.actual_file_bytes)
                 if report_state.actual_file_bytes
@@ -421,8 +420,8 @@ async def export_rejection_report(ws_client, http_client, cfg: IsRejectedConfig,
                 ReplyStatus.OK.value
             ).equal_to()
             StepCheck("Проверка наличия контента ответа на скачивание", "replyContent").actual(
-                has_download_reply_content
-            ).expected(True).equal_to()
+                download_reply_content
+            ).is_not_none()
             StepCheck("Проверка наличия байт файла", "fileChunk").actual(report_state.actual_file_bytes).is_not_empty()
             StepCheck("Проверка xlsx (zip) сигнатуры файла", "file_signature").actual(is_xlsx_signature).expected(
                 True
@@ -551,7 +550,7 @@ async def export_rejection_report(ws_client, http_client, cfg: IsRejectedConfig,
                         RejectedReportConst.COL_DATETIME,
                         soft_failures,
                     ).actual(case_check.datetime_in_window).is_true_with_details(
-                        expected_text=(f"дата и время в диапазоне {case_check.window_start} — {case_check.window_end}"),
+                        expected_text=f"дата и время в диапазоне {case_check.window_start} — {case_check.window_end}",
                         actual_text=case_check.datetime_actual_text,
                     )
 
@@ -644,4 +643,3 @@ async def export_rejection_report(ws_client, http_client, cfg: IsRejectedConfig,
             StepCheck("В нотификации нет текста ошибки", "errorMessage", soft_failures).actual(
                 notification_error_message
             ).is_empty()
-            

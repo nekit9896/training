@@ -30,7 +30,6 @@ from constants.enums import (
     LeakStatus,
     ReplyStatus,
     SignalType,
-    SiteKpKp,
     StationaryReason,
     StationaryStatus,
     StoppedPumpingReason,
@@ -245,7 +244,7 @@ def get_longest_flow_area(flow_areas: List[FlowArea]) -> Optional[FlowArea]:
         return longest_flow_area
     except (TypeError, ValueError):
         return None
-    
+
 
 def get_longest_flow_area_by_pipes(flow_areas: List[FlowArea]) -> Optional[FlowArea]:
     """
@@ -297,18 +296,22 @@ def determine_stationary_status_by_majority(statuses: list[StationaryStatus]) ->
 
 
 def collect_stationary_statuses_from_output_signals(
-    controlled_site_signals: list[ControlledSiteSignalMessage],
-) -> list[tuple[SiteKpKp, StationaryStatus]]:
+    controlled_site_signals: list[ControlledSiteSignalMessage], controlled_sites_dict: dict
+) -> tuple[list[tuple[str, StationaryStatus]], list[str]]:
     """
     Собирает stationaryStatus (SignalType.REGLU) по всем участкам КП-КП из OutputSignalsInfo
     """
     all_signals_dict = extract_signal_on_site_and_segment(controlled_site_signals)
-    site_stationary_statuses: list[tuple[SiteKpKp, StationaryStatus]] = []
-    for site in SiteKpKp:
-        stationary_status = get_signal_value(all_signals_dict, site.site_key, SignalType.REGLU)
-        if isinstance(stationary_status, StationaryStatus):
-            site_stationary_statuses.append((site, stationary_status))
-    return site_stationary_statuses
+    site_stationary_statuses: list[tuple[str, StationaryStatus]] = []
+    missed_controlled_sites: list[str] = []
+    for name, value in controlled_sites_dict.items():
+        stationary_status = get_signal_value(all_signals_dict, value, SignalType.REGLU)
+        if stationary_status:
+            if isinstance(stationary_status, StationaryStatus):
+                site_stationary_statuses.append((name, stationary_status))
+        else:
+            missed_controlled_sites.append(name)
+    return site_stationary_statuses, missed_controlled_sites
 
 
 def determine_lds_status_by_priority(lds_status_set: Set[int]) -> Optional[int]:
@@ -407,8 +410,8 @@ def get_signal_value(
     signals_id: int,
 ) -> StationaryStatus | LdsStatus | int | None:
     """
-    Получает значение сигналов
-    Приводит значение к типу инт
+    Получает значение сигналов.
+    Приводит значение к типу инт.
     Кладет в обертку значения режима МТ и режима СОУ
     """
     signals_value = all_signals_dict.get(site_kp_kp, {}).get(signals_id)
@@ -423,7 +426,7 @@ def get_signal_value(
     return int_signals_value
 
 
-def parse_event(event_value: str) -> tuple[str | None, str | None]:
+def parse_journal_event(event_value: str) -> tuple[str | None, str | None]:
     """
     Разделяет строку события на имя и причину, вложенную в скобки
     """
@@ -818,8 +821,9 @@ async def poll_for_exported_file(
                 fail(f"Не удалось разобрать ответ на {request_name}: {error}")
 
             items = []
-            if parsed_payload.replyContent is not None:
-                items = parsed_payload.replyContent.exportedData or []
+            reply_content = getattr(parsed_payload, "replyContent", None)
+            if reply_content:
+                items = getattr(reply_content, "exportedData", [])
 
             if len(items) != last_items_count:
                 allure.attach(
@@ -1237,6 +1241,41 @@ async def connect_and_get_msg(
         if _is_configurator_flow_active():
             raise
         fail(f"Не удалось получить сообщение типа: {ws_invoke_type}. Ошибка: {error}")
+
+
+async def connect_and_poll_subscribed_msg(
+    ws_client: WebSocketClient,
+    ws_message_type: str,
+    ws_invoke_type: str,
+    ws_invoke_params: Any = None,
+    retries: int = TestConst.SUBSCRIBE_MESSAGE_POLL_ATTEMPTS,
+) -> list:
+    """
+    Подписывается и ищет нужное сообщение в потоке, с повторным переподключением ws клиента
+    """
+    ws_client.suppress_recv_logging = True
+    try:
+        for attempt in range(1, retries + 1):
+            try:
+                with allure.step(
+                    f"Получение сообщения с контентом типа: {ws_message_type} - попытка {attempt} из {retries}"
+                ):
+                    await connect(ws_client, ws_invoke_type, ws_invoke_params)
+                    payload = await ws_client.receive_by_type(
+                        ws_message_type, timeout=TestConst.POLL_BY_TIMEOUT_SECONDS
+                    )
+                    return payload
+            except asyncio.TimeoutError:
+                await ws_client.reconnect()
+                continue
+            except Exception:
+                await ws_client.reconnect()
+                continue
+        fail(f"Не удалось получить сообщение с контентом типа: {ws_message_type} за {retries} попыток")
+    except (asyncio.TimeoutError, OSError, ConnectionError, ConnectionResetError) as error:
+        fail(f"Не удалось получить сообщение типа: {ws_message_type}. Ошибка: {error}")
+    finally:
+        ws_client.suppress_recv_logging = False
 
 
 async def connect_and_poll_subscribed_signal(

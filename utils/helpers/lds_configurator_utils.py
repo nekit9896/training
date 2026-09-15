@@ -127,7 +127,7 @@ def get_basic_info_admin_with_retry(
                     error,
                 )
                 if attempt < retries:
-                    time.sleep(2)
+                    time.sleep(LdsCfgConst.GET_BASIC_INFO_ADMIN_TIMEOUT_SECONDS)
 
     with _step("Проверка: GetBasicInfoAdminResponse получен"):
         _fail_or_raise(

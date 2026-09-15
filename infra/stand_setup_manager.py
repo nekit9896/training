@@ -40,6 +40,7 @@ class StandSetupManager:
         test_data_id: int,  # id тест кейса из которого будут загружены данные
         test_data_name: str,  # Название архива данных имитатора для загрузки из TestOps
         tu_id: int,
+        ost_name: str,
         measure_conversion_rules: MeasureConversionRule | None = None,
         username: str = os.environ.get(EnvKeyConstants.SSH_USER_DEV),
         stand_name: str = os.environ.get(EnvKeyConstants.STAND_NAME),
@@ -48,6 +49,7 @@ class StandSetupManager:
         self._test_data_id = test_data_id
         self._test_data_name = test_data_name
         self._tu_id = tu_id
+        self._ost_name = ost_name
         self._measure_conversion_rules = measure_conversion_rules
         self._username = username
         self._stand_name = stand_name
@@ -116,11 +118,11 @@ class StandSetupManager:
         # Чистка ключей ClickHouse
         self._clickhouse_manager.delete_clickhouse_keys_with_check()
 
-    def get_sensor_ids_by_address(self) -> dict[str, int]:
+    def get_data_from_configuration(self) -> tuple:
         """
         Возвращает словарь address: id из конфигурации, скопированной на runner.
         """
-        return self._configuration_manager.get_sensor_ids_by_address()
+        return self._configuration_manager.get_data_from_configuration()
 
     def stop_all_containers(self):
         """
@@ -260,7 +262,7 @@ class StandSetupManager:
                 self._stand_client, self._test_data_id, self._test_data_name, self._tu_id
             )
             self._data_path = self._uploader.remote_temp_dir_path
-            return ImitatorCmdGenerator(self._data_path, self._stand_name, self._duration_m)
+            return ImitatorCmdGenerator(self._data_path, self._ost_name, self._stand_name, self._duration_m)
         except Exception as error:
             error_msg = "[SETUP] [ERROR] Ошибка при выборе варианта генерации команды запуска имитатора"
             logger.exception(error_msg)

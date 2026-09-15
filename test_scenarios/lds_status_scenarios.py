@@ -287,7 +287,7 @@ def lds_status_in_journal(http_client, cfg: LDSStatusConfig, test_data: CaseData
     else:
         expected_lds_status, expected_lds_status_reasons = test_data.expected_result, None
 
-    with allure.step("Http запрос сообщений журнала с фильтром messageTypes=MASKING_LDS"):
+    with allure.step("Http запрос сообщений журнала с фильтром messageTypes=LDS_STATUS"):
         end_time = datetime.now()
         start_time = t_utils.datetime_minus_seconds(end_time, TestConst.JOURNAL_STATUS_TOTAL_WAIT)
         request_body = t_utils.create_journal_req_body(
@@ -326,7 +326,7 @@ def lds_status_in_journal(http_client, cfg: LDSStatusConfig, test_data: CaseData
     with SoftAssertions() as soft_failures:
         for msg in lds_msg_by_control_points:
             msg_event = getattr(msg, 'event', None)
-            cp_lds_status, cp_lds_status_reasons = t_utils.parse_event(msg_event)
+            cp_lds_status, cp_lds_status_reasons = t_utils.parse_journal_event(msg_event)
             StepCheck(f"Проверка режима работы СОУ на КП:{msg.controlPoint}", "event", soft_failures).actual(
                 cp_lds_status
             ).expected(expected_lds_status).equal_to()

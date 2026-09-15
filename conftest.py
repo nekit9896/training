@@ -24,10 +24,7 @@ from utils.helpers.pytest_auth import (
     init_http_stand_client,
     init_ws_stand_client,
 )
-from utils.helpers.vault_pytest_utils import (
-    configure_vault_for_suite,
-    reset_vault_process_empty_values_rejection,
-)
+from utils.helpers.vault_pytest_utils import configure_vault_for_suite, reset_vault_process_empty_values_rejection
 from utils.helpers.ws_message_parser import ws_message_parser as lds_ws_parser
 
 
@@ -112,12 +109,13 @@ def pytest_configure(config):
     }
 
 
-def _update_sensor_ids(stand_manager: StandSetupManager) -> None:
+def _update_configuration_data(stand_manager: StandSetupManager) -> None:
     """
-    Для тестов датчиков обновляет sensor_id по address из конфигурации стенда.
+    Обновляет данные для тестов из файла конфигурации стенда.
     """
-    sensor_ids_by_address = stand_manager.get_sensor_ids_by_address()
+    sensor_ids_by_address, segments = stand_manager.get_data_from_configuration()
     BaseTN3Constants.SENSOR_IDS_BY_ADDRESS.update(sensor_ids_by_address)
+    BaseTN3Constants.CONTROLLED_SITE_SEGMENTS.update(segments)
     RejectionSensorTag.update_ids_from_config(sensor_ids_by_address)
 
 
@@ -165,6 +163,7 @@ SMOKE_SUITE_LEVEL_MAPPING = {
 # Regress-тесты режимов СОУ (маркеры из LDSStatusConfig)
 LDS_STATUS_SUITE_LEVEL_MAPPING = {
     'test_lds_status_basic_info': 'lds_status_basic_info_test',
+    # ===== ТЕСТЫ течение. ЭФ Схема =====
     'test_lds_status_init_accumulation_data': 'init_accumulation_data_test',
     'test_lds_status_init_accumulation_data_in_journal': 'init_accumulation_data_in_journal_test',
     'test_lds_status_init_cold_start': 'init_cold_start_test',
@@ -194,22 +193,25 @@ LDS_STATUS_SUITE_LEVEL_MAPPING = {
     'test_lds_status_degradation_pig_sensor_passage': 'deg_pig_sensor_passage_test',
     'test_lds_status_degradation_starting_pumping_out_pumps': 'deg_starting_pumping_out_pumps_test',
     'test_lds_status_degradation_exceeding_distance_between_flow_meters': 'deg_exceeding_distance_between_flow_meters_test',  # noqa: E501
-    # ===== ТЕСТЫ на схеме=====
+    'test_lds_status_faulty_absence_min_flow_meters_continuous': 'faulty_absence_min_flow_meters_continuous_test',
+    'test_lds_status_faulty_absence_min_flow_meters': 'faulty_absence_min_flow_meters_test',
+    'test_lds_status_faulty_absence_min_pressure_sensors': 'faulty_absence_min_pressure_sensors_test',
+    # ===== ТЕСТЫ бики. ЭФ Схема=====
     'test_lds_status_degradation_rejection_temperature_sensor_on_du_2': 'deg_rejection_temperature_sensor_on_du_2_test',
     'test_lds_status_degradation_rejection_temperature_sensor_on_du_3': 'deg_rejection_temperature_sensor_on_du_3_test',
     'test_lds_status_degradation_rejection_temperature_sensor_on_du_5': 'deg_rejection_temperature_sensor_on_du_5_test',
     'test_lds_status_degradation_rejection_density_and_viscosity_on_du_2': 'deg_rejection_density_and_viscosity_on_du_2_test',  # noqa: E501
     'test_lds_status_degradation_rejection_density_and_viscosity_on_du_3': 'deg_rejection_density_and_viscosity_on_du_3_test',  # noqa: E501
     'test_lds_status_degradation_rejection_density_and_viscosity_on_du_5': 'deg_rejection_density_and_viscosity_on_du_5_test',  # noqa: E501
-    # ===== ТЕСТЫ в журнале бики ДУ2=====
+    # ===== ТЕСТЫ бики ДУ2. ЭФ Журнал =====
     'test_degradation_temperature_du_2_in_journal': 'degradation_temperature_du_2_in_journal_test',
     'test_degradation_density_du_2_in_journal': 'degradation_density_du_2_in_journal_test',
     'test_degradation_viscosity_du_2_in_journal': 'degradation_viscosity_du_2_in_journal_test',
-    # ===== ТЕСТЫ в журнале бики ДУ3=====
+    # ===== ТЕСТЫ бики ДУ3. ЭФ Журнал =====
     'test_degradation_temperature_du_3_in_journal': 'degradation_temperature_du_3_in_journal_test',
     'test_degradation_density_du_3_in_journal': 'degradation_density_du_3_in_journal_test',
     'test_degradation_viscosity_du_3_in_journal': 'degradation_viscosity_du_3_in_journal_test',
-    # ===== ТЕСТЫ на схеме течение=====
+    # ===== ТЕСТЫ течение. ЭФ Журнал =====
     'test_lds_status_degradation_gravity_section_pumping_in_stopping_in_journal': 'deg_gravity_section_pumping_in_stopping_in_journal_test',  # noqa: E501
     'test_between_si_pressure_more_50_km_in_journal': 'between_si_pressure_more_50_km_in_journal_test',
     'test_deg_gravity_section_pumping_in_journal': 'deg_gravity_section_pumping_in_journal_test',
@@ -221,10 +223,6 @@ LDS_STATUS_SUITE_LEVEL_MAPPING = {
     'test_deg_pig_sensor_passage_in_journal': 'deg_pig_sensor_passage_in_journal_test',
     'test_deg_additive_injectors_operation_in_journal': 'deg_additive_injectors_operation_in_journal_test',
     'test_lds_status_faulty_absence_min_pressure_sensors_in_journal': 'faulty_absence_min_pressure_sensors_in_journal_test',  # noqa: E501
-    # ===== ТЕСТЫ на схеме течение=====
-    'test_lds_status_faulty_absence_min_flow_meters_continuous': 'faulty_absence_min_flow_meters_continuous_test',
-    'test_lds_status_faulty_absence_min_flow_meters': 'faulty_absence_min_flow_meters_test',
-    'test_lds_status_faulty_absence_min_pressure_sensors': 'faulty_absence_min_pressure_sensors_test',
 }
 
 # Тесты уровня утечки (маркеры из LeakTestConfig - параметр leak)
@@ -253,9 +251,30 @@ LEAK_LEVEL_TEST_MAPPING = {
 
 STATIONARY_STATUS_SUITE_LEVEL_MAPPING = {
     'test_stationary_status_basic_info': 'stationary_status_basic_info_test',
-    'test_stationary_status_common_scheme': 'stationary_status_common_scheme_test',
-    'test_stationary_status_journal': 'stationary_status_journal_test',
-    'test_stationary_status_main_page_info': 'stationary_status_main_page_info_test',
+    'test_common_scheme_cold_start': 'common_scheme_cold_start_test',
+    'test_journal_cold_start': 'journal_cold_start_test',
+    'test_main_page_info_cold_start': 'main_page_info_cold_start_test',
+    'test_output_signals_cold_start': 'output_signals_cold_start_test',
+    'test_common_scheme_stationary_after_cold': 'common_scheme_stationary_after_cold_test',
+    'test_journal_stationary_after_cold': 'journal_stationary_after_cold_test',
+    'test_main_page_info_stationary_after_cold': 'main_page_info_stationary_after_cold_test',
+    'test_output_signals_stationary_after_cold': 'output_signals_stationary_after_cold_test',
+    'test_common_scheme_switch_on': 'common_scheme_switch_on_test',
+    'test_journal_switch_on': 'journal_switch_on_test',
+    'test_main_page_info_switch_on': 'main_page_info_switch_on_test',
+    'test_output_signals_switch_on': 'output_signals_switch_on_test',
+    'test_common_scheme_stationary_after_switch_on': 'common_scheme_stationary_after_switch_on_test',
+    'test_journal_stationary_after_switch_on': 'journal_stationary_after_switch_on_test',
+    'test_main_page_info_stationary_after_switch_on': 'main_page_info_stationary_after_switch_on_test',
+    'test_output_signals_stationary_after_switch_on': 'output_signals_stationary_after_switch_on_test',
+    'test_common_scheme_switch_off': 'common_scheme_switch_off_test',
+    'test_journal_switch_off': 'journal_switch_off_test',
+    'test_main_page_info_switch_off': 'main_page_info_switch_off_test',
+    'test_output_signals_switch_off': 'output_signals_switch_off_test',
+    'test_common_scheme_stationary_after_switch_off': 'common_scheme_stationary_after_switch_off_test',
+    'test_journal_stationary_after_switch_off': 'journal_stationary_after_switch_off_test',
+    'test_main_page_info_stationary_after_switch_off': 'main_page_info_stationary_after_switch_off_test',
+    'test_output_signals_stationary_after_switch_off': 'output_signals_stationary_after_switch_off_test',
 }
 
 # Тесты уровня отбраковки (маркеры из RejectionTestCase - параметр rejection_case)
@@ -602,7 +621,7 @@ def pytest_runtest_setup(item):
             else:
                 cfg["vault_rejection_enabled"] = vault_rejection_enabled
         except Exception as error:
-            _skip_current_suite_after_setup_failure(cfg, f"[SETUP] [ERROR] Vault: {error}")
+            _skip_current_suite_after_setup_failure(cfg, f"[SETUP] [ERROR] Vault: {error})")
 
         stand_manager = StandSetupManager(
             duration_m=imitator_duration,
@@ -631,7 +650,7 @@ def pytest_runtest_setup(item):
         except BaseException as error:
             _skip_current_suite_after_setup_failure(cfg, f"[SETUP] [ERROR] не удалось инициализировать auth: {error}")
         try:
-            _update_sensor_ids(stand_manager)
+            _update_configuration_data(stand_manager)
         except Exception as error:
             _skip_current_suite_after_setup_failure(
                 cfg,
@@ -885,4 +904,3 @@ def pytest_sessionfinish(session, exitstatus):
     else:
         for file in files_for_drop:
             os.remove(file)
-            

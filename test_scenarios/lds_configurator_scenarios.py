@@ -80,6 +80,7 @@ async def lds_configurator_admin_setup(
 
     if target_tu_status == SouAdminStatus.RUNNING.value:
         if len(running_tus) == 1:
+            group_state["is_target_tu_active"] = True
             logger.info(
                 "[SETUP] Запущен ранее только целевой ТУ: tuId=%s, tuName=%r, status=%s (%s)",
                 target_tu_id,
@@ -222,6 +223,7 @@ async def lds_configurator_teardown(
     http_client: StandHttpClient,
     tu_id: int,
     admin_tu_name: str,
+    group_state: Optional[Dict[str, Any]] = None,
     pre_run_running_tus: Optional[list[Dict[str, Any]]] = None,
 ) -> None:
     """
@@ -229,13 +231,14 @@ async def lds_configurator_teardown(
     Некритичные отклонения логируются без падения прогона.
     """
     snapshot = pre_run_running_tus or []
-    running_tu = {"tuId": tu_id, "tuName": admin_tu_name}
+    if group_state.get("is_target_tu_active"):
+        logger.info("[LDS_CONFIGURATOR] [TEARDOWN] [SKIP] Запущен ранее только целевой ТУ, остановка не требуется")
+        return
     try:
         logger.info("[TEARDOWN] Проверка статуса СОУ (tuId=%s, «%s»)", tu_id, admin_tu_name)
         admin_reply = lds_utils.get_basic_info_admin_with_retry(http_client, parser)
-
         sou_status = lds_utils.get_admin_tu_status(admin_reply, tu_id)
-        if sou_status == SouAdminStatus.RUNNING and not (len(snapshot) == 1 and snapshot[0] == running_tu):
+        if sou_status == SouAdminStatus.RUNNING:
             logger.info("[TEARDOWN] Остановка СОУ (StopLdsRequest) для tuId=%s", tu_id)
             lds_utils.run_lds_command(http_client, HttpConst.STOP_LDS_URL_PATH, tu_id)
 
@@ -247,8 +250,8 @@ async def lds_configurator_teardown(
                 )
         else:
             lds_utils.attach_allure_alert(
-                f"[SKIP] tuId={tu_id}, adminTuName='{admin_tu_name} не в статусе 'включена' "
-                "или была включена до старта прогона. Остановка пропущена."
+                f"СОУ не в статусе 'включена' при teardown (status={sou_status}), остановка пропущена. "
+                f"tuId={tu_id}, adminTuName='{admin_tu_name}'"
             )
         if snapshot:
             await lds_utils.restore_pre_run_tus(http_client, parser, snapshot, tu_id)
@@ -265,4 +268,3 @@ async def lds_configurator_teardown(
             f"Ошибка LDS Configurator teardown: {type(error).__name__}: {error!r}. "
             f"tuId={tu_id}, adminTuName={admin_tu_name!r}"
         )
-        

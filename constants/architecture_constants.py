@@ -17,6 +17,7 @@ class StandConstants:
     STOP_LDS_URL_PATH: str = "/configurator/StopLds"
     GET_MESSAGES_URL_PATH: str = "/journals/GetMessages"
     GET_OUTPUT_SIGNALS_URL_PATH: str = "/apigateway/GetOutputSignals"
+    LAUNCH_PIG_URL_PATH: str = "/core/LaunchPig"
     MASK_SIGNAL_URL_PATH: str = "/layerbuilder/MaskSignal"
     MASK_LDS_URL_PATH: str = "/core/MaskLds"
     PING_URL_PATH: str = "/apigateway/Ping"
@@ -70,13 +71,13 @@ class ImitatorConstants:
     DEFAULT_ENCODINGS = [ENCODING_UTF_8_SIG, ENCODING_UTF_8, WIN_ENCODING_CP866, WIN_ENCODING_CP1251, ENCODING_LATIN_1]
 
     HOST_MAP = {
-        "dev1": {IMITATOR_KEY_NAME: "DEV1_", SERVER_IP_KEY_NAME: "10.7.49.37"},
-        "dev2": {IMITATOR_KEY_NAME: "DEV2_", SERVER_IP_KEY_NAME: "10.7.49.38"},
-        "dev3": {IMITATOR_KEY_NAME: "DEV3_", SERVER_IP_KEY_NAME: "10.7.49.205"},
-        "test1": {IMITATOR_KEY_NAME: "TEST1_", SERVER_IP_KEY_NAME: "10.7.49.206"},
-        "test2": {IMITATOR_KEY_NAME: "TEST2_", SERVER_IP_KEY_NAME: "10.7.49.207"},
-        "test3": {IMITATOR_KEY_NAME: "TEST3_", SERVER_IP_KEY_NAME: "10.7.49.208"},
-        "test4": {IMITATOR_KEY_NAME: "TEST4_", SERVER_IP_KEY_NAME: "10.7.49.209"},
+        "dev1": {IMITATOR_KEY_NAME: "DEV1", SERVER_IP_KEY_NAME: "10.7.49.37"},
+        "dev2": {IMITATOR_KEY_NAME: "DEV2", SERVER_IP_KEY_NAME: "10.7.49.38"},
+        "dev3": {IMITATOR_KEY_NAME: "DEV3", SERVER_IP_KEY_NAME: "10.7.49.205"},
+        "test1": {IMITATOR_KEY_NAME: "TEST1", SERVER_IP_KEY_NAME: "10.7.49.206"},
+        "test2": {IMITATOR_KEY_NAME: "TEST2", SERVER_IP_KEY_NAME: "10.7.49.207"},
+        "test3": {IMITATOR_KEY_NAME: "TEST3", SERVER_IP_KEY_NAME: "10.7.49.208"},
+        "test4": {IMITATOR_KEY_NAME: "TEST4", SERVER_IP_KEY_NAME: "10.7.49.209"},
     }
 
 
@@ -87,12 +88,16 @@ class ClickhouseConstants(ImitatorConstants):
     OBJECT_ID_KEY_NAME: str = "objectId"
     PARAMETER_ID_KEY_NAME: str = "parameterId"
     EVO_ID_PAIRS_CHUNK_SIZE: int = 450
-    NAME_CONTAINER: str = "clickhouse-2"
+    NAME_CONTAINER: str = "clickhouse"
 
 
 class DockerConstants:
+    TIMEOUT_S: int = 20
+    RETRIES_TIMEOUT_S: int = 5
+    STOP_CONTAINER_RETRIES: int = 5
     HOSTNAME_CMD: str = "hostname"
     STOP_CMD: str = "docker stop"
+    STOP_WITH_TIMEOUT_CMD: str = f"{STOP_CMD} --time {TIMEOUT_S}"
     START_CMD: str = "docker start"
     CHECK_STATUS_CMD: str = "docker inspect -f '{{.State.Status}}'"
     RUNNING_STATUS: str = "running"
@@ -159,6 +164,7 @@ class WebSocketClientConstants(StandConstants):
     START_INVOCATION_ID: str = 1
     DEFAULT_RECONNECT_INTERVAL: float | int = 5.0
     WS_CONNECT_TIMEOUT_SECONDS: float = 120.0
+    WS_RECONNECT_TIMEOUT_SECONDS: float = 20.0
     PING_INTERVAL: int = 3
     PING_TIMEOUT: int = 5
     CLOSE_TIMEOUT: int = 30
@@ -172,13 +178,14 @@ class WebSocketClientConstants(StandConstants):
     EVENT_TYPE_INDEX = 3
     INVOCATION_ID_INDEX = 2
     SERVICE_NAME: str = StandConstants.MAIN_SUBDOMAIN
-    FILTERING_TIMEOUT: int | float = 10.0
+    FILTERING_TIMEOUT: int | float = 30.0
 
 
 class MockConstants:
     MOCK_DURATION: int = 60
     MOCK_TEST_DATA_ID: int = 1
     MOCK_TEST_DATA_NAME: str = "mock.tar.gz"
+    MOCK_CHTN_OST_NAME: str = "CHTN"
 
 
 class EnvKeyConstants:

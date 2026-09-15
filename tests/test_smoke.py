@@ -39,6 +39,7 @@ def _get_suite_markers(config: SmokeSuiteConfig) -> List[pytest.MarkDecorator]:
         pytest.mark.test_suite_data_id(config.suite_data_id),
         pytest.mark.test_data_name(config.archive_name),
         pytest.mark.tu_id(config.technological_unit.id),
+        pytest.mark.ost_name(config.ost_name),
     ]
 
 
@@ -198,6 +199,7 @@ class TestSuiteScenarios:
         _apply_allure_markers(config.lds_status_init_in_journal_test, tag, title, description)
         scenarios.lds_status_init_in_journal(http_client, config, imitator_start_time)
 
+    @pytest.mark.skip("Включить после выполнения LDS-15408")
     @pytest.mark.asyncio
     async def test_main_page_info(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
         """[MainPageInfo] Проверка установки режима МТ"""
@@ -464,11 +466,11 @@ class TestSuiteScenarios:
         test_data = config.exp_mode_mt_message
         scenarios.stationary_status_in_journal(http_client, config, imitator_start_time, test_data)
 
-    @pytest.mark.skip("Не готов после перехода на REST API, включить в задаче LDS-14843")
     @pytest.mark.asyncio
     async def test_export_lds_status_report(
         self,
         ws_client: WebSocketClient,
+        http_client: StandHttpClient,
         config: SmokeSuiteConfig,
         imitator_start_time: datetime,
     ) -> None:
@@ -496,13 +498,13 @@ class TestSuiteScenarios:
                 "Во вложениях Allure xlsx прикладывается только при падении теста"
             ),
         )
-        await scenarios.export_lds_status_report(ws_client, config, imitator_start_time)
+        await scenarios.export_lds_status_report(ws_client, http_client, config, imitator_start_time)
 
-    @pytest.mark.skip("Не готов после перехода на REST API, включить в задаче LDS-14843")
     @pytest.mark.asyncio
     async def test_export_mt_mode_report(
         self,
         ws_client: WebSocketClient,
+        http_client: StandHttpClient,
         config: SmokeSuiteConfig,
         imitator_start_time: datetime,
     ) -> None:
@@ -530,7 +532,7 @@ class TestSuiteScenarios:
                 "Во вложениях Allure xlsx прикладывается только при падении теста"
             ),
         )
-        await scenarios.export_mt_mode_report(ws_client, config, imitator_start_time)
+        await scenarios.export_mt_mode_report(ws_client, http_client, config, imitator_start_time)
 
 
 # ===== ТЕСТЫ УРОВНЯ УТЕЧКИ =====
@@ -769,7 +771,6 @@ class TestLeakScenarios:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.lds_status_during_leak(ws_client, config, leak)
 
-    @pytest.mark.skip("Не готов после перехода на REST API, включить в задаче LDS-14845")
     @pytest.mark.asyncio
     async def test_acknowledge_leak_info(
         self,
@@ -801,7 +802,6 @@ class TestLeakScenarios:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.acknowledge_leak_info(ws_client, http_client, config, leak)
 
-    @pytest.mark.skip("Не готов после перехода на REST API, включить в задаче LDS-14845")
     def test_acknowledge_leak_in_journal(
         self,
         http_client: StandHttpClient,
@@ -824,7 +824,6 @@ class TestLeakScenarios:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         scenarios.acknowledge_leak_in_journal(http_client, config, imitator_start_time)
 
-    @pytest.mark.skip("Не готов после перехода на REST API, включить в задаче LDS-14845")
     @pytest.mark.asyncio
     async def test_output_signals(
         self,
@@ -1142,11 +1141,11 @@ class TestLeakScenarios:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
         await scenarios.complete_tu_leaks_info_content(ws_client, config)
 
-    @pytest.mark.skip("Не готов после перехода на REST API, включить в задаче LDS-14843")
     @pytest.mark.asyncio
     async def test_export_leaks_report(
         self,
         ws_client: WebSocketClient,
+        http_client: StandHttpClient,
         config: SmokeSuiteConfig,
         leak: LeakTestConfig,
         leak_number: int,
@@ -1182,4 +1181,4 @@ class TestLeakScenarios:
         )
         if config.has_multiple_leaks:
             allure.dynamic.title(f"{title} (утечка #{leak_number})")
-        await scenarios.export_leaks_report(ws_client, config, leak, imitator_start_time)
+        await scenarios.export_leaks_report(ws_client, http_client, config, leak, imitator_start_time)

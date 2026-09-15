@@ -36,6 +36,7 @@ def _get_suite_markers(config: StationaryStatusConfig) -> List[pytest.MarkDecora
         pytest.mark.test_suite_data_id(config.suite_data_id),
         pytest.mark.test_data_name(config.archive_name),
         pytest.mark.tu_id(config.technological_unit.id),
+        pytest.mark.ost_name(config.ost_name),
     ]
 
 
@@ -88,39 +89,524 @@ class TestSuiteScenarios:
         smoke_scenarios.basic_info(http_client, config)
 
     @pytest.mark.asyncio
-    async def test_stationary_status_check_with_reasons(
-        self, ws_client: WebSocketClient, config: StationaryStatusConfig
-    ) -> None:
+    async def test_common_scheme_cold_start(self, ws_client: WebSocketClient, config: StationaryStatusConfig) -> None:
         """
         [CommonScheme] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Схема
         """
-        test_data = config.stationary_status_check_with_reasons_test_data
+        test_data = config.status_unstationary_cold_start_test_data
         expected_stationary_status, expected_stationary_status_reasons = test_data.expected_result
         tag = "CommonScheme"
         title = (
-            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status},"
-            f" по причине: {expected_stationary_status_reasons}. ЭФ: Схема"
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text},"
+            f" по причине: {expected_stationary_status_reasons.report_text}. ЭФ: Схема"
         )
         _apply_allure_markers(
-            config.stationary_status_check_with_reasons_test,
+            config.common_scheme_cold_start_test,
             tag,
             title,
             (
-                f"Проверка режима работы МТ на одном ДУ, на наборе данных {config.suite_name}, \n"
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
                 f"на технологическом участке {config.tu_name}\n"
-                f"Время проведения проверки : {config.stationary_status_check_with_reasons_test.offset} мин.\n"
+                f"Время проведения проверки : {config.common_scheme_cold_start_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
-                f"Ожидаемый режим работы СОУ: {expected_stationary_status}\n "
-                f"Ожидаемая причина режима работы СОУ: {expected_stationary_status_reasons}"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}\n "
+                f"Ожидаемая причина режима работы МТ: {expected_stationary_status_reasons.report_text}"
             ),
         )
-        await scenarios.stationary_status_check_with_reasons(ws_client, config, test_data)
+        await scenarios.stationary_status_common_scheme(ws_client, config, test_data)
 
-    def test_stationary_status_in_journal(self, http_client: StandHttpClient, config: StationaryStatusConfig) -> None:
+    @pytest.mark.asyncio
+    async def test_common_scheme_stationary_after_cold(
+        self, ws_client: WebSocketClient, config: StationaryStatusConfig
+    ) -> None:
         """
-        [MessagesInfo] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Журнал
+        [CommonScheme] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Схема.
+        Стационар после холодного старта
         """
-        test_data = config.stationary_status_in_journal_test_data
+        test_data = config.status_stationary_test_data
+        expected_stationary_status, expected_stationary_status_reasons = test_data.expected_result
+        tag = "CommonScheme"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text},"
+            f" по причине: {expected_stationary_status_reasons.report_text}. ЭФ: Схема"
+        )
+        _apply_allure_markers(
+            config.common_scheme_stationary_after_cold_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.common_scheme_stationary_after_cold_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}\n "
+                f"Ожидаемая причина режима работы МТ: {expected_stationary_status_reasons.report_text}"
+            ),
+        )
+        await scenarios.stationary_status_common_scheme(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_common_scheme_switch_on(self, ws_client: WebSocketClient, config: StationaryStatusConfig) -> None:
+        """
+        [CommonScheme] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Схема.
+        Событие: Открытие задвижки / включение насоса
+        """
+        test_data = config.status_unstationary_switch_test_data
+        expected_stationary_status, expected_stationary_status_reasons = test_data.expected_result
+        tag = "CommonScheme"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text},"
+            f" по причине: {expected_stationary_status_reasons.report_text}. "
+            "Событие: Открытие задвижки / включение насоса. ЭФ: Схема"
+        )
+        _apply_allure_markers(
+            config.common_scheme_switch_on_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.common_scheme_switch_on_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}\n "
+                f"Ожидаемая причина режима работы МТ: {expected_stationary_status_reasons.report_text}"
+            ),
+        )
+        await scenarios.stationary_status_common_scheme(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_common_scheme_stationary_after_switch_on(
+        self, ws_client: WebSocketClient, config: StationaryStatusConfig
+    ) -> None:
+        """
+        [CommonScheme] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Схема.
+        Стационар после открытия задвижки / включения насоса
+        """
+        test_data = config.status_stationary_test_data
+        expected_stationary_status, expected_stationary_status_reasons = test_data.expected_result
+        tag = "CommonScheme"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text},"
+            f" по причине: {expected_stationary_status_reasons.report_text}. "
+            "Стационар после открытия задвижки / включения насоса. ЭФ: Схема"
+        )
+        _apply_allure_markers(
+            config.common_scheme_stationary_after_switch_on_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.common_scheme_stationary_after_switch_on_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}\n "
+                f"Ожидаемая причина режима работы МТ: {expected_stationary_status_reasons.report_text}"
+            ),
+        )
+        await scenarios.stationary_status_common_scheme(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_common_scheme_switch_off(self, ws_client: WebSocketClient, config: StationaryStatusConfig) -> None:
+        """
+        [CommonScheme] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Схема.
+        Событие: Закрытие задвижки / выключение насоса
+        """
+        test_data = config.status_unstationary_switch_test_data
+        expected_stationary_status, expected_stationary_status_reasons = test_data.expected_result
+        tag = "CommonScheme"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text},"
+            f" по причине: {expected_stationary_status_reasons.report_text}. "
+            "Событие: Закрытие задвижки / выключение насоса. ЭФ: Схема"
+        )
+        _apply_allure_markers(
+            config.common_scheme_switch_off_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.common_scheme_switch_off_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}\n "
+                f"Ожидаемая причина режима работы МТ: {expected_stationary_status_reasons.report_text}"
+            ),
+        )
+        await scenarios.stationary_status_common_scheme(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_common_scheme_stationary_after_switch_off(
+        self, ws_client: WebSocketClient, config: StationaryStatusConfig
+    ) -> None:
+        """
+        [CommonScheme] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Схема.
+        Стационар после закрытия задвижки / выключения насоса
+        """
+        test_data = config.status_stationary_test_data
+        expected_stationary_status, expected_stationary_status_reasons = test_data.expected_result
+        tag = "CommonScheme"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text},"
+            f" по причине: {expected_stationary_status_reasons.report_text}. "
+            "Стационар после закрытия задвижки / выключения насоса. ЭФ: Схема"
+        )
+        _apply_allure_markers(
+            config.common_scheme_stationary_after_switch_off_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.common_scheme_stationary_after_switch_off_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonScheme\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}\n "
+                f"Ожидаемая причина режима работы МТ: {expected_stationary_status_reasons.report_text}"
+            ),
+        )
+        await scenarios.stationary_status_common_scheme(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_main_page_info_cold_start(self, ws_client: WebSocketClient, config: StationaryStatusConfig) -> None:
+        """
+        [CommonScheme] Проверка режима работы МТ на ЭФ: Главная страница. Контент таблица по ТУ.
+        Нестационар по причине Одновременный «холодный» запуск нескольких серверов СОУ
+        """
+        test_data = config.status_unstationary_cold_start_test_data
+        expected_stationary_status, _ = test_data.expected_result
+        tag = "MainPageInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text}."
+            " ЭФ: Главная страница. Контент таблица по ТУ"
+        )
+        _apply_allure_markers(
+            config.main_page_info_cold_start_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.main_page_info_cold_start_test.offset} мин.\n"
+                "Подписка на сообщения типа: MainPageInfoContent\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}"
+            ),
+        )
+        await scenarios.stationary_status_main_page_info(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_main_page_info_stationary_after_cold(
+        self, ws_client: WebSocketClient, config: StationaryStatusConfig
+    ) -> None:
+        """
+        [CommonScheme] Проверка режима работы МТ на ЭФ: Главная страница. Контент таблица по ТУ.
+        Стационар после холодного старта
+        """
+        test_data = config.status_stationary_test_data
+        expected_stationary_status, _ = test_data.expected_result
+        tag = "MainPageInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text}."
+            " ЭФ: Главная страница. Контент таблица по ТУ"
+        )
+        _apply_allure_markers(
+            config.main_page_info_stationary_after_cold_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.main_page_info_stationary_after_cold_test.offset} мин.\n"
+                "Подписка на сообщения типа: MainPageInfoContent\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}"
+            ),
+        )
+        await scenarios.stationary_status_main_page_info(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_main_page_info_switch_on(self, ws_client: WebSocketClient, config: StationaryStatusConfig) -> None:
+        """
+        [CommonScheme] Проверка режима работы МТ на ЭФ: Главная страница. Контент таблица по ТУ.
+        Открытие задвижки / включение насоса
+        """
+        test_data = config.status_unstationary_switch_test_data
+        expected_stationary_status, _ = test_data.expected_result
+        tag = "MainPageInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text}. "
+            "Событие: Открытие задвижки / включение насоса. ЭФ: Главная страница. Контент таблица по ТУ"
+        )
+        _apply_allure_markers(
+            config.main_page_info_switch_on_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.main_page_info_switch_on_test.offset} мин.\n"
+                "Подписка на сообщения типа: MainPageInfoContent\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}"
+            ),
+        )
+        await scenarios.stationary_status_main_page_info(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_main_page_info_stationary_after_switch_on(
+        self, ws_client: WebSocketClient, config: StationaryStatusConfig
+    ) -> None:
+        """
+        [CommonScheme] Проверка режима работы МТ на ЭФ: Главная страница. Контент таблица по ТУ.
+        Стационар после открытия задвижки / включения насоса
+        """
+        test_data = config.status_stationary_test_data
+        expected_stationary_status, _ = test_data.expected_result
+        tag = "MainPageInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text}."
+            " Стационар после открытия задвижки / включения насоса. ЭФ: Главная страница. Контент таблица по ТУ"
+        )
+        _apply_allure_markers(
+            config.main_page_info_stationary_after_switch_on_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.main_page_info_stationary_after_switch_on_test.offset} мин.\n"
+                "Подписка на сообщения типа: MainPageInfoContent\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}"
+            ),
+        )
+        await scenarios.stationary_status_main_page_info(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_main_page_info_switch_off(self, ws_client: WebSocketClient, config: StationaryStatusConfig) -> None:
+        """
+        [CommonScheme] Проверка режима работы МТ на ЭФ: Главная страница. Контент таблица по ТУ.
+        Событие: Закрытие задвижки / выключение насоса
+        """
+        test_data = config.status_unstationary_switch_test_data
+        expected_stationary_status, _ = test_data.expected_result
+        tag = "MainPageInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text}. "
+            "Событие: Закрытие задвижки / выключение насоса. ЭФ: Главная страница. Контент таблица по ТУ"
+        )
+        _apply_allure_markers(
+            config.main_page_info_switch_off_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.main_page_info_switch_off_test.offset} мин.\n"
+                "Подписка на сообщения типа: MainPageInfoContent\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}"
+            ),
+        )
+        await scenarios.stationary_status_main_page_info(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_main_page_info_stationary_after_switch_off(
+        self, ws_client: WebSocketClient, config: StationaryStatusConfig
+    ) -> None:
+        """
+        [CommonScheme] Проверка режима работы МТ на ЭФ: Главная страница. Контент таблица по ТУ.
+        Стационар после закрытия задвижки / выключения насоса
+        """
+        test_data = config.status_stationary_test_data
+        expected_stationary_status, _ = test_data.expected_result
+        tag = "MainPageInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text}."
+            " Стационар после закрытия задвижки / выключения насоса. ЭФ: Главная страница. Контент таблица по ТУ"
+        )
+        _apply_allure_markers(
+            config.main_page_info_stationary_after_switch_off_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.main_page_info_stationary_after_switch_off_test.offset} мин.\n"
+                "Подписка на сообщения типа: MainPageInfoContent\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}"
+            ),
+        )
+        await scenarios.stationary_status_main_page_info(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_output_signals_cold_start(self, ws_client: WebSocketClient, config: StationaryStatusConfig) -> None:
+        """
+        [OutputSignalsInfo] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Схема.
+        Нестационар по причине Одновременный «холодный» запуск нескольких серверов СОУ
+        """
+        test_data = config.status_unstationary_cold_start_test_data
+        expected_stationary_status, _ = test_data.expected_result
+        tag = "OutputSignalsInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text}. "
+            "ЭФ: Диагностика сигналов.Выходные"
+        )
+        _apply_allure_markers(
+            config.output_signals_cold_start_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.output_signals_cold_start_test.offset} мин.\n"
+                "Подписка на сообщения типа: OutputSignalsInfo\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}\n "
+            ),
+        )
+        await scenarios.stationary_status_in_output_signals(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_output_signals_stationary_after_cold(
+        self, ws_client: WebSocketClient, config: StationaryStatusConfig
+    ) -> None:
+        """
+        [OutputSignalsInfo] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Схема.
+        Стационар после холодного старта
+        """
+        test_data = config.status_stationary_test_data
+        expected_stationary_status, _ = test_data.expected_result
+        tag = "OutputSignalsInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text}. "
+            "ЭФ: Диагностика сигналов.Выходные"
+        )
+        _apply_allure_markers(
+            config.output_signals_stationary_after_cold_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.output_signals_stationary_after_cold_test.offset} мин.\n"
+                "Подписка на сообщения типа: OutputSignalsInfo\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}\n "
+            ),
+        )
+        await scenarios.stationary_status_in_output_signals(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_output_signals_switch_on(self, ws_client: WebSocketClient, config: StationaryStatusConfig) -> None:
+        """
+        [OutputSignalsInfo] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Схема.
+        Открытие задвижки / включение насоса
+        """
+        test_data = config.status_unstationary_switch_test_data
+        expected_stationary_status, _ = test_data.expected_result
+        tag = "OutputSignalsInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text}. "
+            "Событие: Открытие задвижки / включение насоса. ЭФ: Диагностика сигналов.Выходные"
+        )
+        _apply_allure_markers(
+            config.output_signals_switch_on_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.output_signals_switch_on_test.offset} мин.\n"
+                "Подписка на сообщения типа: OutputSignalsInfo\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}\n "
+            ),
+        )
+        await scenarios.stationary_status_in_output_signals(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_output_signals_stationary_after_switch_on(
+        self, ws_client: WebSocketClient, config: StationaryStatusConfig
+    ) -> None:
+        """
+        [OutputSignalsInfo] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Схема.
+        Стационар после открытия задвижки / включения насоса
+        """
+        test_data = config.status_stationary_test_data
+        expected_stationary_status, _ = test_data.expected_result
+        tag = "OutputSignalsInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text}. "
+            "Стационар после открытия задвижки / включения насоса. ЭФ: Диагностика сигналов.Выходные"
+        )
+        _apply_allure_markers(
+            config.output_signals_stationary_after_switch_on_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.output_signals_stationary_after_switch_on_test.offset} мин.\n"
+                "Подписка на сообщения типа: OutputSignalsInfo\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}\n "
+            ),
+        )
+        await scenarios.stationary_status_in_output_signals(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_output_signals_switch_off(self, ws_client: WebSocketClient, config: StationaryStatusConfig) -> None:
+        """
+        [OutputSignalsInfo] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Схема.
+        Событие: Закрытие задвижки / выключение насоса
+        """
+        test_data = config.status_unstationary_switch_test_data
+        expected_stationary_status, _ = test_data.expected_result
+        tag = "OutputSignalsInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text}. "
+            "Событие: Закрытие задвижки / выключение насоса. ЭФ: Диагностика сигналов.Выходные"
+        )
+        _apply_allure_markers(
+            config.output_signals_switch_off_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.output_signals_switch_off_test.offset} мин.\n"
+                "Подписка на сообщения типа: OutputSignalsInfo\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}\n "
+            ),
+        )
+        await scenarios.stationary_status_in_output_signals(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_output_signals_stationary_after_switch_off(
+        self, ws_client: WebSocketClient, config: StationaryStatusConfig
+    ) -> None:
+        """
+        [OutputSignalsInfo] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Схема.
+        Стационар после закрытия задвижки / выключения насоса
+        """
+        test_data = config.status_stationary_test_data
+        expected_stationary_status, _ = test_data.expected_result
+        tag = "OutputSignalsInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status.report_text}. "
+            "Стационар после закрытия задвижки / выключения насоса. ЭФ: Диагностика сигналов.Выходные"
+        )
+        _apply_allure_markers(
+            config.output_signals_stationary_after_switch_off_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.output_signals_stationary_after_switch_off_test.offset} мин.\n"
+                "Подписка на сообщения типа: OutputSignalsInfo\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status.report_text}\n "
+            ),
+        )
+        await scenarios.stationary_status_in_output_signals(ws_client, config, test_data)
+
+    def test_journal_cold_start(self, http_client: StandHttpClient, config: StationaryStatusConfig) -> None:
+        """
+        [MessagesInfo] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Журнал.
+        Нестационар по причине Одновременный «холодный» запуск нескольких серверов СОУ
+        """
+        test_data = config.journal_unstationary_cold_start_test_data
         expected_stationary_status, expected_stationary_status_reasons = test_data.expected_result
         tag = "MessagesInfo"
         title = (
@@ -129,17 +615,164 @@ class TestSuiteScenarios:
         )
 
         _apply_allure_markers(
-            config.stationary_status_in_journal_test,
+            config.journal_cold_start_test,
             tag,
             title,
             (
                 f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
                 f"на технологическом участке {config.tu_name}\n"
-                f"Время проведения проверки : {config.stationary_status_in_journal_test.offset} мин.\n"
+                f"Время проведения проверки : {config.journal_cold_start_test.offset} мин.\n"
                 "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=PUMPING_STATUS\n"
-                f"Ожидаемый режим работы СОУ: {expected_stationary_status}\n "
-                f"Ожидаемая причина режима работы СОУ: {expected_stationary_status_reasons}"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status}\n "
+                f"Ожидаемая причина режима работы МТ: {expected_stationary_status_reasons}"
             ),
         )
-        scenarios.stationary_status_in_journal(http_client, config, test_data)
-        
+        scenarios.stationary_status_journal(http_client, config, test_data)
+
+    def test_journal_stationary_after_cold(self, http_client: StandHttpClient, config: StationaryStatusConfig) -> None:
+        """
+        [MessagesInfo] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Журнал.
+        Стационар после холодного старта
+        """
+        test_data = config.journal_stationary_test_data
+        expected_stationary_status, expected_stationary_status_reasons = test_data.expected_result
+        tag = "MessagesInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status},"
+            f" по причине: {expected_stationary_status_reasons}. ЭФ: Журнал. Реальное время"
+        )
+
+        _apply_allure_markers(
+            config.journal_stationary_after_cold_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.journal_stationary_after_cold_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=PUMPING_STATUS\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status}\n "
+                f"Ожидаемая причина режима работы МТ: {expected_stationary_status_reasons}"
+            ),
+        )
+        scenarios.stationary_status_journal(http_client, config, test_data)
+
+    def test_journal_switch_on(self, http_client: StandHttpClient, config: StationaryStatusConfig) -> None:
+        """
+        [MessagesInfo] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Журнал.
+        Открытие задвижки / включение насоса
+        """
+        test_data = config.journal_unstationary_switch_test_data
+        expected_stationary_status, expected_stationary_status_reasons = test_data.expected_result
+        tag = "MessagesInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status},"
+            f" по причине: {expected_stationary_status_reasons}. "
+            "Событие: Открытие задвижки / включение насоса. ЭФ: Журнал. Реальное время"
+        )
+
+        _apply_allure_markers(
+            config.journal_switch_on_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.journal_switch_on_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=PUMPING_STATUS\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status}\n "
+                f"Ожидаемая причина режима работы МТ: {expected_stationary_status_reasons}"
+            ),
+        )
+        scenarios.stationary_status_journal(http_client, config, test_data)
+
+    def test_journal_stationary_after_switch_on(
+        self, http_client: StandHttpClient, config: StationaryStatusConfig
+    ) -> None:
+        """
+        [MessagesInfo] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Журнал.
+        Стационар после открытия задвижки / включения насоса
+        """
+        test_data = config.journal_stationary_test_data
+        expected_stationary_status, expected_stationary_status_reasons = test_data.expected_result
+        tag = "MessagesInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status},"
+            f" по причине: {expected_stationary_status_reasons}. Стационар после открытия задвижки / включения насоса. "
+            "ЭФ: Журнал. Реальное время"
+        )
+
+        _apply_allure_markers(
+            config.journal_stationary_after_switch_on_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.journal_stationary_after_switch_on_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=PUMPING_STATUS\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status}\n "
+                f"Ожидаемая причина режима работы МТ: {expected_stationary_status_reasons}"
+            ),
+        )
+        scenarios.stationary_status_journal(http_client, config, test_data)
+
+    def test_journal_switch_off(self, http_client: StandHttpClient, config: StationaryStatusConfig) -> None:
+        """
+        [MessagesInfo] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Журнал.
+        Событие: Закрытие задвижки / выключение насоса
+        """
+        test_data = config.journal_unstationary_switch_test_data
+        expected_stationary_status, expected_stationary_status_reasons = test_data.expected_result
+        tag = "MessagesInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status},"
+            f" по причине: {expected_stationary_status_reasons}. "
+            "Событие: Закрытие задвижки / выключение насоса. ЭФ: Журнал. Реальное время"
+        )
+
+        _apply_allure_markers(
+            config.journal_switch_off_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.journal_switch_off_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=PUMPING_STATUS\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status}\n "
+                f"Ожидаемая причина режима работы МТ: {expected_stationary_status_reasons}"
+            ),
+        )
+        scenarios.stationary_status_journal(http_client, config, test_data)
+
+    def test_journal_stationary_after_switch_off(
+        self, http_client: StandHttpClient, config: StationaryStatusConfig
+    ) -> None:
+        """
+        [MessagesInfo] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Журнал.
+        Стационар после закрытия задвижки / выключения насоса
+        """
+        test_data = config.journal_stationary_test_data
+        expected_stationary_status, expected_stationary_status_reasons = test_data.expected_result
+        tag = "MessagesInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status},"
+            f" по причине: {expected_stationary_status_reasons}. "
+            "Стационар после закрытия задвижки / выключения насоса. ЭФ: Журнал. Реальное время"
+        )
+
+        _apply_allure_markers(
+            config.journal_stationary_after_switch_off_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки : {config.journal_stationary_after_switch_off_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=PUMPING_STATUS\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status}\n "
+                f"Ожидаемая причина режима работы МТ: {expected_stationary_status_reasons}"
+            ),
+        )
+        scenarios.stationary_status_journal(http_client, config, test_data)

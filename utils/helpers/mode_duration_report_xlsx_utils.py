@@ -102,31 +102,19 @@ def parse_duration_seconds(value: object) -> Optional[int]:
     if isinstance(value, timedelta):
         return int(value.total_seconds())
     if isinstance(value, time):
-        return (
-            value.hour * TestConst.SECONDS_PER_HOUR
-            + value.minute * TestConst.SEC_PER_MIN
-            + value.second
-        )
+        return value.hour * TestConst.SECONDS_PER_HOUR + value.minute * TestConst.SEC_PER_MIN + value.second
     if isinstance(value, datetime):
-        return (
-            value.hour * TestConst.SECONDS_PER_HOUR
-            + value.minute * TestConst.SEC_PER_MIN
-            + value.second
-        )
+        return value.hour * TestConst.SECONDS_PER_HOUR + value.minute * TestConst.SEC_PER_MIN + value.second
 
     duration_text = _stringify_cell(value).strip()
     if not duration_text:
         return None
-
-    parts = duration_text.split(":")
+    duration_text_no_microseconds = duration_text.split(".")[0]
+    parts = duration_text_no_microseconds.split(":")
     try:
         if len(parts) == _DURATION_PARTS_H_MM_SS:
             hours, minutes, seconds = (int(part) for part in parts)
-            return (
-                hours * TestConst.SECONDS_PER_HOUR
-                + minutes * TestConst.SEC_PER_MIN
-                + seconds
-            )
+            return hours * TestConst.SECONDS_PER_HOUR + minutes * TestConst.SEC_PER_MIN + seconds
         if len(parts) == _DURATION_PARTS_MM_SS:
             minutes, seconds = (int(part) for part in parts)
             return minutes * TestConst.SEC_PER_MIN + seconds
@@ -173,9 +161,7 @@ def find_total_work_duration(
             if column_index + 1 < len(row_values):
                 duration_candidates.append(row_values[column_index + 1])
             if row_index + 1 <= worksheet.max_row:
-                duration_candidates.append(
-                    worksheet.cell(row=row_index + 1, column=column_index + 1).value
-                )
+                duration_candidates.append(worksheet.cell(row=row_index + 1, column=column_index + 1).value)
 
             for candidate in duration_candidates:
                 duration_seconds = parse_duration_seconds(candidate)
@@ -255,8 +241,7 @@ def format_mode_duration_section_rows_for_allure(
     lines = []
     for row in section_rows:
         durations_text = ", ".join(
-            f"{column}={format_duration_seconds(seconds)}"
-            for column, seconds in row.mode_durations_seconds.items()
+            f"{column}={format_duration_seconds(seconds)}" for column, seconds in row.mode_durations_seconds.items()
         )
         lines.append(
             f"row#{row.row_index}: {row.section_name} | sum={format_duration_seconds(row.modes_sum_seconds)} | "

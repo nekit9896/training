@@ -75,7 +75,7 @@ def get_token(max_retries: int = 12, backoff: float = 5.0, force_refresh: bool =
     """
     Получает JWT access token из Keycloak с повторными попытками.
 
-    max_retries: сколько всего попыток (включая первую)
+    max_retries: сколько всего попыток
     backoff: время в секундах между попытками
     force_refresh: принудительно запросить новый token в Keycloak
     """
@@ -117,7 +117,7 @@ def clear_suite_auth(group_state: dict) -> None:
     group_state["auth_suite"] = None
 
 
-def _fetch_x_user_id(http_client: StandHttpClient, max_retries: int = 5, backoff: float = 5.0) -> str:
+def _fetch_x_user_id(http_client: StandHttpClient, max_retries: int = 12, backoff: float = 5.0) -> str:
     """
     Запрашивает x-user-id через POST /apigateway/Ping с повторными попытками.
     Значение нужно для параметра xUserId= в URL WebSocket-подключения.

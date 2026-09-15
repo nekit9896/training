@@ -876,13 +876,13 @@ class TestSuiteScenarios:
     ) -> None:
         """
         [CommonScheme] Проверка режима работы СОУ: Неисправна
-        Причина: Отсутствие минимального количества СИ Расхода
+        Причина: Недостоверность граничного СИ расхода
         """
 
         tag = "CommonScheme"
         title = (
             f"[{tag}] Проверка режима работы СОУ: 'Неисправна', "
-            "по причине: 'Отсутствие минимального количества СИ Расхода'. ЭФ: Схема"
+            "по причине: 'Недостоверность граничного СИ расхода'. ЭФ: Схема"
         )
         _apply_allure_markers(
             config.faulty_absence_min_flow_meters_test,
@@ -895,11 +895,7 @@ class TestSuiteScenarios:
                 f"{config.faulty_absence_min_flow_meters_test.offset} мин.\n"
                 "Подписка на сообщения типа: CommonScheme\n"
                 "Ожидаемый режим работы СОУ: Неисправна\n "
-                "Ожидаемая причина режима работы СОУ: При одновременном выполнении следующих условий:"
-                "- отсутствие достоверных показаний граничного на диагностическом участке СИ расхода (кроме "
-                "отсеченных от рассматриваемого участка СИ расхода для трубопровода в режиме остановленной перекачки);"
-                "- отсутствие смежного с данным СИ расхода диагностического участка "
-                "с достоверными показаниями СИ расхода"
+                "Ожидаемая причина режима работы СОУ: Недостоверность граничного СИ расхода"
             ),
         )
         test_data = config.faulty_absence_min_flow_meters_test_data
@@ -911,14 +907,14 @@ class TestSuiteScenarios:
     ) -> None:
         """
         [CommonScheme] Проверка режима работы СОУ: Неисправна
-        Причина: Отсутствие минимального количества СИ Расхода
+        Причина:Недостоверность граничного СИ расхода
         После устранения причины неисправности
         """
 
         tag = "CommonScheme"
         title = (
             f"[{tag}] Проверка режима работы СОУ: 'Неисправна', "
-            "по причине: 'Отсутствие минимального количества СИ Расхода'. "
+            "по причине: 'Недостоверность граничного СИ расхода'. "
             "После устранения причины неисправности. ЭФ: Схема"
         )
         _apply_allure_markers(
@@ -933,11 +929,7 @@ class TestSuiteScenarios:
                 "После устранения причины неисправности (Заменяет Инициализацию при непродолжительной неисправности)\n"
                 "Подписка на сообщения типа: CommonScheme\n"
                 "Ожидаемый режим работы СОУ: Неисправна\n "
-                "Ожидаемая причина режима работы СОУ: При одновременном выполнении следующих условий:"
-                "- отсутствие достоверных показаний граничного на диагностическом участке СИ расхода (кроме "
-                "отсеченных от рассматриваемого участка СИ расхода для трубопровода в режиме остановленной перекачки);"
-                "- отсутствие смежного с данным СИ расхода диагностического участка "
-                "с достоверными показаниями СИ расхода"
+                "Ожидаемая причина режима работы СОУ: Недостоверность граничного СИ расхода"
             ),
         )
         test_data = config.faulty_absence_min_flow_meters_test_data
@@ -1276,4 +1268,432 @@ class TestSuiteScenarios:
             ),
         )
         test_data = config.faulty_absence_min_pressure_sensors_in_journal_test_data
+        scenarios.lds_status_in_journal(http_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_degradation_temperature_du_2_in_journal(
+        self,
+        http_client: StandHttpClient,
+        config: LDSStatusConfig,
+    ) -> None:
+        """
+        [MessagesInfo] Проверка режима работы СОУ в журнале: Ухудшение
+        Причина: Отказ СИ температуры
+        """
+        tag = "MessagesInfo"
+        title = f"[{tag}] ЭФ Журнал. Режим СОУ: Ухудшение.\n" "Причина: 'Отказ СИ температуры'.\n" "ДУ 2."
+
+        _apply_allure_markers(
+            config.degradation_temperature_du_2_in_journal_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                "Время проведения проверки : "
+                f"{config.degradation_temperature_du_2_in_journal_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
+                "Ожидаемый режим работы СОУ: Ухудшение\n "
+                "Ожидаемая причина режима работы СОУ: Отказ СИ температуры.\n"
+                "ДУ Тихорецкая-Нововеличковская."
+            ),
+        )
+        test_data = config.degradation_temperature_du_2_in_journal_test_data
+        scenarios.lds_status_in_journal(http_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_degradation_density_du_2_in_journal(
+        self,
+        http_client: StandHttpClient,
+        config: LDSStatusConfig,
+    ) -> None:
+        """
+        [MessagesInfo] Проверка режима работы СОУ в журнале: Ухудшение
+        Причина: Отказ СИ плотности
+        """
+        tag = "MessagesInfo"
+        title = f"[{tag}] ЭФ Журнал. Режим СОУ: Ухудшение.\n" "Причина: Отказ СИ плотности.\n" "ДУ 2."
+
+        _apply_allure_markers(
+            config.degradation_density_du_2_in_journal_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                "Время проведения проверки : "
+                f"{config.degradation_density_du_2_in_journal_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
+                "Ожидаемый режим работы СОУ: Ухудшение\n "
+                "Ожидаемая причина режима работы СОУ: Отказ СИ плотности.\n"
+                "ДУ 2."
+            ),
+        )
+        test_data = config.degradation_density_du_2_in_journal_test_data
+        scenarios.lds_status_in_journal(http_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_degradation_viscosity_du_2_in_journal(
+        self,
+        http_client: StandHttpClient,
+        config: LDSStatusConfig,
+    ) -> None:
+        """
+        [MessagesInfo] Проверка режима работы СОУ в журнале: Ухудшение
+        Причина: Отказ СИ вязкости
+        """
+        tag = "MessagesInfo"
+        title = f"[{tag}] ЭФ Журнал. Режим СОУ: Ухудшение.\n" "Причина: Отказ СИ вязкости.\n" "ДУ 2."
+
+        _apply_allure_markers(
+            config.degradation_viscosity_du_2_in_journal_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                "Время проведения проверки : "
+                f"{config.degradation_viscosity_du_2_in_journal_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
+                "Ожидаемый режим работы СОУ: Ухудшение\n "
+                "Ожидаемая причина режима работы СОУ: Отказ СИ вязкости.\n"
+                "ДУ Тихорецкая-Нововеличковская."
+            ),
+        )
+        test_data = config.degradation_viscosity_du_2_in_journal_test_data
+        scenarios.lds_status_in_journal(http_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_degradation_temperature_du_3_in_journal(
+        self,
+        http_client: StandHttpClient,
+        config: LDSStatusConfig,
+    ) -> None:
+        """
+        [MessagesInfo] Проверка режима работы СОУ в журнале: Ухудшение
+        Причина: Отказ СИ температуры
+        """
+        tag = "MessagesInfo"
+        title = f"[{tag}] ЭФ Журнал. Режим СОУ: Ухудшение.\n" "Причина: Отказ СИ температуры.\n" "ДУ 3."
+
+        _apply_allure_markers(
+            config.degradation_temperature_du_3_in_journal_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                "Время проведения проверки : "
+                f"{config.degradation_temperature_du_3_in_journal_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
+                "Ожидаемый режим работы СОУ: Ухудшение\n "
+                "Ожидаемая причина режима работы СОУ: Отказ СИ температуры.\n"
+                "ДУ Нововеличковская-Крымская."
+            ),
+        )
+        test_data = config.degradation_temperature_sensor_du_3_in_journal_test_data
+        scenarios.lds_status_in_journal(http_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_degradation_density_du_3_in_journal(
+        self,
+        http_client: StandHttpClient,
+        config: LDSStatusConfig,
+    ) -> None:
+        """
+        [MessagesInfo] Проверка режима работы СОУ в журнале: Ухудшение
+        Причина: Отказ СИ плотности
+        """
+        tag = "MessagesInfo"
+        title = f"[{tag}] ЭФ Журнал. Режим СОУ: Ухудшение.\n" "Причина: Отказ СИ плотности.\n" "ДУ 3."
+
+        _apply_allure_markers(
+            config.degradation_density_du_3_in_journal_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                "Время проведения проверки : "
+                f"{config.degradation_density_du_3_in_journal_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
+                "Ожидаемый режим работы СОУ: Ухудшение\n "
+                "Ожидаемая причина режима работы СОУ: Отказ СИ плотности.\n"
+                "ДУ Нововеличковская-Крымская."
+            ),
+        )
+        test_data = config.degradation_density_du_3_in_journal_test_data
+        scenarios.lds_status_in_journal(http_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_degradation_viscosity_du_3_in_journal(
+        self,
+        http_client: StandHttpClient,
+        config: LDSStatusConfig,
+    ) -> None:
+        """
+        [MessagesInfo] Проверка режима работы СОУ в журнале: Ухудшение
+        Причина: Отказ СИ вязкости
+        """
+        tag = "MessagesInfo"
+        title = f"[{tag}] ЭФ Журнал. Режим СОУ: Ухудшение.\n" "Причина: Отказ СИ вязкости.\n" "ДУ 3."
+
+        _apply_allure_markers(
+            config.degradation_viscosity_du_3_in_journal_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                "Время проведения проверки : "
+                f"{config.degradation_viscosity_du_3_in_journal_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
+                "Ожидаемый режим работы СОУ: Ухудшение\n "
+                "Ожидаемая причина режима работы СОУ: Отказ СИ вязкости.\n"
+                "ДУ Нововеличковская-Крымская."
+            ),
+        )
+        test_data = config.degradation_viscosity_du_3_in_journal_test_data
+        scenarios.lds_status_in_journal(http_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_between_si_pressure_more_50_km_in_journal(
+        self,
+        http_client: StandHttpClient,
+        config: LDSStatusConfig,
+    ) -> None:
+        """
+        [MessagesInfo] Проверка режима работы СОУ в журнале: Ухудшение
+        Причина:'Расстояние между ближайшими исправными СИ давления на пути перекачки более 50 км',
+        """
+        tag = "MessagesInfo"
+        title = (
+            f"[{tag}] ЭФ Журнал. Режим СОУ: Ухудшение.\n"
+            f"Причина: Расстояние между ближайшими исправными СИ давления на пути перекачки более 50 км"
+        )
+
+        _apply_allure_markers(
+            config.between_si_pressure_more_50_km_in_journal_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                "Время проведения проверки : "
+                f"{config.between_si_pressure_more_50_km_in_journal_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
+                "Ожидаемый режим работы СОУ: Ухудшение\n "
+                "Ожидаемая причина режима работы СОУ: "
+                "Расстояние между ближайшими исправными СИ давления на пути перекачки более 50 км"
+            ),
+        )
+        test_data = config.between_si_pressure_more_50_km_in_journal_test_data
+        scenarios.lds_status_in_journal(http_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_deg_gravity_section_pumping_in_journal(
+        self,
+        http_client: StandHttpClient,
+        config: LDSStatusConfig,
+    ) -> None:
+        """
+        [MessagesInfo] Проверка режима работы СОУ в журнале: Ухудшение
+        Причина:'Наличие самотечного участка/участка с неполным сечением',
+        """
+        tag = "MessagesInfo"
+        title = (
+            f"[{tag}] ЭФ Журнал. Режим СОУ: Ухудшение.\n"
+            f"Причина: Наличие самотечного участка/участка с неполным сечением"
+        )
+
+        _apply_allure_markers(
+            config.deg_gravity_section_pumping_in_journal_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                "Время проведения проверки : "
+                f"{config.deg_gravity_section_pumping_in_journal_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
+                "Ожидаемый режим работы СОУ: Ухудшение\n "
+                "Ожидаемая причина режима работы СОУ: Наличие самотечного участка/участка с неполным сечением"
+            ),
+        )
+        test_data = config.deg_gravity_section_pumping_in_journal_test_data
+        scenarios.lds_status_in_journal(http_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_deg_absence_min_pressure_sensors_in_journal(
+        self,
+        http_client: StandHttpClient,
+        config: LDSStatusConfig,
+    ) -> None:
+        """
+        [MessagesInfo] Проверка режима работы СОУ в журнале: Ухудшение
+        Причина: Менее 4-х исправных СИ давления,
+        """
+        tag = "MessagesInfo"
+        title = f"[{tag}] ЭФ Журнал. Режим СОУ: Ухудшение.\n" f"Причина: Менее 4-х исправных СИ давления"
+
+        _apply_allure_markers(
+            config.deg_absence_min_pressure_sensors_in_journal_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                "Время проведения проверки : "
+                f"{config.deg_absence_min_pressure_sensors_in_journal_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
+                "Ожидаемый режим работы СОУ: Ухудшение\n "
+                "Ожидаемая причина режима работы СОУ: Менее 4-х исправных СИ давления"
+            ),
+        )
+        test_data = config.deg_absence_min_pressure_sensors_in_journal_test_data
+        scenarios.lds_status_in_journal(http_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_deg_starting_pumping_out_pumps_in_journal(
+        self,
+        http_client: StandHttpClient,
+        config: LDSStatusConfig,
+    ) -> None:
+        """
+        [MessagesInfo] Проверка режима работы СОУ в журнале: Ухудшение
+        """
+        tag = "MessagesInfo"
+        title = f"[{tag}] ЭФ Журнал. Режим СОУ: Ухудшение.\n" f"Причина: Работа насосов откачки"
+
+        _apply_allure_markers(
+            config.deg_starting_pumping_out_pumps_in_journal_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                "Время проведения проверки : "
+                f"{config.deg_starting_pumping_out_pumps_in_journal_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
+                "Ожидаемый режим работы СОУ: Ухудшение\n "
+                "Ожидаемая причина режима работы СОУ: Работа насосов откачки"
+            ),
+        )
+        test_data = config.deg_starting_pumping_out_pumps_in_journal_test_data
+        scenarios.lds_status_in_journal(http_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_faulty_absence_min_flow_meters_in_journal(
+        self,
+        http_client: StandHttpClient,
+        config: LDSStatusConfig,
+    ) -> None:
+        """
+        [MessagesInfo] Проверка режима работы СОУ в журнале: Ухудшение
+        """
+        tag = "MessagesInfo"
+        title = f"[{tag}] ЭФ Журнал. Режим СОУ: неисправна.\n" f"Причина: Недостоверность граничного СИ расхода "
+
+        _apply_allure_markers(
+            config.faulty_absence_min_flow_meters_in_journal_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                "Время проведения проверки : "
+                f"{config.faulty_absence_min_flow_meters_in_journal_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
+                "Ожидаемый режим работы СОУ: неисправна\n "
+                "Ожидаемая причина режима работы СОУ: Недостоверность граничного СИ расхода "
+            ),
+        )
+        test_data = config.faulty_absence_min_flow_meters_in_journal_test_data
+        scenarios.lds_status_in_journal(http_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_deg_exceeding_distance_between_flow_meters_in_journal(
+        self,
+        http_client: StandHttpClient,
+        config: LDSStatusConfig,
+    ) -> None:
+        """
+        [MessagesInfo] Проверка режима работы СОУ в журнале: Ухудшение
+        """
+        tag = "MessagesInfo"
+        title = f"[{tag}] ЭФ Журнал. Режим СОУ: Ухудшение.\n" f"Причина: Расстояние между СИ расхода более 200 км"
+
+        _apply_allure_markers(
+            config.deg_exceeding_distance_between_flow_meters_in_journal_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                "Время проведения проверки : "
+                f"{config.deg_exceeding_distance_between_flow_meters_in_journal_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
+                "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
+                "Ожидаемая причина режима работы СОУ: Расстояние между СИ расхода более 200 км"
+            ),
+        )
+        test_data = config.deg_exceeding_distance_between_flow_meters_in_journal_test_data
+        scenarios.lds_status_in_journal(http_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_deg_additive_injectors_operation_in_journal(
+        self,
+        http_client: StandHttpClient,
+        config: LDSStatusConfig,
+    ) -> None:
+        """
+        [MessagesInfo] Проверка режима работы СОУ в журнале: Ухудшение
+        """
+        tag = "MessagesInfo"
+        title = f"[{tag}] ЭФ Журнал. Режим СОУ: Ухудшение.\n" f"Причина: Наличие ПТП"
+
+        _apply_allure_markers(
+            config.deg_additive_injectors_operation_in_journal_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                "Время проведения проверки : "
+                f"{config.deg_additive_injectors_operation_in_journal_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
+                "Ожидаемый режим работы СОУ: Ухудшение характеристик.\n "
+                "Ожидаемая причина режима работы СОУ: Наличие ПТП"
+            ),
+        )
+        test_data = config.deg_additive_injectors_operation_in_journal_test_data
+        scenarios.lds_status_in_journal(http_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_deg_pig_sensor_passage_in_journal(
+        self,
+        http_client: StandHttpClient,
+        config: LDSStatusConfig,
+    ) -> None:
+        """
+        [MessagesInfo] Проверка режима работы СОУ в журнале: Ухудшение
+        """
+        tag = "MessagesInfo"
+        title = f"[{tag}] ЭФ Журнал. Режим СОУ: Ухудшение.\n" f"Причина: прохождение СОД"
+
+        _apply_allure_markers(
+            config.deg_pig_sensor_passage_in_journal_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                "Время проведения проверки : "
+                f"{config.deg_pig_sensor_passage_in_journal_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=LDS_STATUS\n"
+                "Ожидаемый режим работы СОУ: Ухудшение характеристик\n "
+                "Ожидаемая причина режима работы СОУ: прохождение СОД "
+            ),
+        )
+        test_data = config.deg_pig_sensor_passage_in_journal_test_data
         scenarios.lds_status_in_journal(http_client, config, test_data)
