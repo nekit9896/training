@@ -7,7 +7,6 @@ Pytest маркеры и allure декораторы применяются в �
 """
 
 import time
-from collections import defaultdict
 from datetime import datetime, timedelta
 
 import allure
@@ -22,7 +21,6 @@ from constants.enums import (
     GravityPipe,
     LdsStatus,
     LeakStatus,
-    MessagePriority,
     MessageType,
     ReplyStatus,
     ReservedType,
@@ -484,111 +482,6 @@ def lds_status_init_in_journal(http_client, cfg: SmokeSuiteConfig | LDSStatusCon
         StepCheck("Проверка messageType", "messageType", soft_failures).actual(lds_msg.messageType).expected(
             TestConst.JOURNAL_MESSAGE_TYPE_LDS_STATUS
         ).equal_to()
-
-
-async def main_page_info(ws_client, cfg: SmokeSuiteConfig):
-    """
-    Проверка установки режима МТ по MainPageInfo, OutputSignalsInfo и CommonSchemeContent.
-    """
-    with allure.step("Подключение по ws, получение и обработка сообщения типа: MainPageInfoContent"):
-        main_page_payload = await t_utils.connect_and_poll_subscribed_msg(
-            ws_client,
-            "MainPageInfoContent",
-            "subscribeMainPageInfoRequest",
-            {'tuIds': [cfg.tu_id], 'additionalProperties': None},
-        )
-        parsed_main_page = parser.parse_main_page_msg(main_page_payload)
-
-    with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
-        common_scheme_payload = await t_utils.connect_and_poll_subscribed_msg(
-            ws_client,
-            "CommonSchemeContent",
-            "SubscribeCommonSchemeRequest",
-            {'tuId': cfg.tu_id, 'additionalProperties': None},
-        )
-        parsed_common_scheme = parser.parse_common_scheme_info_msg(common_scheme_payload)
-
-    with allure.step("Извлечение и подготовка данных для проверки"):
-        tu_info = getattr(parsed_main_page.replyContent, 'tuInfo', None)
-        StepCheck("Проверка наличия данных по ТУ (ЭФ Состояние МТ)", "tuInfo").actual(
-            tu_info is not None
-        ).is_true_with_details(
-            expected_text="tuInfo присутствует",
-            actual_text="tuInfo присутствует" if tu_info is not None else "tuInfo отсутствует",
-        )
-        if tu_info is not None:
-            allure.attach(
-                str(tu_info),
-                name="MainPageInfo: tuInfo",
-                attachment_type=allure.attachment_type.TEXT,
-            )
-        main_pipeline_stationary_status = (
-            StationaryStatus(tu_info.stationaryStatus) if tu_info and tu_info.stationaryStatus else None
-        )
-
-        flow_areas = t_utils.filter_flow_areas_with_available_flow(
-            getattr(parsed_common_scheme.replyContent, 'flowAreas', [])
-        )
-        StepCheck(
-            "Проверка наличия участков карты течения с доступным течением CommonSchemeContent (ЭФ Схема)", "flowAreas"
-        ).actual(flow_areas).is_not_empty()
-        longest_flow_area = t_utils.get_longest_flow_area_by_pipes(flow_areas)
-        StepCheck(
-            "Проверка наличия самого длинного пути течения CommonSchemeContent (ЭФ Схема)", "longest_flow_area"
-        ).actual(longest_flow_area is not None).is_true_with_details(
-            expected_text="longest_flow_area определён",
-            actual_text=(
-                "longest_flow_area определён" if longest_flow_area is not None else "longest_flow_area не определён"
-            ),
-        )
-        if longest_flow_area is not None:
-            allure.attach(
-                str(longest_flow_area),
-                name="CommonSchemeContent: самый длинный путь течения (ЭФ Схема)",
-                attachment_type=allure.attachment_type.TEXT,
-            )
-        diagnostic_areas = getattr(longest_flow_area, 'diagnosticAreas', [])
-        StepCheck(
-            "Проверка наличия данных диагностических участков CommonSchemeContent (ЭФ Схема)", "diagnosticAreas"
-        ).actual(diagnostic_areas).is_not_empty()
-
-        common_scheme_stationary_statuses = []
-        common_scheme_details = []
-        for diagnostic_area in diagnostic_areas:
-            stationary_status_int = getattr(diagnostic_area, 'stationaryStatus', None)
-            if stationary_status_int is None:
-                continue
-            stationary_status = StationaryStatus(stationary_status_int)
-            common_scheme_stationary_statuses.append(stationary_status)
-            common_scheme_details.append(f"{t_utils.diagnostic_area_title(diagnostic_area.id)}: {stationary_status}")
-        StepCheck(
-            "Проверка наличия режимов МТ на ДУ в CommonSchemeContent (ЭФ Схема)",
-            "stationaryStatus",
-        ).actual(common_scheme_stationary_statuses).is_not_empty()
-        common_scheme_majority = t_utils.determine_stationary_status_by_majority(common_scheme_stationary_statuses)
-        if common_scheme_details:
-            allure.attach(
-                "\n".join(common_scheme_details),
-                name="CommonSchemeContent: режимы МТ на ДУ (ЭФ Схема)",
-                attachment_type=allure.attachment_type.TEXT,
-            )
-
-    with allure.step("Проверка режима работы МТ на ЭФ: Состояние МТ, Схема, Выходные сигналы"):
-        with SoftAssertions() as soft_failures:
-            StepCheck("Проверка id полученного ТУ MainPageInfo (ЭФ Состояние МТ)", "tu_id", soft_failures).actual(
-                parsed_main_page.replyContent.tuId
-            ).expected(cfg.tu_id).equal_to()
-
-            StepCheck(
-                f"MainPageInfo: режим МТ для ТУ {cfg.tu_name} (ЭФ Состояние МТ)",
-                "stationaryStatus",
-                soft_failures,
-            ).actual(main_pipeline_stationary_status).expected(cfg.expected_stationary_status).equal_to()
-            StepCheck(
-                "CommonSchemeContent: общий режим МТ по большинству базовых ДУ (ЭФ Схема)",
-                "stationaryStatus",
-                soft_failures,
-            ).actual(common_scheme_majority).expected(cfg.expected_stationary_status).equal_to()
 
 
 async def main_page_info_signals(ws_client, cfg: SmokeSuiteConfig):
@@ -3517,118 +3410,6 @@ async def export_lds_status_report(ws_client, http_client, cfg: SmokeSuiteConfig
             StepCheck("В нотификации нет текста ошибки", "errorMessage", soft_failures).actual(
                 notification_error_message
             ).is_empty()
-
-
-def stationary_status_in_journal(http_client, cfg: SmokeSuiteConfig, imitator_start_time, test_data: CaseData):
-    """
-    Проверка записей журнала о режиме мт
-    """
-    if not test_data:
-        pytest.fail("Не заполнены обязательные параметры теста")
-    exp_mode_part_message, exp_reason_part_message, exp_priority_message = test_data.expected_result
-
-    with allure.step("Http запрос сообщений журнала с фильтром messageTypes=PUMPING_STATUS"):
-        end_time = datetime.now()
-        request_body = t_utils.create_journal_req_body(
-            pagination=Pagination(limit=TestConst.LIMIT_CONTROLLED_SITES),
-            filtering=Filtering(messageTypes=int(MessageType.PUMPING_STATUS), objects=FilteringObjects(tuId=cfg.tu_id)),
-        )
-        response = http_client.post_request(HttpConst.GET_MESSAGES_URL_PATH, request_body)
-        payload = t_utils.get_json_from_http_response(response)
-        parsed_payload = parser.parse_journal_msg(payload)
-
-    with allure.step("Извлечение и подготовка данных для проверки"):
-        messages_info = getattr(parsed_payload.replyContent, 'messagesInfo', [])
-        StepCheck("Проверка наличия сообщений в журнале", "messagesInfo").actual(messages_info).is_not_empty()
-
-        filter_start_msk = t_utils.localize_as_moscow(imitator_start_time)
-        filter_end_msk = t_utils.localize_as_moscow(end_time)
-
-        messages_time_filtered = [
-            msg
-            for msg in messages_info
-            if filter_start_msk <= t_utils.ensure_moscow_timezone(msg.time) <= filter_end_msk
-        ]
-        messages_time_filtered.sort(key=lambda msg: t_utils.ensure_moscow_timezone(msg.time), reverse=True)
-
-        # Фильтрация уникальных наименований участков КП-КП
-        control_points_list = []
-
-        for msg in messages_time_filtered:
-            control_points_list.append(msg.controlPoint)
-
-        unique_control_points_list = set(control_points_list)
-        count_unique_control_points = len(unique_control_points_list)
-
-        # Собираю список сообщений с уникальными наименованиями участков КП_КП
-        already_been = set()  # Создание пустого множества для хранения отобранных сообщений
-        filter_messages_with_unique_control_points = []  # пустой список
-
-        for msg in messages_time_filtered:
-            if msg.controlPoint in unique_control_points_list:  # условие1: наименование КП-КП в списке
-                if msg.controlPoint not in already_been:  # условие2: сообщение еще не в already_been
-                    filter_messages_with_unique_control_points.append(
-                        msg
-                    )  # действие1: добавляется сообщение в filter_messages_with_unique_control_points
-                    already_been.add(msg.controlPoint)  # действие2: добавляется КП-КП во множество, для условия 2
-
-        allure.attach(
-            f" Список: {filter_messages_with_unique_control_points}",
-            name="Результат фильтрации сообщений журнала",
-            attachment_type=allure.attachment_type.TEXT,
-        )
-
-        # Создание и наполнение списков сообщений с фильтром по 'event'
-
-        containers = defaultdict(list)
-
-        for msg in filter_messages_with_unique_control_points:
-            event = msg.event
-            if event in (
-                TestConst.JOURNAL_MESSAGE_EVENT_STATIONARY,
-                TestConst.JOURNAL_MESSAGE_EVENT_NOT_STATIONARY,
-                TestConst.JOURNAL_MESSAGE_EVENT_STOP,
-            ):
-                containers[event].append(msg)
-            else:
-                containers["another"].append(msg)
-
-        stationary_status_list = list(containers[TestConst.JOURNAL_MESSAGE_EVENT_STATIONARY])
-        unstationary_status_list = list(containers[TestConst.JOURNAL_MESSAGE_EVENT_NOT_STATIONARY])
-        stopped_status_list = list(containers[TestConst.JOURNAL_MESSAGE_EVENT_STOP])
-        another_event_list = list(containers["another"])
-        most_long_event_list = max(
-            [unstationary_status_list, stationary_status_list, stopped_status_list, another_event_list], key=len
-        )
-
-        first_message = next(iter(most_long_event_list)) if most_long_event_list else None
-        if first_message:
-            priority_message = MessagePriority(first_message.priority) if first_message.priority else None
-            mode_part, reason_part = t_utils.parse_journal_event(getattr(first_message, "event", None))
-        else:
-            priority_message = None
-            mode_part, reason_part = None, None
-
-    with SoftAssertions() as soft_failures:
-        StepCheck(
-            "Проверка результата фильтрации сообщений о режиме МТ",
-            "Кол-во сообщений о режиме МТ с уникальными наименованиями участков КП-КП",
-            soft_failures,
-        ).actual(count_unique_control_points).expected(TestConst.COUNT_CONTROLLED_SITES).equal_to()
-        StepCheck(
-            "Проверка режима МТ на ЛЧ в наибольшей области связности.",
-            "Режим МТ",
-            soft_failures,
-        ).actual(
-            mode_part
-        ).expected(exp_mode_part_message).equal_to()
-        if reason_part:
-            StepCheck(
-                "Проверка причины режима МТ на ЛЧ в наибольшей области связности.", "Причина режима МТ", soft_failures
-            ).contains(reason_part, exp_reason_part_message)
-        StepCheck("Проверка значимости сообщения", "Важность", soft_failures).actual(priority_message).expected(
-            exp_priority_message
-        ).equal_to()
 
 
 async def export_mt_mode_report(ws_client, http_client, cfg: SmokeSuiteConfig, imitator_start_time: datetime):

@@ -6,6 +6,7 @@ Pytest маркеры и allure декораторы применяются в �
 """
 
 from datetime import datetime
+from typing import Any
 
 import allure
 import pytest
@@ -20,12 +21,36 @@ from utils.helpers.asserts import SoftAssertions, StepCheck
 from utils.helpers.ws_message_parser import ws_message_parser as parser
 
 
+def _unpack_stationary_status_test_data(
+    test_data: CaseData, require_control_points: bool = False
+) -> tuple[Any, Any, list[str]]:
+    """
+    Проверяет и распаковывает конфигурацию теста режима МТ.
+    """
+    if not test_data or not test_data.expected_result:
+        pytest.fail("Не заполнены данные для теста режима МТ")
+
+    try:
+        expected_stationary_status, expected_stationary_status_reasons = test_data.expected_result
+    except (TypeError, ValueError) as error:
+        pytest.fail(
+            "Данные режима МТ должны содержать пару: "
+            f"(ожидаемый режим, ожидаемая причина). Получено: {test_data.expected_result}. Ошибка: {error}"
+        )
+
+    control_points = (test_data.params or {}).get(TestConst.CONTROL_POINTS_KEY, [])
+    if require_control_points and not control_points:
+        pytest.fail(f"Не заполнены обязательные параметры для теста: {TestConst.CONTROL_POINTS_KEY}")
+
+    return expected_stationary_status, expected_stationary_status_reasons, control_points
+
+
 async def stationary_status_common_scheme(ws_client, cfg: BaseSuiteConfig, test_data: CaseData):
     """
     Проверка режима работы и причины режима МТ в сообщении CommonSchemeContent
     """
     # Распаковка данных для теста
-    expected_stationary_status, expected_stationary_status_reasons = test_data.expected_result
+    expected_stationary_status, expected_stationary_status_reasons, _ = _unpack_stationary_status_test_data(test_data)
     with allure.step("Подключение по ws, получение и обработка сообщения типа: CommonSchemeContent"):
         payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
@@ -101,7 +126,7 @@ async def stationary_status_main_page_info(ws_client, cfg: BaseSuiteConfig, test
     """
     Проверка установки режима МТ в сообщении MainPageInfoContent
     """
-    expected_stationary_status, _ = test_data.expected_result
+    expected_stationary_status, _, _ = _unpack_stationary_status_test_data(test_data)
     with allure.step("Подключение по ws, получение и обработка сообщения типа: MainPageInfoContent"):
         payload = await t_utils.connect_and_poll_subscribed_msg(
             ws_client,
@@ -136,12 +161,15 @@ async def stationary_status_in_output_signals(ws_client, cfg: BaseSuiteConfig, t
     Проверка установки режима МТ в сообщении OutputSignalsInfo
     """
     # Распаковка тестовых данных
-    if not test_data:
-        pytest.fail("Не заполнены данные для теста")
-    control_points = test_data.params.get(TestConst.CONTROL_POINTS_KEY, [])
-    if not control_points:
-        pytest.fail(f"Не заполнены обязательные параметры для теста: {TestConst.CONTROL_POINTS_KEY}")
-    expected_stationary_status, _ = test_data.expected_result
+    expected_stationary_status, _, control_points = _unpack_stationary_status_test_data(
+        test_data, require_control_points=True
+    )
+    unknown_control_points = [name for name in control_points if name not in TestConst.CONTROLLED_SITE_SEGMENTS]
+    if unknown_control_points:
+        pytest.fail(
+            "Для контрольных участков не найдены controlledSiteId/segmentId "
+            f"в конфигурации стенда: {unknown_control_points}"
+        )
     # получает часть словаря для всего списка controlled_sites_names
     controlled_sites_dict = {
         name: TestConst.CONTROLLED_SITE_SEGMENTS[name]
@@ -209,13 +237,9 @@ def stationary_status_journal(http_client, cfg: BaseSuiteConfig, test_data: Case
     Проверка наличия записи в журнале о режиме МТ.
     """
     # Распаковка данных для теста
-    if not test_data:
-        pytest.fail("Не заполнены данные для теста")
-    control_points = test_data.params.get(TestConst.CONTROL_POINTS_KEY, [])
-    if isinstance(test_data.expected_result, tuple):
-        expected_stationary_status, expected_stationary_status_reasons = test_data.expected_result
-    else:
-        expected_stationary_status, expected_stationary_status_reasons = test_data.expected_result, None
+    expected_stationary_status, expected_stationary_status_reasons, control_points = (
+        _unpack_stationary_status_test_data(test_data, require_control_points=True)
+    )
 
     with allure.step("Http запрос сообщений журнала с фильтром messageTypes=PUMPING_STATUS"):
         end_time = datetime.now()

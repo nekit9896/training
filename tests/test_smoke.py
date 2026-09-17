@@ -28,6 +28,7 @@ from test_config.datasets import ALL_SMOKE_CONFIGS
 from test_config.models_for_tests import CaseMarkers, LeakTestConfig, SmokeSuiteConfig
 from test_scenarios import lds_status_scenarios
 from test_scenarios import smoke_scenarios as scenarios
+from test_scenarios import stationary_status_scenarios as stationary_scenarios
 
 # ===== ГЕНЕРАЦИЯ ПАРАМЕТРОВ =====
 
@@ -199,25 +200,85 @@ class TestSuiteScenarios:
         _apply_allure_markers(config.lds_status_init_in_journal_test, tag, title, description)
         scenarios.lds_status_init_in_journal(http_client, config, imitator_start_time)
 
-    @pytest.mark.skip("Включить после выполнения LDS-15408")
     @pytest.mark.asyncio
-    async def test_main_page_info(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
-        """[MainPageInfo] Проверка установки режима МТ"""
-        tag = "MainPageInfo"
-        title = f"[{tag}] Проверка установки режима работы МТ: стационарный. ЭФ: Главная страница.Контент таблица по ТУ"
+    async def test_stationary_status_common_scheme(
+        self, ws_client: WebSocketClient, config: SmokeSuiteConfig
+    ) -> None:
+        """[CommonScheme] Проверка режима работы и причины режима работы МТ на ЭФ: Схема"""
+        test_data = config.stationary_status_test_data
+        expected_stationary_status, expected_stationary_status_reasons = (
+            (test_data.expected_result if test_data else (None, None))
+        )
+        tag = "CommonScheme"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status},"
+            f" по причине: {expected_stationary_status_reasons}. ЭФ: Схема"
+        )
         _apply_allure_markers(
-            config.main_page_info_test,
+            config.stationary_status_common_scheme_test,
             tag,
             title,
             (
-                f"Проверка установки режима работы МТ: стационарный на данных {config.suite_name}, \n"
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
                 f"на технологическом участке {config.tu_name}\n"
-                f"Время проведения проверки: {config.main_page_info_test.offset} мин.\n"
-                "Подписка на сообщения типа: MainPageInfo\n"
-                "Ожидаемый режим работы МТ: Стационарный"
+                f"Время проведения проверки: {config.stationary_status_common_scheme_test.offset} мин.\n"
+                "Подписка на сообщения типа: CommonSchemeContent\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status}\n "
+                f"Ожидаемая причина режима работы МТ: {expected_stationary_status_reasons}"
             ),
         )
-        await scenarios.main_page_info(ws_client, config)
+        await stationary_scenarios.stationary_status_common_scheme(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_stationary_status_main_page_info(
+        self, ws_client: WebSocketClient, config: SmokeSuiteConfig
+    ) -> None:
+        """[MainPageInfo] Проверка установки режима работы МТ. ЭФ: Главная страница. Контент таблицы с ТУ"""
+        test_data = config.stationary_status_test_data
+        expected_stationary_status, expected_stationary_status_reasons = (
+            (test_data.expected_result if test_data else (None, None))
+        )
+        tag = "MainPageInfo"
+        title = f"[{tag}] Проверка установки режима работы МТ: {expected_stationary_status}. " \
+            "ЭФ: Главная страница. Контент таблицы с ТУ"
+        _apply_allure_markers(
+            config.stationary_status_main_page_info_test,
+            tag,
+            title,
+            (
+                f"Проверка установки режима работы МТ на данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки: {config.stationary_status_main_page_info_test.offset} мин.\n"
+                "Подписка на сообщения типа: MainPageInfoContent\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status}"
+            ),
+        )
+        await stationary_scenarios.stationary_status_main_page_info(ws_client, config, test_data)
+
+    @pytest.mark.asyncio
+    async def test_stationary_status_in_output_signals(
+        self, ws_client: WebSocketClient, config: SmokeSuiteConfig
+    ) -> None:
+        """[OutputSignalsInfo] Проверка установки режима работы МТ. ЭФ: Диагностика сигналов. Выходные сигналы"""
+        test_data = config.stationary_status_test_data
+        expected_stationary_status, expected_stationary_status_reasons = (
+            (test_data.expected_result if test_data else (None, None))
+        )
+        tag = "OutputSignalsInfo"
+        title = f"[{tag}] Проверка режима работы МТ: {expected_stationary_status}. ЭФ: Диагностика сигналов. Выходные сигналы"
+        _apply_allure_markers(
+            config.stationary_status_in_output_signals_test,
+            tag,
+            title,
+            (
+                f"Проверка режима работы МТ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки: {config.stationary_status_in_output_signals_test.offset} мин.\n"
+                "Подписка на сообщения типа: OutputSignalsInfo\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status}\n "
+            ),
+        )
+        await stationary_scenarios.stationary_status_in_output_signals(ws_client, config, test_data)
 
     @pytest.mark.asyncio
     async def test_main_page_info_signals(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
@@ -449,22 +510,35 @@ class TestSuiteScenarios:
         )
         await scenarios.main_page_info_unstationary(ws_client, config)
 
-    def test_mode_mt_in_journal(
+    def test_stationary_status_journal(
         self,
         http_client: StandHttpClient,
         config: SmokeSuiteConfig,
-        imitator_start_time: datetime,
     ) -> None:
-        """[MessagesInfo] Проверка наличия сообщения о режиме МТ в журнале"""
-        tag = "MessagesInfo"
-        title = f"[{tag}] Проверка сообщений о режиме МТ. ЭФ Журнал."
-        description = (
-            f"Проверка сообщений о режиме МТ на наборе данных {config.suite_name}, \n"
-            f"Время проведения проверки {config.mode_mt_in_journal_test.offset}"
+        """[MessagesInfo] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Журнал. Реальное время"""
+        test_data = config.stationary_status_journal_test_data
+        expected_stationary_status, expected_stationary_status_reasons = (
+            (test_data.expected_result if test_data else (None, None))
         )
-        _apply_allure_markers(config.mode_mt_in_journal_test, tag, title, description)
-        test_data = config.exp_mode_mt_message
-        scenarios.stationary_status_in_journal(http_client, config, imitator_start_time, test_data)
+        tag = "MessagesInfo"
+        title = (
+            f"[{tag}] Проверка режима работы МТ: {expected_stationary_status},"
+            f" по причине: {expected_stationary_status_reasons}. ЭФ: Журнал. Реальное время"
+        )
+        _apply_allure_markers(
+            config.stationary_status_journal_test,
+            tag,
+            title,
+            (
+                f"Проверка записи в журнале о режиме работы СОУ, на наборе данных {config.suite_name}, \n"
+                f"на технологическом участке {config.tu_name}\n"
+                f"Время проведения проверки: {config.stationary_status_journal_test.offset} мин.\n"
+                "Синхронный запрос типа: MessagesInfo с фильтром messageTypes=PUMPING_STATUS\n"
+                f"Ожидаемый режим работы МТ: {expected_stationary_status}\n "
+                f"Ожидаемая причина режима работы МТ: {expected_stationary_status_reasons}"
+            ),
+        )
+        stationary_scenarios.stationary_status_journal(http_client, config, test_data)
 
     @pytest.mark.asyncio
     async def test_export_lds_status_report(

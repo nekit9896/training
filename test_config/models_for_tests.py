@@ -319,13 +319,16 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     technological_section: Optional[str] = None
     imitate_flowmeter_signal_test_data: Optional[CaseData] = None
     imitate_pressure_sensor_signal_test_data: Optional[CaseData] = None
-    exp_mode_mt_message: Optional[CaseData] = None
 
     # Режим МТ в xlsx export_leaks_report
     expected_report_stationary_status: int = StationaryStatus.STATIONARY.value
 
     # ===== Данные участков КП-КП =====
     controlled_sites_with_segment: Optional[CaseData] = None
+
+    # ===== Данные для проверки режима МТ =====
+    stationary_status_test_data: Optional[CaseData] = None
+    stationary_status_journal_test_data: Optional[CaseData] = None
 
     # дефолтные значения для датчиков маскирования
     mask_signal_test_data: Optional[CaseData] = CaseData(
@@ -342,7 +345,10 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     journal_info_test: Optional[CaseMarkers] = None
     lds_status_initialization_test: Optional[CaseMarkers] = None
     lds_status_init_in_journal_test: Optional[CaseMarkers] = None
-    main_page_info_test: Optional[CaseMarkers] = None
+    stationary_status_common_scheme_test: Optional[CaseMarkers] = None
+    stationary_status_main_page_info_test: Optional[CaseMarkers] = None
+    stationary_status_in_output_signals_test: Optional[CaseMarkers] = None
+    stationary_status_journal_test: Optional[CaseMarkers] = None
     main_page_info_signals_test: Optional[CaseMarkers] = None
     mask_signal_test: Optional[CaseMarkers] = None
     mask_info_in_journal_test: Optional[CaseMarkers] = None
@@ -351,7 +357,6 @@ class SmokeSuiteConfig(BaseSuiteConfig):
     mask_du_on_mini_scheme_test: Optional[CaseMarkers] = None
     unmask_du_on_mini_scheme_test: Optional[CaseMarkers] = None
     diagnostics_of_signals_after_initialization_test: Optional[CaseMarkers] = None
-    mode_mt_in_journal_test: Optional[CaseMarkers] = None
     export_lds_status_report_test: Optional[CaseMarkers] = None
     export_mt_mode_report_test: Optional[CaseMarkers] = None
 
