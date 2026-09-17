@@ -8,14 +8,15 @@
 """
 
 from constants.enums import (
-    TU,
     AdminTU,
     ConfirmationStatus,
     LdsStatus,
     LdsStatusInitialization,
     MeasureConversionRule,
     ReservedType,
+    StationaryReason,
     StationaryStatus,
+    TU,
 )
 from constants.test_constants import BaseTN3Constants as TestConst
 from test_config.models_for_tests import (
@@ -55,6 +56,11 @@ DIAGNOSTIC_AREA_6_PIPE_ID = 999205440  # OUT_NEIGHBOR_DIAGNOSTIC_AREA_PIPE_ID
 # ID линейного участка
 LINEAR_PART_ID = 408
 
+CONTROL_POINTS = [
+    "ЗА 105-3 - ЗА 129-3",
+    "ЗА 180-3 - ЗА 207-3",
+]
+
 # ===== Конфигурация набора =====
 IMITATIVE_31_CONFIG = SmokeSuiteConfig(
     # ----- Метаданные -----
@@ -89,7 +95,21 @@ IMITATIVE_31_CONFIG = SmokeSuiteConfig(
     journal_info_test=CaseMarkers(test_case_id="2", offset=5),
     lds_status_initialization_test=CaseMarkers(test_case_id="86", offset=5),
     lds_status_init_in_journal_test=CaseMarkers(test_case_id="228", offset=5),
-    main_page_info_test=CaseMarkers(test_case_id="3", offset=6),
+    stationary_status_test_data=CaseData(
+        params={TestConst.CONTROL_POINTS_KEY: CONTROL_POINTS},
+        expected_result=(StationaryStatus.STATIONARY, StationaryReason.PRESSURE_AND_FLOW_MOVING_AVERAGES_MEET_CRITERIA),
+    ),
+    stationary_status_journal_test_data=CaseData(
+        params={TestConst.CONTROL_POINTS_KEY: CONTROL_POINTS},
+        expected_result=(
+            StationaryStatus.STATIONARY.report_text,
+            StationaryReason.PRESSURE_AND_FLOW_MOVING_AVERAGES_MEET_CRITERIA.report_text,
+        ),
+    ),
+    stationary_status_common_scheme_test=CaseMarkers(test_case_id="42", offset=6),
+    stationary_status_main_page_info_test=CaseMarkers(test_case_id="3", offset=6),
+    stationary_status_in_output_signals_test=CaseMarkers(test_case_id="41", offset=6),
+    stationary_status_journal_test=CaseMarkers(test_case_id="43", offset=6),
     mask_signal_test=CaseMarkers(test_case_id="32", offset=8),
     mask_info_in_journal_test=CaseMarkers(test_case_id="213", offset=9),
     diagnostics_of_signals_after_initialization_test=CaseMarkers(test_case_id="210", offset=25),

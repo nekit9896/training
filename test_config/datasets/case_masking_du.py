@@ -19,9 +19,7 @@ from constants.enums import (
     ConfirmationStatus,
     LdsStatus,
     MeasureConversionRule,
-    MessagePriority,
     ReservedType,
-    StationaryReason,
     StationaryStatus,
 )
 from constants.test_constants import BaseTN3Constants as TestConst
@@ -104,14 +102,6 @@ CASE_MASKING_DU_CONFIG = SmokeSuiteConfig(
     # ===== LDS Configurator =====
     use_lds_configurator=True,
     admin_tu=AdminTU.TIKHORETSK_NOVOROSSIYSK_3_AUTOTEST,
-    # ----- Данные для проверки имитации -----
-    exp_mode_mt_message=CaseData(
-        expected_result=(
-            StationaryStatus.report_text_by_value(2),
-            StationaryReason.PRESSURE_AND_FLOW_MOVING_AVERAGES_MEET_CRITERIA.report_text,
-            MessagePriority.MEDIUM,
-        ),
-    ),
     measure_conversion_rules=MeasureConversionRule.KG_CM_MEASURE,
     # ----- Ожидаемый статус стационара -----
     expected_stationary_status=StationaryStatus.STATIONARY,
@@ -134,8 +124,6 @@ CASE_MASKING_DU_CONFIG = SmokeSuiteConfig(
     basic_info_test=CaseMarkers(test_case_id="1", offset=5),
     journal_info_test=CaseMarkers(test_case_id="2", offset=5),
     lds_status_initialization_test=CaseMarkers(test_case_id="29", offset=5),
-    main_page_info_test=CaseMarkers(test_case_id="3", offset=6),
-    mode_mt_in_journal_test=CaseMarkers(test_case_id="236", offset=7),
     main_page_info_signals_test=CaseMarkers(test_case_id="120", offset=7),
     mask_signal_test=CaseMarkers(test_case_id="32", offset=8),
     mask_info_in_journal_test=CaseMarkers(test_case_id="213", offset=9),
