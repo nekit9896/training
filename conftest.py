@@ -24,6 +24,12 @@ from utils.helpers.pytest_auth import (
     init_http_stand_client,
     init_ws_stand_client,
 )
+from utils.helpers.pytest_skip_utils import (
+    decorate_skipped_test_in_allure,
+    get_skip_reason_marker,
+    is_marked_as_skipped,
+    resolve_skip_reason,
+)
 from utils.helpers.vault_pytest_utils import configure_vault_for_suite, reset_vault_process_empty_values_rejection
 from utils.helpers.ws_message_parser import ws_message_parser as lds_ws_parser
 
@@ -356,6 +362,7 @@ def pytest_collection_modifyitems(session, config, items):
     2. Исключает тесты, у которых конфиг = None (тест отключён для этого набора данных)
     3. Добавляет маркеры offset и test_case_id из конфига к каждому параметризованному тесту
     4. Сортирует тесты по test_suite_name для группировки по наборам данных
+    5. Помечает маркером skip_reason тесты, у которых в конфигурации теста задан skip_reason (CaseMarkers.skip_reason)
     """
     # Получаем список выбранных наборов из --suites
     suites_option = config.getoption("--suites")
@@ -400,6 +407,12 @@ def pytest_collection_modifyitems(session, config, items):
             # Конфиг теста = None - исключаем тест из прогона
             deselected_items.append(item)
             continue
+
+        # Скип по причине из конфигурации теста: тест остаётся в прогоне, но будет пропущен
+        # фикстурой skip_reason_guard и попадёт в отчёт как skipped с причиной
+        if skip_reason := resolve_skip_reason(test_config):
+            item.add_marker(pytest.mark.skip_reason(reason=skip_reason))
+            logger.info("[SKIP] %s: %s", item.nodeid, skip_reason)
 
         selected_items.append(item)
 
@@ -463,7 +476,25 @@ def allure_tms_link(request):
 
 
 @pytest.fixture(autouse=True)
-def require_suite_infra(request):
+def skip_reason_guard(request, allure_suite_hierarchy, allure_tms_link):
+    """
+    Скипает тест, если для него задан skip_reason в конфигурации теста (CaseMarkers.skip_reason).
+
+    Порядок фикстур важен, поэтому зависимости запрошены явно:
+    - allure_suite_hierarchy и allure_tms_link должны отработать ДО скипа, иначе в отчёте
+      потеряются группировка по набору данных и линк на тест-кейс TestOps;
+    - require_suite_infra и offset_wait зависят от этой фикстуры, чтобы скипнутый тест
+      не ждал свой offset и не подменял причину скипа сообщением об инфраструктуре.
+    """
+    if skip_reason := get_skip_reason_marker(request.node):
+        decorate_skipped_test_in_allure(request.node, skip_reason)
+        pytest.skip(skip_reason)
+
+
+# skip_reason_guard в аргументах require_suite_infra/offset_wait нужен только для порядка фикстур:
+# скип теста должен сработать до проверки готовности инфраструктуры
+@pytest.fixture(autouse=True)
+def require_suite_infra(request, skip_reason_guard):
     """
     Пропускает тесты набора, если infra-setup не завершился успешно.
     """
@@ -474,8 +505,10 @@ def require_suite_infra(request):
         pytest.skip("[SETUP] [ERROR] Набор пропущен: инфраструктура не готова")
 
 
+# skip_reason_guard в аргументах offset_wait нужен только для порядка фикстур:
+# скипнутый тест не должен ждать свой offset
 @pytest.fixture(autouse=True)
-def offset_wait(request):
+def offset_wait(request, skip_reason_guard):
     """
     Offset‑ожидание перед каждым тестом относительно фактического старта core
     """
@@ -498,6 +531,7 @@ def compute_imitator_duration(item, current_test_suite: str) -> float:
     Правило:
       - Собирает все тесты (item.session.items) с меткой test_suite_name == current_test_suite
       - Извлекает все значения @pytest.mark.offset(...) (в минутах)
+      - Offset скипнутых тестов (маркер skip_reason) не учитывается: они не выполняются
       - Если offsets найдены: возвращает max(offsets) + IMITATOR_FINISH_DELAY задержка остановки имитатора
       - Иначе: если у текущего item есть @pytest.mark.imitator_duration — используется как fallback и логируется
       - Если ничего не найдено — pytest.fail с понятным текстом
@@ -511,6 +545,9 @@ def compute_imitator_duration(item, current_test_suite: str) -> float:
 
     offsets = []
     for suite_item in suite_items:
+        # Скипнутый тест не выполняется - ждать его offset не нужно
+        if is_marked_as_skipped(suite_item):
+            continue
         offset_marker = suite_item.get_closest_marker("offset")
         if offset_marker:
             try:
