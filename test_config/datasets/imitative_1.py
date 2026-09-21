@@ -105,7 +105,7 @@ IMITATIVE_1_CONFIG = SmokeSuiteConfig(
     stationary_status_main_page_info_test=CaseMarkers(test_case_id="3", offset=6),
     stationary_status_in_output_signals_test=CaseMarkers(test_case_id="41", offset=6),
     stationary_status_journal_test=CaseMarkers(test_case_id="43", offset=6),
-    mask_signal_test=CaseMarkers(test_case_id="32", offset=8),
+    mask_signal_test=CaseMarkers(test_case_id="32", offset=8, skip_reason="Пример: тест отключён для набора"),
     mask_info_in_journal_test=CaseMarkers(test_case_id="213", offset=9),
     diagnostics_of_signals_after_initialization_test=CaseMarkers(test_case_id="210", offset=25),
     lds_status_initialization_out_test=CaseMarkers(test_case_id="30", offset=30),

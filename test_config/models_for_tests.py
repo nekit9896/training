@@ -41,6 +41,14 @@ class CaseMarkers:
 
     test_case_id: str
     offset: float
+    skip_reason: Optional[str] = None
+
+    @classmethod
+    def skipped(cls, reason: str, test_case_id: str = "", offset: float = 0) -> "CaseMarkers":
+        """
+        Маркеры теста, который нужно скипнуть на этом наборе данных.
+        """
+        return cls(test_case_id=test_case_id, offset=offset, skip_reason=reason)
 
 
 class SuiteTuIdentityMixin:

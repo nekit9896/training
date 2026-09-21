@@ -47,7 +47,8 @@ markers = [
     "test_data_name: название набора данных",
     "tu_id: id ТУ",
     "ost_name: Имя ОСТ",
-    "offset(minutes): сколько ждать от старта имитатора перед проверкой"
+    "offset(minutes): сколько ждать от старта имитатора перед проверкой",
+    "skip_reason(reason): тест скипнут по причине из конфигурации теста (CaseMarkers.skip_reason)"
 ]
 asyncio_mode="auto"
 norecursedirs = [".*", ".git", ".env", ".env.example", "poetry.lock", "pyproject.toml", "clients", "models", "utils"]
