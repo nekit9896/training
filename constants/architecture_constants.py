@@ -161,7 +161,7 @@ class WebSocketClientConstants(StandConstants):
     HANDSHAKE_WAITING: float | int = 5.0
     HANDSHAKE_MESSAGE: str = "{\"protocol\":\"messagepack\",\"version\":1}"
     WS_HUBS: str = "/hubs/ldsClientHub"
-    START_INVOCATION_ID: str = 1
+    START_INVOCATION_ID: str = "1"
     DEFAULT_RECONNECT_INTERVAL: float | int = 5.0
     WS_CONNECT_TIMEOUT_SECONDS: float = 120.0
     WS_RECONNECT_TIMEOUT_SECONDS: float = 20.0
@@ -201,6 +201,7 @@ class EnvKeyConstants:
     SSH_KEY_NAME: str = "SSH_KEY_NAME"
     SSH_USER_DEV: str = "SSH_USER_DEV"
     STAND_NAME: str = "STAND_NAME"
+    DESCRIPTION: str = "DESCRIPTION"
     DATA_PATH: str = "DATA_PATH"
     OPC_URL: str = "OPC_URL"
     TU_ID: str = "TU_ID"

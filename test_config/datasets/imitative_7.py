@@ -10,6 +10,7 @@
 """
 
 from constants.enums import (
+    TU,
     AdminTU,
     ConfirmationStatus,
     LdsStatus,
@@ -17,7 +18,6 @@ from constants.enums import (
     ReservedType,
     StationaryStatus,
     StoppedPumpingReason,
-    TU,
 )
 from constants.test_constants import BaseTN3Constants as TestConst
 from test_config.models_for_tests import CaseData, CaseMarkers, LeakTestConfig, SmokeSuiteConfig

@@ -2,3 +2,4 @@
 __pycache__
 .mimocode/
 .pytest_cache/
+.clinerules

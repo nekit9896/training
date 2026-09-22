@@ -170,4 +170,3 @@ class SubprocessClient:
         """
 
         return os.device_encoding(1) or Im_const.WIN_ENCODING_CP866
-        

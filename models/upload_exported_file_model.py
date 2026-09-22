@@ -14,6 +14,7 @@ class ReplyErrors:
 @dataclass
 class DownloadExportedDataRequest:
     """Запрос на скачивание сформированного файла"""
+
     exportedDataId: int
     exportedDataType: str
     timeOffset: int
@@ -23,6 +24,7 @@ class DownloadExportedDataRequest:
 @dataclass
 class DownloadExportedDataContent:
     """Контент ответа на запрос скачивания"""
+
     fileChunk: bytes
 
 

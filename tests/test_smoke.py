@@ -201,13 +201,11 @@ class TestSuiteScenarios:
         scenarios.lds_status_init_in_journal(http_client, config, imitator_start_time)
 
     @pytest.mark.asyncio
-    async def test_stationary_status_common_scheme(
-        self, ws_client: WebSocketClient, config: SmokeSuiteConfig
-    ) -> None:
+    async def test_stationary_status_common_scheme(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
         """[CommonScheme] Проверка режима работы и причины режима работы МТ на ЭФ: Схема"""
         test_data = config.stationary_status_test_data
         expected_stationary_status, expected_stationary_status_reasons = (
-            (test_data.expected_result if test_data else (None, None))
+            test_data.expected_result if test_data else (None, None)
         )
         tag = "CommonScheme"
         title = (
@@ -230,17 +228,17 @@ class TestSuiteScenarios:
         await stationary_scenarios.stationary_status_common_scheme(ws_client, config, test_data)
 
     @pytest.mark.asyncio
-    async def test_stationary_status_main_page_info(
-        self, ws_client: WebSocketClient, config: SmokeSuiteConfig
-    ) -> None:
+    async def test_stationary_status_main_page_info(self, ws_client: WebSocketClient, config: SmokeSuiteConfig) -> None:
         """[MainPageInfo] Проверка установки режима работы МТ. ЭФ: Главная страница. Контент таблицы с ТУ"""
         test_data = config.stationary_status_test_data
         expected_stationary_status, expected_stationary_status_reasons = (
-            (test_data.expected_result if test_data else (None, None))
+            test_data.expected_result if test_data else (None, None)
         )
         tag = "MainPageInfo"
-        title = f"[{tag}] Проверка установки режима работы МТ: {expected_stationary_status}. " \
+        title = (
+            f"[{tag}] Проверка установки режима работы МТ: {expected_stationary_status}. "
             "ЭФ: Главная страница. Контент таблицы с ТУ"
+        )
         _apply_allure_markers(
             config.stationary_status_main_page_info_test,
             tag,
@@ -262,7 +260,7 @@ class TestSuiteScenarios:
         """[OutputSignalsInfo] Проверка установки режима работы МТ. ЭФ: Диагностика сигналов. Выходные сигналы"""
         test_data = config.stationary_status_test_data
         expected_stationary_status, expected_stationary_status_reasons = (
-            (test_data.expected_result if test_data else (None, None))
+            test_data.expected_result if test_data else (None, None)
         )
         tag = "OutputSignalsInfo"
         title = f"[{tag}] Проверка режима работы МТ: {expected_stationary_status}. ЭФ: Диагностика сигналов. Выходные сигналы"
@@ -518,7 +516,7 @@ class TestSuiteScenarios:
         """[MessagesInfo] Проверка режима работы МТ и причины режима работы МТ на ЭФ: Журнал. Реальное время"""
         test_data = config.stationary_status_journal_test_data
         expected_stationary_status, expected_stationary_status_reasons = (
-            (test_data.expected_result if test_data else (None, None))
+            test_data.expected_result if test_data else (None, None)
         )
         tag = "MessagesInfo"
         title = (

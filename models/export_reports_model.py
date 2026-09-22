@@ -12,7 +12,8 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from constants.enums import ExportStatus, ExportedDataType
+from constants.enums import ExportedDataType, ExportStatus
+
 
 @dataclass
 class ReplyErrors:
