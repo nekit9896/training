@@ -205,7 +205,3 @@ class DockerContainerManager:
 
         self._operate_with_containers(DC_const.START_CMD, container_group)
         self._check_container_group_status(container_group, DC_const.RUNNING_STATUS)
-
-
-
-        

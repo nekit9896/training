@@ -9,6 +9,7 @@
 """
 
 from constants.enums import (
+    TU,
     AdminTU,
     ConfirmationStatus,
     LdsStatus,
@@ -16,7 +17,6 @@ from constants.enums import (
     MeasureConversionRule,
     ReservedType,
     StationaryStatus,
-    TU,
     UnStationaryReason,
 )
 from constants.test_constants import BaseTN3Constants as TestConst

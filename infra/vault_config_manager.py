@@ -31,9 +31,7 @@ class VaultConfigManager:
             return VaultConstants.ENVIRONMENT_TESTING
         if "dev" in stand_lower:
             return VaultConstants.ENVIRONMENT_DEVELOPMENT
-        raise ValueError(
-            f"Неизвестный STAND_NAME='{stand_name}', невозможно определить path для настроек Vault"
-        )
+        raise ValueError(f"Неизвестный STAND_NAME='{stand_name}', невозможно определить path для настроек Vault")
 
     def _get_stand_name(self) -> str:
         """
@@ -142,9 +140,7 @@ class VaultConfigManager:
         Читает текущие данные секрета из Vault KV v2.
         """
         secret_path = self.resolve_secret_path()
-        output = self._run_vault_cmd(
-            ["kv", "get", f"-mount={VaultConstants.KV_MOUNT}", "-format=json", secret_path]
-        )
+        output = self._run_vault_cmd(["kv", "get", f"-mount={VaultConstants.KV_MOUNT}", "-format=json", secret_path])
         response = json.loads(output)
         secret_data = response.get("data", {}).get("data")
         if secret_data is None:

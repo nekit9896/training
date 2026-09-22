@@ -5,13 +5,25 @@ import tarfile
 from pathlib import Path
 from typing import BinaryIO, Optional
 
-import conftest
 import requests
 
+import conftest
 from constants.architecture_constants import EnvKeyConstants as Env_Const
 from constants.architecture_constants import TestOpsConstants as T_const
 
 logger = logging.getLogger(__name__)
+
+
+def _repair_mojibake(value: Optional[str]) -> Optional[str]:
+    """
+    Восстанавливает текст, повреждённый перекодировкой UTF-8 -> Latin-1/CP1252.
+    """
+    if not value:
+        return value
+    try:
+        return value.encode("latin-1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return value
 
 
 class AllureResultsFileManager:
@@ -88,17 +100,24 @@ class AllureResultsFileManager:
         """
         Создает файл environment.properties в allure-results с json-объектом
         {
-            "stand": "<STAND_NAME>"
+            "stand": "<STAND_NAME>",
+            "description": "<DESCRIPTION>"   # опционально
         }
         """
         stand_key = Env_Const.STAND_NAME
+        description_key = Env_Const.DESCRIPTION
 
-        stand_value = os.environ.get(stand_key)
+        stand_value = _repair_mojibake(os.environ.get(stand_key))
+        description_value = _repair_mojibake(os.environ.get(description_key))
+
+        environment_data = {"stand": stand_value}
+        if description_value:
+            environment_data["description"] = description_value
 
         environment_properties_path = self._allure_results_path / "environment.properties"
         try:
             with environment_properties_path.open("w", encoding="utf-8") as env_prop_file:
-                json.dump({"stand": stand_value}, env_prop_file, ensure_ascii=False, indent=1)
+                json.dump(environment_data, env_prop_file, ensure_ascii=False, indent=1)
             logger.info(f"[TEARDOWN] [OK] Создан файл environment.properties в {env_prop_file}")
         except Exception:
             logger.exception(f"[TEARDOWN] [ERROR] Не удалось создать {env_prop_file}")

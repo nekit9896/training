@@ -6,6 +6,7 @@
 """
 
 from constants.enums import (
+    TU,
     AdminTU,
     ConfirmationStatus,
     LdsStatus,
@@ -14,7 +15,6 @@ from constants.enums import (
     ReservedType,
     StationaryReason,
     StationaryStatus,
-    TU,
 )
 from constants.test_constants import BaseTN3Constants as TestConst
 from test_config.models_for_tests import (
