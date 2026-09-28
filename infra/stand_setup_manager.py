@@ -228,8 +228,8 @@ class StandSetupManager:
         """
         host, port = self._parse_opc_target()
         check_cmd = (
-            f"if timeout {timeout_s} bash -lc 'cat < /dev/null > /dev/tcp/{host}/{port}'; "
-            f"then echo {Im_const.CMD_STATUS_OK}; else echo {Im_const.CMD_STATUS_FAIL}; fi"
+            f"timeout {timeout_s} bash -c 'cat < /dev/null > /dev/tcp/{host}/{port}' "
+            f"&& echo {Im_const.CMD_STATUS_OK} || echo {Im_const.CMD_STATUS_FAIL}"
         )
         result = self._stand_client.run_cmd(check_cmd, need_output=True)
         if result != Im_const.CMD_STATUS_OK:

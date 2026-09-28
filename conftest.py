@@ -692,7 +692,7 @@ def pytest_runtest_setup(item):
         )
         cfg["stand_manager"] = stand_manager
         try:
-            stand_manager.check_opc_server_availability()
+            stand_manager.check_opc_server_status()
         except RuntimeError as error:
             msg = (
                 "[SETUP] [ERROR] OPC сервер недоступен. Имитатор и автотесты не запущены. "
