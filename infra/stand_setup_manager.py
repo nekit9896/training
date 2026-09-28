@@ -2,6 +2,8 @@ import logging
 import os
 from urllib.parse import urlparse
 
+import allure
+
 from clients.subprocess_client import SubprocessClient
 from constants.architecture_constants import EnvKeyConstants
 from constants.architecture_constants import ImitatorConstants as Im_const
@@ -233,6 +235,48 @@ class StandSetupManager:
             raise RuntimeError(f"[SETUP] [ERROR] OPC сервер {host}:{port} недоступен с сервера стенда")
 
         logger.info(f"[SETUP] [OK] OPC сервер {host}:{port} доступен")
+
+    def check_opc_server_availability(self) -> None:
+        """
+        Проверяет доступность OPC UA сервера с runner'а: реальное подключение
+        (asyncua) и чтение пробного тега выходного сигнала.
+        """
+        from clients.opc_ua_client import build_opc_node_id, read_data_value_sync
+        from constants.architecture_constants import OpcUaConstants as OpcConst
+
+        opc_url = os.environ.get(EnvKeyConstants.OPC_URL)
+        if not opc_url:
+            raise RuntimeError("[SETUP] [ERROR] OPC_URL не задан в переменных окружения")
+
+        probe_node_id = build_opc_node_id(
+            ost_name=self._ost_name,
+            stand_name=self._stand_name,
+            address=OpcConst.PROBE_ADDRESS,
+            suffix=OpcConst.PROBE_SUFFIX,
+        )
+
+        try:
+            data_value = read_data_value_sync(opc_url, probe_node_id)
+        except Exception as error:
+            raise RuntimeError(f"[SETUP] [ERROR] OPC UA сервер недоступен ({opc_url}): {error}") from error
+
+        status = data_value.StatusCode
+        if not status.is_good():
+            raise RuntimeError(f"[SETUP] [ERROR] OPC UA тег {probe_node_id} вернул плохой статус: {status}")
+
+        value = data_value.Value.Value if data_value.Value else None
+        snapshot = (
+            f"{probe_node_id}\n"
+            f"Value={value}\n"
+            f"StatusCode={status}\n"
+            f"SourceTimestamp={data_value.SourceTimestamp}"
+        )
+        logger.info("[SETUP] [OK] OPC UA сервер доступен. Слепок выходного сигнала:\n%s", snapshot)
+        allure.attach(
+            snapshot,
+            name="OPC UA выходной сигнал",
+            attachment_type=allure.attachment_type.TEXT,
+        )
 
     def _get_server_ip(self) -> str:
         """

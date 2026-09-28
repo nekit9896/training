@@ -1,0 +1,246 @@
+asyncapi: 3.0.0
+info:
+  title: API Gateway Websockets API for unimitate signal.
+  version: '1.0.0'
+  description: WebSockets API for API-GW
+servers:
+  prod:
+    host: localhost
+    pathname: "/"
+    protocol: https
+    description: |
+      Public server available without authorization.
+      Once the socket is open you can subscribe to a public channel by sending
+      a subscribe request message.
+  develop:
+    host: "192.168.1.1"
+    pathname: "/"
+    protocol: wss
+    description: |
+      Public server available without authorization.
+      Once the socket is open you can subscribe to a public channel by sending
+      a subscribe request message.
+channels:
+  ldsMain:
+    address: "/hub"
+    messages:
+      unimitateOutputSignalRequest:
+        $ref: '#/components/messages/unimitateOutputSignalRequest'
+      unimitateOutputSignalReply:
+        $ref: '#/components/messages/unimitateOutputSignalReply'
+operations:
+  unimitateOutputSignal:
+    title: unimitateOutputSignal
+    description: >
+      Метод позволяет деимитировать выходные сигналы.
+    action: send
+    channel:
+      $ref: '#/channels/ldsMain'
+    messages:
+      - $ref: '#/channels/ldsMain/messages/unimitateOutputSignalRequest'
+    reply:
+      messages:
+        - $ref: '#/channels/ldsMain/messages/unimitateOutputSignalReply'
+components:
+  messages:
+    unimitateOutputSignalRequest:
+      title: unimitateOutputSignalRequest
+      summary: Метод позволяет деимитировать выходные сигналы.
+      payload:
+        $ref: '#/components/schemas/unimitateOutputSignalRequest'
+      x-response:
+        $ref: '#/components/schemas/unimitateOutputSignalReply'
+      examples:
+        - payload:
+            signalInfo:
+              id: 123
+            imitateInfo:
+              value: Значение деимитации.
+    unimitateOutputSignalReply:
+      title: unimitateOutputSignalReply
+      summary: Ответ на запрос unimitateOutputSignalRequest.
+      payload:
+        $ref: '#/components/schemas/unimitateOutputSignalReply'
+      examples:
+        - name: OK
+          payload:
+            replyStatus: 200
+        - name: Bad request
+          payload:
+            replyStatus: 400
+            replyErrors:
+              - errorType: UNKNOWN
+                reason: Иная ошибка клиента, не описанная в примерах
+        - name: Unauthorized
+          payload:
+            replyStatus: 401
+            replyErrors:
+              - errorType: UNAUTHORIZED
+                reason: Неавторизованный запрос
+        - name: Permission denied
+          payload:
+            replyStatus: 403
+            replyErrors:
+              - errorType: PERMISSION_DENIED
+                reason: Недостаточно полномочий
+        - name: Not found
+          payload:
+            replyStatus: 404
+            replyErrors:
+              - errorType: NOT_FOUND
+                reason: Сигнал не найден
+                location: id
+        - name: Request timeout
+          payload:
+            replyStatus: 408
+            replyErrors:
+              - errorType: REQUEST_TIMEOUT
+                reason: Время ожидания ответа сервером истекло
+        - name: Too many requests
+          payload:
+            replyStatus: 429
+            replyErrors:
+              - errorType: TOO_MANY_REQUESTS
+                reason: Слишком много запросов
+        - name: Internal server error
+          payload:
+            replyStatus: 500
+            replyErrors:
+              - errorType: INTERNAL
+                reason: Иная ошибка сервера, не описанная в примерах
+        - name: Not implemented
+          payload:
+            replyStatus: 501
+            replyErrors:
+              - errorType: NOT_IMPLEMENTED
+                reason: Метод не поддерживается
+        - name: Service unavailable
+          payload:
+            replyStatus: 503
+            replyErrors:
+              - errorType: UNAVAILABLE
+                reason: Сервис временно недоступен
+        - name: Gateway timeout
+          payload:
+            replyStatus: 504
+            replyErrors:
+              - errorType: DEADLINE_EXCEEDED
+                reason: Превышено время ожидания от сервера
+        - name: Unknown error
+          payload:
+            replyStatus: 520
+            replyErrors:
+              - errorType: UNKNOWN_ERROR
+                reason: Сервер не может обработать ошибку
+  schemas:
+    unimitateOutputSignalRequest:
+      title: unimitateOutputSignalRequest
+      description: Метод позволяет деимитировать значения выходного сигнала.
+      type: object
+      properties:
+        objectId:
+          title: objectId
+          description: Идентификатор объекта к которому принадлежит сигнал.
+          type: integer
+          format: int32
+          examples: [ 123 ]
+
+        signalType:
+          title: signalType
+          description: Тип сигнала.
+          type: string
+          enum:
+            - mask
+            - maskReason
+            - leak
+            - leakCoordinate
+            - pumpingStatus
+            - freeFlow
+            - acknowledge
+            - leakTime
+            - leakVolume
+            - ldsStatus
+            - controlledSites
+            - linearParts
+            - serverDown
+            - timeSynchronizationDisable
+            - freeFlowStartCoordinate
+          example: [ leak ]
+        tuId:
+          title: tuId
+          description: Идентификатор ТУ.
+          type: number
+          format: int64
+          examples: [456]
+      required: [id, signalType, tuId]
+    unimitateSignalReply:
+      title: unimitateOutputSignalReply
+      description: Ответ на запрос unimitateOutputSignalRequest.
+      type: object
+      properties:
+        replyStatus:
+          $ref: '#/components/schemas/replyStatus'
+        replyErrors:
+          $ref: '#/components/schemas/replyErrors'
+      required: [replyStatus]
+    replyStatus:
+      title: replyStatus
+      type: integer
+      format: int32
+      enum:
+        - 200
+        - 400
+        - 401
+        - 403
+        - 404
+        - 408
+        - 409
+        - 412
+        - 416
+        - 429
+        - 500
+        - 501
+        - 503
+        - 504
+        - 520
+      x-enumNames:
+        "200": OK
+        "400": Bad request
+        "401": Unauthorized
+        "403": Permission denied
+        "404": Not found
+        "408": Request timeout
+        "409": Conflict
+        "412": Precondition failed
+        "416": Range not satisfiable
+        "429": Too many requests
+        "500": Internal server error
+        "501": Not implemented
+        "503": Service unavailable
+        "504": Gateway timeout
+        "520": Unknown error
+    replyErrors:
+      title: replyErrors
+      description: Информация об ошибках.
+      type: array
+      items:
+        title: replyError
+        description: Информация об ошибке.
+        type: object
+        properties:
+          errorType:
+            title: errorType
+            description: Тип ошибки
+            type: string
+            examples: [INVALID_ARGUMENT]
+          reason:
+            title: reason
+            description: Причина ошибки
+            type: string
+            examples: [Значение должно лежать в пределах от 0 до 200]
+          location:
+            title: location
+            description: Место возникновения ошибки
+            type: string
+            examples: [maxVolume]
+        required: [reason]

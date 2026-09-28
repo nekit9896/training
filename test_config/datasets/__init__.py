@@ -22,6 +22,7 @@ from test_config.models_for_tests import (
     BaseSuiteConfig,
     IsRejectedConfig,
     LDSStatusConfig,
+    OutputSignalImitationConfig,
     SmokeSuiteConfig,
     StationaryStatusConfig,
 )
@@ -85,6 +86,9 @@ ALL_STATIONARY_STATUS_CONFIGS = _discover_configs_by_type(StationaryStatusConfig
 # ===== Regress-тесты отбраковки сигналов =====
 ALL_IS_REJECTED_CONFIGS = _discover_configs_by_type(IsRejectedConfig)
 
+# ===== Тесты имитации выходных сигналов СОУ (СДКУ) =====
+ALL_OUTPUT_SIGNAL_IMITATION_CONFIGS = _discover_configs_by_type(OutputSignalImitationConfig)
+
 
 def get_config_by_name(name: str) -> BaseSuiteConfig:
     """Получить конфиг по имени suite_name"""
@@ -113,6 +117,7 @@ def __dir__():
         "ALL_LDS_STATUS_CONFIGS",
         "ALL_STATIONARY_STATUS_CONFIGS",
         "ALL_IS_REJECTED_CONFIGS",
+        "ALL_OUTPUT_SIGNAL_IMITATION_CONFIGS",
         "get_config_by_name",
     ]
 
@@ -124,5 +129,6 @@ __all__ = [
     "ALL_LDS_STATUS_CONFIGS",
     "ALL_STATIONARY_STATUS_CONFIGS",
     "ALL_IS_REJECTED_CONFIGS",
+    "ALL_OUTPUT_SIGNAL_IMITATION_CONFIGS",
     "get_config_by_name",
 ] + list(_CONFIG_CACHE.keys())

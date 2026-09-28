@@ -624,3 +624,37 @@ class GravityPipe(Enum):
 class MeasureConversionRule(Enum):
     MPA_MEASURE = "MPA_MEASURE"
     KG_CM_MEASURE = "KG_CM_MEASURE"
+
+
+class OutputSignalType(Enum):
+    """
+    Типы выходных сигналов СОУ, которые имитируются через api-gateway (обратный обмен СДКУ).
+
+    Значение каждого элемента — кортеж:
+      (signal_type, opc_suffix, section_type)
+
+    - signal_type: значение поля signalType в imitateOutputSignalRequest (контракт asyncapi).
+    - opc_suffix: суффикс OPC-тега, из которого собирается NodeId вида
+      ns=2;s={ost}{stand}:{address}.{suffix}.
+    - section_type: тип участка, к которому относится сигнал:
+      "linearParts" (ДУ, НПС-НПС) или "controlledSites" (КП-КП, сегменты ДУ).
+    """
+
+    LEAK = ("leak", "isLeakDetected", "linearParts")
+    LEAK_COORDINATE = ("leakCoordinate", "leakCoordinate", "linearParts")
+    LEAK_VOLUME = ("leakVolume", "leakVolume", "linearParts")
+    LEAK_TIME = ("leakTime", "leakDetectedAt", "linearParts")
+    ACKNOWLEDGE = ("acknowledge", "isLeakAcknowledged", "linearParts")
+    MASK = ("mask", "isMasked", "linearParts")
+    MASK_REASON = ("maskReason", "maskReason", "linearParts")
+    PUMPING_STATUS = ("pumpingStatus", "pumpingStatus", "controlledSites")
+    LDS_STATUS = ("ldsStatus", "ldsStatus", "controlledSites")
+    FREE_FLOW = ("freeFlow", "hasFreeFlow", "controlledSites")
+
+    def __init__(self, signal_type: str, opc_suffix: str, section_type: str) -> None:
+        self.signal_type = signal_type
+        self.opc_suffix = opc_suffix
+        self.section_type = section_type
+
+    def __str__(self) -> str:
+        return f"{self.signal_type} -> .{self.opc_suffix} ({self.section_type})"
