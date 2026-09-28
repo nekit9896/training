@@ -1,5 +1,6 @@
 import logging
 import os
+import traceback
 from urllib.parse import urlparse
 
 import allure
@@ -258,7 +259,15 @@ class StandSetupManager:
         try:
             data_value = read_data_value_sync(opc_url, probe_node_id)
         except Exception as error:
-            raise RuntimeError(f"[SETUP] [ERROR] OPC UA сервер недоступен ({opc_url}): {error}") from error
+            logger.error(
+                "[SETUP] [ERROR] OPC UA проверка не удалась. URL=%s node=%s\n%s",
+                opc_url,
+                probe_node_id,
+                traceback.format_exc(),
+            )
+            raise RuntimeError(
+                f"[SETUP] [ERROR] OPC UA сервер недоступен ({opc_url}): {type(error).__name__}: {error}"
+            ) from error
 
         status = data_value.StatusCode
         if not status.is_good():

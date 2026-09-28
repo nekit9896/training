@@ -698,7 +698,6 @@ def pytest_runtest_setup(item):
                 "[SETUP] [ERROR] OPC сервер недоступен. Имитатор и автотесты не запущены. "
                 f"Ошибка при проверке статуса OPC: {error}"
             )
-            allure.attach(msg, name="OPC сервер недоступен", attachment_type=allure.attachment_type.TEXT)
             _skip_current_suite_after_setup_failure(cfg, msg)
         try:
             stand_manager.setup_stand_for_imitator_run()

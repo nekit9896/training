@@ -5,7 +5,6 @@ OPC UA клиент для чтения выходных сигналов СОУ
 (Value + StatusCode + SourceTimestamp). Используется как в setup-части
 (проверка доступности OPC), так и в сценариях имитации выходных сигналов.
 """
-
 import asyncio
 import logging
 from typing import Any, Optional
@@ -36,6 +35,20 @@ def build_opc_node_id(
     return f"ns={namespace_index};s={ost_name}{stand_name}:{address}.{suffix}"
 
 
+async def _discover_endpoint_url(opc_url: str, timeout: float = OpcConst.DISCOVERY_TIMEOUT_S) -> str:
+    """
+    Получает полный endpoint URL через GetEndpoints.
+    """
+    try:
+        endpoints = await asyncio.wait_for(Client.get_endpoints(opc_url), timeout=timeout)
+        if endpoints and getattr(endpoints[0], "EndpointUrl", None):
+            logger.info("[OPC] Discovery: найден endpoint %s", endpoints[0].EndpointUrl)
+            return endpoints[0].EndpointUrl
+    except Exception as error:
+        logger.warning("[OPC] Discovery не удался (%s), используем исходный URL %s", error, opc_url)
+    return opc_url
+
+
 def read_data_value_sync(
     opc_url: str,
     node_id: str,
@@ -45,11 +58,12 @@ def read_data_value_sync(
     Синхронное подключение и чтение DataValue тега. Используется в setup-части
     (синхронный контекст pytest), чтобы понять, что OPC UA сервер жив и отдаёт данные.
     """
-
     async def _read() -> ua.DataValue:
-        client = Client(url=opc_url, timeout=timeout)
+        endpoint_url = await _discover_endpoint_url(opc_url)
+        client = Client(url=endpoint_url, timeout=timeout)
         try:
             await client.connect()
+            logger.info("[OPC] Подключено к endpoint %s", endpoint_url)
             return await client.get_node(node_id).read_data_value()
         finally:
             await client.disconnect()

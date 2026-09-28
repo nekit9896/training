@@ -231,6 +231,8 @@ class OpcUaConstants:
     # Таймаут подключения и операций OPC UA (в секундах).
     CONNECT_TIMEOUT_S: float = 10.0
     OPERATION_TIMEOUT_S: float = 5.0
+    # Таймаут discovery (GetEndpoints) перед подключением.
+    DISCOVERY_TIMEOUT_S: float = 5.0
     # Число попыток переподключения и пауза между ними.
     RECONNECT_ATTEMPTS: int = 6
     RECONNECT_INTERVAL_S: float = 5.0
