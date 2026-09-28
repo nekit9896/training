@@ -233,6 +233,8 @@ class OpcUaConstants:
     OPERATION_TIMEOUT_S: float = 5.0
     # Таймаут discovery (GetEndpoints) перед подключением.
     DISCOVERY_TIMEOUT_S: float = 5.0
+    # Пауза после поднятия SSH-туннеля до OPC перед началом работы.
+    TUNNEL_START_DELAY_S: float = 2.0
     # Число попыток переподключения и пауза между ними.
     RECONNECT_ATTEMPTS: int = 6
     RECONNECT_INTERVAL_S: float = 5.0

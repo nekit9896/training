@@ -1,6 +1,8 @@
 import logging
 import os
+import time
 import traceback
+from typing import Optional
 from urllib.parse import urlparse
 
 import allure
@@ -64,6 +66,8 @@ class StandSetupManager:
         # Экземпляр имитатор менеджера нужно создавать после генерации команды, отдельно от других клиентов
         self._imitator_manager = ImitatorManager(self._stand_client, self._final_cmd)
         self._remote_data_uploaded = False
+        self._opc_tunnel_process = None
+        self._opc_tunnel_port: Optional[int] = None
 
     @property
     def remote_data_uploaded(self) -> bool:
@@ -178,6 +182,10 @@ class StandSetupManager:
         В teardown может вызываться даже если имитатор не запущен
         """
         try:
+            self.stop_opc_ssh_tunnel()
+        except Exception:
+            logger.exception("[TEARDOWN] [ERROR] Ошибка при закрытии OPC SSH-туннеля")
+        try:
             if not self._imitator_manager.imitator_process:
                 logger.info("[TEARDOWN] [SKIP] Имитатор не был запущен")
                 return
@@ -237,55 +245,37 @@ class StandSetupManager:
 
         logger.info(f"[SETUP] [OK] OPC сервер {host}:{port} доступен")
 
-    def check_opc_server_availability(self) -> None:
+    def start_opc_ssh_tunnel(self) -> None:
         """
-        Проверяет доступность OPC UA сервера с runner'а: реальное подключение
-        (asyncua) и чтение пробного тега выходного сигнала.
+        Поднимает SSH-туннель до OPC сервера: пробрасывает порт OPC на runner.
+        После этого OPC доступен на runner'е как opc.tcp://localhost:<port>.
         """
-        from clients.opc_ua_client import build_opc_node_id, read_data_value_sync
         from constants.architecture_constants import OpcUaConstants as OpcConst
 
-        opc_url = os.environ.get(EnvKeyConstants.OPC_URL)
-        if not opc_url:
-            raise RuntimeError("[SETUP] [ERROR] OPC_URL не задан в переменных окружения")
+        opc_host, opc_port = self._parse_opc_target()
+        self._opc_tunnel_port = opc_port
+        process = self._stand_client.open_ssh_tunnel(opc_port, opc_host, opc_port)
+        if process is None:
+            raise RuntimeError("[SETUP] [ERROR] Не удалось запустить OPC SSH-туннель")
+        self._opc_tunnel_process = process
+        time.sleep(OpcConst.TUNNEL_START_DELAY_S)
+        logger.info("[SETUP] [OK] OPC SSH-туннель поднят: localhost:%s -> %s:%s", opc_port, opc_host, opc_port)
 
-        probe_node_id = build_opc_node_id(
-            ost_name=self._ost_name,
-            stand_name=self._stand_name,
-            address=OpcConst.PROBE_ADDRESS,
-            suffix=OpcConst.PROBE_SUFFIX,
-        )
+    def stop_opc_ssh_tunnel(self) -> None:
+        """Закрывает SSH-туннель до OPC сервера."""
+        if self._opc_tunnel_process is None:
+            return
+        SubprocessClient.terminate_process(self._opc_tunnel_process, timeout=5.0)
+        self._opc_tunnel_process = None
+        self._opc_tunnel_port = None
+        logger.info("[TEARDOWN] [OK] OPC SSH-туннель закрыт")
 
-        try:
-            data_value = read_data_value_sync(opc_url, probe_node_id)
-        except Exception as error:
-            logger.error(
-                "[SETUP] [ERROR] OPC UA проверка не удалась. URL=%s node=%s\n%s",
-                opc_url,
-                probe_node_id,
-                traceback.format_exc(),
-            )
-            raise RuntimeError(
-                f"[SETUP] [ERROR] OPC UA сервер недоступен ({opc_url}): {type(error).__name__}: {error}"
-            ) from error
-
-        status = data_value.StatusCode
-        if not status.is_good():
-            raise RuntimeError(f"[SETUP] [ERROR] OPC UA тег {probe_node_id} вернул плохой статус: {status}")
-
-        value = data_value.Value.Value if data_value.Value else None
-        snapshot = (
-            f"{probe_node_id}\n"
-            f"Value={value}\n"
-            f"StatusCode={status}\n"
-            f"SourceTimestamp={data_value.SourceTimestamp}"
-        )
-        logger.info("[SETUP] [OK] OPC UA сервер доступен. Слепок выходного сигнала:\n%s", snapshot)
-        allure.attach(
-            snapshot,
-            name="OPC UA выходной сигнал",
-            attachment_type=allure.attachment_type.TEXT,
-        )
+    @property
+    def opc_tunnel_url(self) -> Optional[str]:
+        """URL OPC через SSH-туннель (localhost) либо None, если туннель не поднят."""
+        if self._opc_tunnel_port:
+            return f"opc.tcp://localhost:{self._opc_tunnel_port}"
+        return None
 
     def _get_server_ip(self) -> str:
         """

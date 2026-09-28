@@ -700,6 +700,12 @@ def pytest_runtest_setup(item):
             )
             _skip_current_suite_after_setup_failure(cfg, msg)
         try:
+            stand_manager.start_opc_ssh_tunnel()
+        except Exception as error:
+            _skip_current_suite_after_setup_failure(
+                cfg, f"[SETUP] [ERROR] не удалось поднять SSH-туннель " f"для подключения по OPC: {error}"
+            )
+        try:
             stand_manager.setup_stand_for_imitator_run()
         except Exception as error:
             _skip_current_suite_after_setup_failure(cfg, f"[SETUP] [ERROR] ошибка при подготовке стенда: {error}")
@@ -927,7 +933,10 @@ async def opc_client(request):
     """
     from clients.opc_ua_client import OpcUaClient
 
-    opc_url = os.environ.get(EnvKeyConstants.OPC_URL)
+    stand_manager = request.config.group_state.get("stand_manager")
+    opc_url = stand_manager.opc_tunnel_url if stand_manager else None
+    if not opc_url:
+        opc_url = os.environ.get(EnvKeyConstants.OPC_URL)
     if not opc_url:
         pytest.fail("OPC_URL не задан в переменных окружения")
 
