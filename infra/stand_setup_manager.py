@@ -259,6 +259,16 @@ class StandSetupManager:
             raise RuntimeError("[SETUP] [ERROR] Не удалось запустить OPC SSH-туннель")
         self._opc_tunnel_process = process
         time.sleep(OpcConst.TUNNEL_START_DELAY_S)
+        check_cmd = (
+            f"timeout 5 bash -c 'cat < /dev/null > /dev/tcp/localhost/{opc_port}' "
+            f"&& echo {Im_const.CMD_STATUS_OK} || echo {Im_const.CMD_STATUS_FAIL}"
+        )
+        result = self._stand_client.run_cmd(check_cmd, need_output=True, use_ssh=False)
+        if result != Im_const.CMD_STATUS_OK:
+            self.stop_opc_ssh_tunnel()
+            raise RuntimeError(
+                f"[SETUP] [ERROR] OPC SSH-туннель не поднялся: localhost:{opc_port} недоступен с runner'а"
+            )
         logger.info("[SETUP] [OK] OPC SSH-туннель поднят: localhost:%s -> %s:%s", opc_port, opc_host, opc_port)
 
     def stop_opc_ssh_tunnel(self) -> None:

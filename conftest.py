@@ -929,7 +929,6 @@ async def opc_client(request):
     Фикстура OPC UA клиента для чтения выходных сигналов СОУ.
 
     Подключается к серверу, указанному в OPC_URL (opc.tcp://host:port).
-    Ошибка подключения помечает тест как Failed (красный), а не Error (жёлтый).
     """
     from clients.opc_ua_client import OpcUaClient
 
