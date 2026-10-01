@@ -111,6 +111,18 @@ class SubprocessClient:
         except (FileNotFoundError, OSError):
             logging.exception(f"[POPEN] [ERROR] Ошибка выполнения команды {cmd}")
 
+    def open_ssh_tunnel(self, local_port: int, remote_host: str, remote_port: int) -> Optional[subprocess.Popen]:
+        """
+        Открывает SSH-туннель (локальный проброс порта) до remote_host:remote_port.
+        После этого remote_host:remote_port доступен на раннере как localhost:local_port.
+        """
+        if os.name == Im_const.OS_NAME_WIN:
+            ssh_prefix = f"ssh -i {self._ssh_key_name}"
+        else:
+            ssh_prefix = "ssh"
+        tunnel_cmd = f"{ssh_prefix} -N -L {local_port}:{remote_host}:{remote_port} {self._username}@{self._host}"
+        return self.exec_popen(tunnel_cmd, use_ssh=False)
+
     def run_cmd(
         self, cmd: str, check: bool = True, timeout: int = None, need_output: bool = False, use_ssh: bool = True
     ) -> Optional[str]:

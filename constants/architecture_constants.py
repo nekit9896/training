@@ -221,3 +221,25 @@ class VaultConstants:
     ENVIRONMENT_DEVELOPMENT: str = "Development"
     PROCESS_EMPTY_VALUES_REJECTION_KEY: str = "ProcessEmptyValuesRejection"
     VAULT_CMD_TIMEOUT_S: int = 30
+
+
+class OpcUaConstants:
+    """Константы для OPC UA клиента (чтение выходных сигналов СОУ)."""
+
+    # Номер пространства имён (namespace index) для тегов СОУ. На стенде всегда NS=2.
+    NAMESPACE_INDEX: int = 2
+    # Таймаут подключения и операций OPC UA (в секундах).
+    CONNECT_TIMEOUT_S: float = 10.0
+    OPERATION_TIMEOUT_S: float = 5.0
+    # Таймаут discovery (GetEndpoints) перед подключением.
+    DISCOVERY_TIMEOUT_S: float = 5.0
+    # Пауза после поднятия SSH-туннеля до OPC перед началом работы.
+    TUNNEL_START_DELAY_S: float = 2.0
+    # Число попыток переподключения и пауза между ними.
+    RECONNECT_ATTEMPTS: int = 6
+    RECONNECT_INTERVAL_S: float = 5.0
+    # Пробный тег для setup-проверки доступности OPC UA (минимальный, не зависит от набора данных).
+    PROBE_ADDRESS: str = "CHTN_linearParts_9"
+    PROBE_SUFFIX: str = "isLeakDetected"
+    # Допуск при проверке времени изменения сигнала (SourceTimestamp), в секундах.
+    TIMESTAMP_DELTA_S: float = 60.0

@@ -10,6 +10,7 @@ import pytest
 import pytest_asyncio
 
 from clients.testops_client import AllureResultsUploader, logger
+from constants.architecture_constants import EnvKeyConstants
 from constants.architecture_constants import ImitatorConstants as ImConst
 from constants.enums import RejectionSensorTag
 from constants.test_constants import BaseTN3Constants
@@ -298,12 +299,27 @@ IS_REJECTED_SUITE_LEVEL_MAPPING = {
     'test_rejection_report': 'rejection_report_test',
 }
 
+# Suite-level тесты имитации выходных сигналов (маркеры из OutputSignalImitationConfig - параметр config)
+OUTPUT_SIGNAL_IMITATION_SUITE_LEVEL_MAPPING = {
+    'test_imitate_leak': 'imitate_leak_test',
+    'test_imitate_leak_coordinate': 'imitate_leak_coordinate_test',
+    'test_imitate_leak_volume': 'imitate_leak_volume_test',
+    'test_imitate_leak_time': 'imitate_leak_time_test',
+    'test_imitate_acknowledge': 'imitate_acknowledge_test',
+    'test_imitate_mask': 'imitate_mask_test',
+    'test_imitate_mask_reason': 'imitate_mask_reason_test',
+    'test_imitate_pumping_status': 'imitate_pumping_status_test',
+    'test_imitate_lds_status': 'imitate_lds_status_test',
+    'test_imitate_free_flow': 'imitate_free_flow_test',
+}
+
 # Мержим все вместе чтобы не переписывать логику коллектора айтемов (тестов)
 SUITE_LEVEL_TEST_MAPPING = {
     **SMOKE_SUITE_LEVEL_MAPPING,
     **LDS_STATUS_SUITE_LEVEL_MAPPING,
     **STATIONARY_STATUS_SUITE_LEVEL_MAPPING,
     **IS_REJECTED_SUITE_LEVEL_MAPPING,
+    **OUTPUT_SIGNAL_IMITATION_SUITE_LEVEL_MAPPING,
 }
 
 
@@ -352,6 +368,10 @@ def _get_test_markers_config(item, test_name):
         if test_name in STATIONARY_STATUS_SUITE_LEVEL_MAPPING:
             suite_config = params['config']
             attr_name = STATIONARY_STATUS_SUITE_LEVEL_MAPPING[test_name]
+            return getattr(suite_config, attr_name, None)
+        if test_name in OUTPUT_SIGNAL_IMITATION_SUITE_LEVEL_MAPPING:
+            suite_config = params['config']
+            attr_name = OUTPUT_SIGNAL_IMITATION_SUITE_LEVEL_MAPPING[test_name]
             return getattr(suite_config, attr_name, None)
     return None
 
@@ -678,8 +698,13 @@ def pytest_runtest_setup(item):
                 "[SETUP] [ERROR] OPC сервер недоступен. Имитатор и автотесты не запущены. "
                 f"Ошибка при проверке статуса OPC: {error}"
             )
-            allure.attach(msg, name="OPC сервер недоступен", attachment_type=allure.attachment_type.TEXT)
             _skip_current_suite_after_setup_failure(cfg, msg)
+        try:
+            stand_manager.start_opc_ssh_tunnel()
+        except Exception as error:
+            _skip_current_suite_after_setup_failure(
+                cfg, f"[SETUP] [ERROR] не удалось поднять SSH-туннель " f"для подключения по OPC: {error}"
+            )
         try:
             stand_manager.setup_stand_for_imitator_run()
         except Exception as error:
@@ -896,6 +921,37 @@ def imitator_start_time(request):
     if start_time is None:
         pytest.fail("imitator_start_time не установлен. Убедитесь что тест запущен после инициализации имитатора.")
     return start_time
+
+
+@pytest_asyncio.fixture
+async def opc_client(request):
+    """
+    Фикстура OPC UA клиента для чтения выходных сигналов СОУ.
+
+    Подключается к серверу, указанному в OPC_URL (opc.tcp://host:port).
+    """
+    from clients.opc_ua_client import OpcUaClient
+
+    stand_manager = request.config.group_state.get("stand_manager")
+    opc_url = stand_manager.opc_tunnel_url if stand_manager else None
+    if not opc_url:
+        opc_url = os.environ.get(EnvKeyConstants.OPC_URL)
+    if not opc_url:
+        pytest.fail("OPC_URL не задан в переменных окружения")
+
+    client = OpcUaClient(opc_url)
+    try:
+        await client.connect()
+    except Exception as error:
+        pytest.fail(f"Не удалось подключиться к OPC UA серверу ({opc_url}): {error}")
+
+    try:
+        yield client
+    finally:
+        try:
+            await client.disconnect()
+        except Exception as error:
+            logger.warning("[OPC] [WARNING] Ошибка при отключении OPC UA клиента: %s", error)
 
 
 def pytest_sessionfinish(session, exitstatus):

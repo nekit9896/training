@@ -20,6 +20,7 @@ from constants.enums import (
     ConfirmationStatus,
     LdsStatus,
     MeasureConversionRule,
+    OutputSignalType,
     RejectionCriteria,
     RejectionSensorTag,
     ReservedType,
@@ -752,3 +753,48 @@ class ExportMtModeReportState:
     actual_temp_file_path: Optional[Path] = None
     actual_worksheet: Any = None
     actual_parsed_report: Any = None
+
+
+@dataclass(frozen=True)
+class OutputSignalImitationCase:
+    """
+    Кейс имитации выходного сигнала СОУ (обратный обмен СДКУ).
+
+    - signal_type: OutputSignalType - связывает signalType контракта имитации,
+      OPC-суффикс и тип участка (linearParts / controlledSites).
+    - address: тег участка в OPC (например "CHTN_linearParts_9").
+    - imitate_value: имитируемое значение (строкой, как imitateInfo.value в контракте).
+    - object_id: идентификатор объекта для запроса имитации (заглушка до готовности бэка).
+    """
+
+    signal_type: OutputSignalType
+    address: str
+    imitate_value: str
+    object_id: Optional[int] = None
+
+    @property
+    def opc_suffix(self) -> str:
+        return self.signal_type.opc_suffix
+
+    @property
+    def section_type(self) -> str:
+        return self.signal_type.section_type
+
+
+@dataclass
+class OutputSignalImitationConfig(BaseSuiteConfig):
+    """
+    Конфигурация набора данных для имитации выходных сигналов СОУ.
+    """
+
+    cases: list[OutputSignalImitationCase] = field(default_factory=list)
+    imitate_leak_test: Optional[CaseMarkers] = None
+    imitate_leak_coordinate_test: Optional[CaseMarkers] = None
+    imitate_leak_volume_test: Optional[CaseMarkers] = None
+    imitate_leak_time_test: Optional[CaseMarkers] = None
+    imitate_acknowledge_test: Optional[CaseMarkers] = None
+    imitate_mask_test: Optional[CaseMarkers] = None
+    imitate_mask_reason_test: Optional[CaseMarkers] = None
+    imitate_pumping_status_test: Optional[CaseMarkers] = None
+    imitate_lds_status_test: Optional[CaseMarkers] = None
+    imitate_free_flow_test: Optional[CaseMarkers] = None
