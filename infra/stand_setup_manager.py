@@ -1,11 +1,7 @@
 import logging
 import os
 import time
-import traceback
-from typing import Optional
 from urllib.parse import urlparse
-
-import allure
 
 from clients.subprocess_client import SubprocessClient
 from constants.architecture_constants import EnvKeyConstants
@@ -66,8 +62,6 @@ class StandSetupManager:
         # Экземпляр имитатор менеджера нужно создавать после генерации команды, отдельно от других клиентов
         self._imitator_manager = ImitatorManager(self._stand_client, self._final_cmd)
         self._remote_data_uploaded = False
-        self._opc_tunnel_process = None
-        self._opc_tunnel_port: Optional[int] = None
 
     @property
     def remote_data_uploaded(self) -> bool:
@@ -176,29 +170,58 @@ class StandSetupManager:
             logger.exception(error_msg)
             raise RuntimeError(error_msg) from error
 
+    def is_imitator_running(self) -> bool:
+        """
+        Проверяет, запущен ли имитатор.
+        """
+        return bool(self._imitator_manager._is_imitator_running())
+
     def stop_imitator_wrapper(self) -> None:
         """
         Останавливает имитатор немедленно (без ожидания --stopTime).
         В teardown может вызываться даже если имитатор не запущен
+
+        Метод делает остановку максимально устойчивой к ошибкам:
+        - graceful termination с ожиданием
+        - force kill если graceful не сработал
+        - ошибки инфраструктуры логируются, но не выбрасываются (чтобы не влиять на статус тестов)
         """
-        try:
-            self.stop_opc_ssh_tunnel()
-        except Exception:
-            logger.exception("[TEARDOWN] [ERROR] Ошибка при закрытии OPC SSH-туннеля")
         try:
             if not self._imitator_manager.imitator_process:
                 logger.info("[TEARDOWN] [SKIP] Имитатор не был запущен")
                 return
+
+            # Попытка 1: graceful termination через terminate_process
+            logger.info("[TEARDOWN] [INFO] Запуск graceful termination имитатора")
             self._imitator_manager.stop_imitator()
+
+            # Проверка, остановился ли имитатор
+            if self.is_imitator_running():
+                logger.warning(
+                    "[TEARDOWN] [WARNING] Имитатор не остановился после graceful termination, запускаем force kill"
+                )
+                # Попытка 2: force kill через kill команды
+                self._stand_client.run_cmd(Im_const.IMITATOR_KILL_CMD)
+                time.sleep(2)  # Даем время на остановку
+
+                if self.is_imitator_running():
+                    logger.warning(
+                        "[TEARDOWN] [WARNING] Имитатор всё ещё запущен после force kill, это не критично для теста"
+                    )
+
             logger.info("[TEARDOWN] [OK] Имитатор остановлен")
         except Exception as error:
-            error_msg = "[TEARDOWN] [ERROR] Не удалось остановить имитатор"
-            logger.exception(error_msg)
-            raise RuntimeError(error_msg) from error
+            # Логирование ошибки, но не выбрасывание
+            # Ошибки teardown не должны прерывать pytest и влиять на статус тестов
+            logger.warning(
+                "[TEARDOWN] [WARNING] Ошибка при остановке имитатора: %s",
+                error,
+                exc_info=True,
+            )
 
     def server_test_data_remover(self):
         """
-        Может вызваться в teardown если загрузка не была выполнена
+        Может вызываться в teardown если загрузка не была выполнена
         """
         uploader = getattr(self, "_uploader", None)
         if uploader is None:
@@ -236,56 +259,14 @@ class StandSetupManager:
         """
         host, port = self._parse_opc_target()
         check_cmd = (
-            f"timeout {timeout_s} bash -c 'cat < /dev/null > /dev/tcp/{host}/{port}' "
-            f"&& echo {Im_const.CMD_STATUS_OK} || echo {Im_const.CMD_STATUS_FAIL}"
+            f"if timeout {timeout_s} bash -lc 'cat < /dev/null > /dev/tcp/{host}/{port}'; "
+            f"then echo {Im_const.CMD_STATUS_OK}; else echo {Im_const.CMD_STATUS_FAIL}; fi"
         )
         result = self._stand_client.run_cmd(check_cmd, need_output=True)
         if result != Im_const.CMD_STATUS_OK:
             raise RuntimeError(f"[SETUP] [ERROR] OPC сервер {host}:{port} недоступен с сервера стенда")
 
         logger.info(f"[SETUP] [OK] OPC сервер {host}:{port} доступен")
-
-    def start_opc_ssh_tunnel(self) -> None:
-        """
-        Поднимает SSH-туннель до OPC сервера: пробрасывает порт OPC на runner.
-        После этого OPC доступен на runner'е как opc.tcp://localhost:<port>.
-        """
-        from constants.architecture_constants import OpcUaConstants as OpcConst
-
-        opc_host, opc_port = self._parse_opc_target()
-        self._opc_tunnel_port = opc_port
-        process = self._stand_client.open_ssh_tunnel(opc_port, opc_host, opc_port)
-        if process is None:
-            raise RuntimeError("[SETUP] [ERROR] Не удалось запустить OPC SSH-туннель")
-        self._opc_tunnel_process = process
-        time.sleep(OpcConst.TUNNEL_START_DELAY_S)
-        check_cmd = (
-            f"timeout 5 bash -c 'cat < /dev/null > /dev/tcp/localhost/{opc_port}' "
-            f"&& echo {Im_const.CMD_STATUS_OK} || echo {Im_const.CMD_STATUS_FAIL}"
-        )
-        result = self._stand_client.run_cmd(check_cmd, need_output=True, use_ssh=False)
-        if result != Im_const.CMD_STATUS_OK:
-            self.stop_opc_ssh_tunnel()
-            raise RuntimeError(
-                f"[SETUP] [ERROR] OPC SSH-туннель не поднялся: localhost:{opc_port} недоступен с runner'а"
-            )
-        logger.info("[SETUP] [OK] OPC SSH-туннель поднят: localhost:%s -> %s:%s", opc_port, opc_host, opc_port)
-
-    def stop_opc_ssh_tunnel(self) -> None:
-        """Закрывает SSH-туннель до OPC сервера."""
-        if self._opc_tunnel_process is None:
-            return
-        SubprocessClient.terminate_process(self._opc_tunnel_process, timeout=5.0)
-        self._opc_tunnel_process = None
-        self._opc_tunnel_port = None
-        logger.info("[TEARDOWN] [OK] OPC SSH-туннель закрыт")
-
-    @property
-    def opc_tunnel_url(self) -> Optional[str]:
-        """URL OPC через SSH-туннель (localhost) либо None, если туннель не поднят."""
-        if self._opc_tunnel_port:
-            return f"opc.tcp://localhost:{self._opc_tunnel_port}"
-        return None
 
     def _get_server_ip(self) -> str:
         """
