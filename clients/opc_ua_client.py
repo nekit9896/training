@@ -51,7 +51,7 @@ def read_data_value_sync(
         try:
             await client.connect()
             logger.info("[OPC] Подключено к %s", opc_url)
-            return await client.get_node(node_id).read_data_value()
+            return await client.get_node(node_id).read_data_value(raise_on_bad_status=False)
         finally:
             await client.disconnect()
 
@@ -87,11 +87,15 @@ class OpcUaClient:
             await self._client.disconnect()
             self._client = None
 
-    async def read_data_value(self, node_id: str) -> ua.DataValue:
-        """Читает DataValue (Value + StatusCode + SourceTimestamp) тега."""
+    async def read_data_value(self, node_id: str, raise_on_bad_status: bool = False) -> ua.DataValue:
+        """
+        Читает DataValue (Value + StatusCode + SourceTimestamp) тега.
+        По умолчанию не бросает исключение при плохом статусе (например BadNoCommunication),
+        а возвращает DataValue со статусом — статус проверяется в сценарии.
+        """
         if self._client is None:
             raise RuntimeError("OPC UA клиент не подключён")
-        return await self._client.get_node(node_id).read_data_value()
+        return await self._client.get_node(node_id).read_data_value(raise_on_bad_status=raise_on_bad_status)
 
     async def read_value(self, node_id: str) -> Any:
         """Читает только значение тега."""

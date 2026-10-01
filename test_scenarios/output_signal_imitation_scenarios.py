@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import Optional
 
 import allure
+import pytest
 
 from clients.opc_ua_client import OpcUaClient
 from constants.architecture_constants import EnvKeyConstants
@@ -42,6 +43,11 @@ async def imitate_output_signal(
     # ===== 1. Слепок значений ноды до имитации =====
     with allure.step("Чтение значения выходного сигнала до имитации (OPC UA)"):
         before_dv = await opc_client.read_data_value(node_id)
+        if not before_dv.StatusCode.is_good():
+            pytest.fail(
+                f"Нет данных по тегу {case.address}.{case.opc_suffix} (NodeId: {node_id}). "
+                f"Статус: {before_dv.StatusCode.name} ({before_dv.StatusCode.value})"
+            )
         allure.attach(
             format_opc_snapshot(node_id, before_dv),
             name=f"до: {case.address}.{case.opc_suffix}",
@@ -66,6 +72,11 @@ async def imitate_output_signal(
     # ===== 3. Слепок значений ноды после имитации =====
     with allure.step("Чтение значения выходного сигнала после имитации (OPC UA)"):
         after_dv = await opc_client.read_data_value(node_id)
+        if not after_dv.StatusCode.is_good():
+            pytest.fail(
+                f"Нет данных по тегу {case.address}.{case.opc_suffix} (NodeId: {node_id}) после имитации. "
+                f"Статус: {after_dv.StatusCode.name} ({after_dv.StatusCode.value})"
+            )
         allure.attach(
             format_opc_snapshot(node_id, after_dv),
             name=f"после: {case.address}.{case.opc_suffix}",
