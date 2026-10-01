@@ -10,6 +10,9 @@
 - Запускать с dataAbsence false в конфигурации
 """
 
+# НАИБОЛЕЕ АКТУАЛЬНЫЙ: наиболее обогащённая версия сценария (STOP, ~216 км, ДУ3);
+# заменяет imitative_7.
+
 from constants.enums import (
     TU,
     AdminTU,

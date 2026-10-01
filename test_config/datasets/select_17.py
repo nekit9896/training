@@ -7,6 +7,9 @@
 - Интенсивность утечки 13,2%
 """
 
+# НАИБОЛЕЕ АКТУАЛЬНЫЙ: основная версия сценария (UNSTATIONARY, 75 км, ДУ2);
+# заменяет похожие select_21 и select_22.
+
 from constants.enums import (
     TU,
     AdminTU,

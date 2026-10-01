@@ -8,6 +8,8 @@
 - Определение утечки на НПС
 """
 
+# НАИБОЛЕЕ АКТУАЛЬНЫЙ: уникальный сценарий (BALANCE_IN_NPS, утечка на НПС, ДУ1).
+
 from constants.enums import (
     TU,
     AdminTU,
