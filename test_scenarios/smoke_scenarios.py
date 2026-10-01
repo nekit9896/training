@@ -634,23 +634,19 @@ async def imitate_sensor_signal(
             sensor_imitate_reply_status
         ).expected(ReplyStatus.OK.value).equal_to()
 
-        time.sleep(cfg.basic_message_timeout)
-
     with allure.step("Подключение по ws и http, получение и обработка данных сообщений для проверки имитации"):
         with allure.step(
             "Получение данных для проверки имитации. Тип сообщения: InputSignalsContent. ЭФ Диагностика Сигналов."
         ):
-            payload = await t_utils.connect_and_poll_subscribed_msg(
+            parsed_payload, imitate_elapsed = await t_utils.poll_input_signal_state(
                 ws_client,
-                "InputSignalsContent",
-                "SubscribeInputSignalsRequest",
-                {
-                    'signalIds': [sensor_id],
-                    'tuId': cfg.tu_id,
-                    'additionalProperties': None,
-                },
+                [sensor_id],
+                "isImitated",
+                True,
+                {'signalIds': [sensor_id], 'tuId': cfg.tu_id, 'additionalProperties': None},
             )
-            parsed_payload = parser.parse_input_signals_info_msg(payload)
+            with allure.step(f"Имитация установилась за {imitate_elapsed:.0f} сек"):
+                pass
 
         with allure.step(
             "Подготовка данных для проверки имитации. Тип сообщения: InputSignalsContent. ЭФ Диагностика Сигналов."
@@ -676,7 +672,6 @@ async def imitate_sensor_signal(
             is_imitated_scheme_sensor_imitate = getattr(scheme_sensor_imitate_data, 'isImitated', [])
 
     with allure.step(f"Http запрос и обработка ответа о снятии имитации датчика с id: {sensor_id}"):
-        time.sleep(cfg.basic_message_timeout)
         request_body = {'id': sensor_id, 'tuId': cfg.tu_id}
         response = http_client.post_request(HttpConst.UNIMITATE_SIGNAL_URL_PATH, request_body)
         sensor_unimitate_reply_status = response.status_code
@@ -684,23 +679,20 @@ async def imitate_sensor_signal(
         StepCheck("Проверка кода ответа на запрос о снятии имитации", "replyStatus").actual(
             sensor_unimitate_reply_status
         ).expected(ReplyStatus.OK.value).equal_to()
-        time.sleep(cfg.basic_message_timeout)
 
     with allure.step("Подключение по ws и http, получение и обработка данных сообщений для проверки снятия имитации"):
         with allure.step(
             "Получение данных для проверки снятия имитации. InputSignalsContent. ЭФ Диагностика Сигналов."
         ):
-            payload = await t_utils.connect_and_poll_subscribed_msg(
+            parsed_payload, unimitate_elapsed = await t_utils.poll_input_signal_state(
                 ws_client,
-                "InputSignalsContent",
-                "SubscribeInputSignalsRequest",
-                {
-                    'signalIds': [sensor_id],
-                    'tuId': cfg.tu_id,
-                    'additionalProperties': None,
-                },
+                [sensor_id],
+                "isImitated",
+                False,
+                {'signalIds': [sensor_id], 'tuId': cfg.tu_id, 'additionalProperties': None},
             )
-            parsed_payload = parser.parse_input_signals_info_msg(payload)
+            with allure.step(f"Имитация снялась за {unimitate_elapsed:.0f} сек"):
+                pass
 
         with allure.step("Извлечение и подготовка данных для проверки снятия имитации"):
             sensor_data = getattr(parsed_payload.replyContent, 'inputSignals', [])
@@ -751,7 +743,7 @@ async def imitate_sensor_signal(
             filter_by_unimitation_messages = [
                 msg
                 for msg in filter_time_messages
-                if getattr(msg, "event", None) == imitation_event and getattr(msg, "tag", None) == sensor_address
+                if getattr(msg, "event", None) == unimitation_event and getattr(msg, "tag", None) == sensor_address
             ]
 
     with SoftAssertions() as soft_failures:
@@ -819,18 +811,19 @@ async def mask_signal_test(ws_client, http_client, cfg: SmokeSuiteConfig, test_d
     with allure.step(
         "Подключение по ws, получение и обработка данных о статусе датчиков из сообщения типа: InputSignalsContent"
     ):
-        time.sleep(cfg.basic_message_timeout)
-        payload = await t_utils.connect_and_poll_subscribed_msg(
+        parsed_payload, mask_elapsed = await t_utils.poll_input_signal_state(
             ws_client,
-            "InputSignalsContent",
-            "SubscribeInputSignalsRequest",
+            [pressure_sensor_id, flowmeter_id],
+            "isMasked",
+            True,
             {
                 'signalIds': [pressure_sensor_id, flowmeter_id],
                 'tuId': cfg.tu_id,
                 'additionalProperties': None,
             },
         )
-        parsed_payload = parser.parse_input_signals_info_msg(payload)
+        with allure.step(f"Маскирование установилось за {mask_elapsed:.0f} сек"):
+            pass
 
     with allure.step("Извлечение и подготовка данных для проверки маскирования"):
         sensor_data = getattr(parsed_payload.replyContent, 'inputSignals', [])
@@ -864,18 +857,19 @@ async def mask_signal_test(ws_client, http_client, cfg: SmokeSuiteConfig, test_d
     with allure.step(
         "Подключение по ws, получение и обработка данных о статусе датчиков из сообщения типа: InputSignalsContent"
     ):
-        time.sleep(cfg.basic_message_timeout)
-        payload = await t_utils.connect_and_poll_subscribed_msg(
+        parsed_payload, unmask_elapsed = await t_utils.poll_input_signal_state(
             ws_client,
-            "InputSignalsContent",
-            "SubscribeInputSignalsRequest",
+            [pressure_sensor_id, flowmeter_id],
+            "isMasked",
+            False,
             {
                 'signalIds': [pressure_sensor_id, flowmeter_id],
                 'tuId': cfg.tu_id,
                 'additionalProperties': None,
             },
         )
-        parsed_payload = parser.parse_input_signals_info_msg(payload)
+        with allure.step(f"Маскирование снялось за {unmask_elapsed:.0f} сек"):
+            pass
 
     with allure.step("Извлечение и подготовка данных для проверки снятия маскирования"):
         sensor_data = getattr(parsed_payload.replyContent, 'inputSignals', [])

@@ -4,6 +4,7 @@ import asyncio
 import pprint
 import random
 import re
+import time
 from collections import Counter
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta, timezone
@@ -1271,6 +1272,46 @@ async def connect_and_poll_subscribed_msg(
         fail(f"Не удалось получить сообщение с контентом типа: {ws_message_type} за {retries} попыток")
     finally:
         ws_client.suppress_recv_logging = False
+
+
+async def poll_input_signal_state(
+    ws_client: WebSocketClient,
+    sensor_ids: list[int],
+    flag_field: str,
+    expected_value: bool,
+    ws_invoke_params: Any,
+    *,
+    attempts: int = TestConst.SIGNAL_STATE_POLL_ATTEMPTS,
+    per_attempt_timeout: float = TestConst.POLL_BY_TIMEOUT_SECONDS,
+) -> tuple[Any, float]:
+    """Опрашивает InputSignalsContent, пока у всех sensor_ids поле flag_field не станет expected_value.
+
+    Возвращает подтверждающий parsed_payload и затраченное время (сек).
+    При недостижении состояния за attempts попыток завершается fail(...).
+    """
+    start = time.monotonic()
+    async for payload in _receive_subscribed_messages(
+        ws_client,
+        "InputSignalsContent",
+        "SubscribeInputSignalsRequest",
+        ws_invoke_params,
+        attempts=attempts,
+        per_attempt_timeout=per_attempt_timeout,
+    ):
+        parsed = ws_message_parser.parse_input_signals_info_msg(payload)
+        signals = getattr(parsed.replyContent, "inputSignals", []) or []
+        signals_by_id = {signal.id: signal for signal in signals if getattr(signal, "id", None) is not None}
+        if all(
+            sensor_id in signals_by_id
+            and bool(getattr(signals_by_id[sensor_id], flag_field, False)) == bool(expected_value)
+            for sensor_id in sensor_ids
+        ):
+            return parsed, time.monotonic() - start
+
+    fail(
+        f"Сигналы id={sensor_ids} не перешли в состояние {flag_field}={expected_value} "
+        f"за {attempts} попыток (лимит ~{attempts * per_attempt_timeout} сек)"
+    )
 
 
 async def connect_and_poll_subscribed_signal(

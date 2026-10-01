@@ -134,6 +134,7 @@ class BaseTN3Constants:
     BASIC_MESSAGE_TIMEOUT = 10.0  # Таймаут ожидания сообщений в секундах
     SUBSCRIBE_MESSAGE_POLL_ATTEMPTS = 12  # Число чтений из потока подписки до отказа
     POLL_BY_TIMEOUT_SECONDS = 10.0  # Таймаут ожидания сообщения в секундах
+    SIGNAL_STATE_POLL_ATTEMPTS = 12  # Число опросов состояния датчика
     MASK_MESSAGE_TIMEOUT = 180.0  # Таймаут ожидания сообщений в секундах
     PRECISION = 3  # Точность округления для координат
     DIGITS_WITH_DOT_PATTERN = r'\d+(?:\.\d+)?'  # Регулярное выражение для поиска чисел с точкой
