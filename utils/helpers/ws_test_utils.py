@@ -1205,19 +1205,22 @@ async def _receive_subscribed_messages(
     needs_subscribe = True
     for attempt in range(1, attempts + 1):
         try:
+            if needs_subscribe:
+                await connect(ws_client, ws_invoke_type, ws_invoke_params)
+                needs_subscribe = False
             with allure.step(
                 f"Получение сообщения с контентом типа: {ws_message_type} - попытка {attempt} из {attempts}"
             ):
-                if needs_subscribe:
-                    await connect(ws_client, ws_invoke_type, ws_invoke_params)
-                    needs_subscribe = False
-                yield await ws_client.receive_by_type(ws_message_type, timeout=per_attempt_timeout)
+                message = await ws_client.receive_by_type(ws_message_type, timeout=per_attempt_timeout)
         except asyncio.TimeoutError:
             await ws_client.reconnect()
             needs_subscribe = True
+            continue
         except Exception:
             await ws_client.reconnect()
             needs_subscribe = True
+            continue
+        yield message
 
 
 async def connect_and_get_parsed_msg_by_tu_id(
