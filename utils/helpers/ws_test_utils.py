@@ -4,11 +4,12 @@ import asyncio
 import pprint
 import random
 import re
+import time
 from collections import Counter
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum, IntFlag
-from typing import Any, Callable, List, Optional, Protocol, Set, Type, TypeVar
+from typing import Any, AsyncIterator, Callable, List, Optional, Protocol, Set, Type, TypeVar
 from zoneinfo import ZoneInfo
 
 import allure
@@ -1186,61 +1187,68 @@ async def receive_download_exported_data_reply(
     )
 
 
+async def _receive_subscribed_messages(
+    ws_client: WebSocketClient,
+    ws_message_type: str,
+    ws_invoke_type: str,
+    ws_invoke_params: Any,
+    *,
+    attempts: int,
+    per_attempt_timeout: float,
+) -> AsyncIterator[list]:
+    """
+    Генератор сообщений подписки: подписывается и последовательно отдаёт сообщения
+    нужного типа. При таймауте или обрыве соединения переподключается и подписывается
+    заново, продолжая попытки до attempts. После исчерпания попыток генератор просто
+    завершается — итоговую ошибку формирует вызывающая функция.
+    """
+    needs_subscribe = True
+    for attempt in range(1, attempts + 1):
+        try:
+            if needs_subscribe:
+                await connect(ws_client, ws_invoke_type, ws_invoke_params)
+                needs_subscribe = False
+            with allure.step(
+                f"Получение сообщения с контентом типа: {ws_message_type} - попытка {attempt} из {attempts}"
+            ):
+                message = await ws_client.receive_by_type(ws_message_type, timeout=per_attempt_timeout)
+        except asyncio.TimeoutError:
+            await ws_client.reconnect()
+            needs_subscribe = True
+            continue
+        except Exception:
+            await ws_client.reconnect()
+            needs_subscribe = True
+            continue
+        yield message
+
+
 async def connect_and_get_parsed_msg_by_tu_id(
     tu_id: int,
     ws_client: WebSocketClient,
     ws_message_type: str,
     ws_invoke_type: str,
     ws_invoke_params: Any = None,
-    timeout: float = TestConst.BASIC_MESSAGE_TIMEOUT,
+    attempts: int = TestConst.SUBSCRIBE_MESSAGE_POLL_ATTEMPTS,
 ) -> SubscribeAllLeaksInfoReply:
     """
-    Подключается, ищет и парсит allLeaksInfo сообщение для конкретного ТУ
+    Подписывается и ищет allLeaksInfo сообщение для конкретного ТУ.
+    Читает сообщения нужного типа с ретраями и реконнектом, фильтруя по tuId.
     """
-    await connect(ws_client, ws_invoke_type, ws_invoke_params)
+    async for payload in _receive_subscribed_messages(
+        ws_client,
+        ws_message_type,
+        ws_invoke_type,
+        ws_invoke_params,
+        attempts=attempts,
+        per_attempt_timeout=TestConst.POLL_BY_TIMEOUT_SECONDS,
+    ):
+        parsed_payload = ws_message_parser.parse_all_leaks_info_msg(payload)
+        #  Ищет сообщение с нужным ТУ
+        if parsed_payload.replyContent.tuId == tu_id:
+            return parsed_payload
 
-    async def get_parsed_msg():
-        """
-        Ищет и парсит allLeaksInfo сообщение для конкретного ТУ
-        """
-        while True:
-            payload = await ws_client.receive_by_type(ws_message_type, timeout=timeout)
-            parsed_payload = ws_message_parser.parse_all_leaks_info_msg(payload)
-            #  Ищет сообщение с нужным ТУ
-            if parsed_payload.replyContent.tuId == tu_id:
-                return parsed_payload
-
-    try:
-        with allure.step(f"Получение сообщения с контентом типа: {ws_message_type} для ТУ {tu_id}"):
-            return await asyncio.wait_for(get_parsed_msg(), timeout=timeout)
-    except (asyncio.TimeoutError, ConnectionError, ConnectionResetError, OSError) as error:
-        fail(f"Не удалось получить сообщение allLeaksInfo для ТУ {tu_id}. Ошибка: {error}")
-
-
-async def connect_and_get_msg(
-    ws_client: WebSocketClient,
-    ws_invoke_type: str,
-    ws_invoke_params: Any = None,
-    receive_timeout: Optional[float] = None,
-) -> list:
-    """
-    Подключение типа get к заданной подписке и получение сообщения с заданным типом контента
-    """
-    await connect(ws_client, ws_invoke_type, ws_invoke_params)
-    invocation_id = ws_client.invocation_id
-    timeout = receive_timeout if receive_timeout is not None else WS_Const.FILTERING_TIMEOUT
-
-    try:
-        if _is_configurator_flow_active():
-            payload = await ws_client.receive_by_invocation_id(invocation_id, timeout=timeout)
-        else:
-            with allure.step(f"Получение входящего сообщения c invocation_id: {invocation_id}"):
-                payload = await ws_client.receive_by_invocation_id(invocation_id, timeout=timeout)
-        return payload
-    except (asyncio.TimeoutError, ConnectionError, ConnectionResetError, OSError) as error:
-        if _is_configurator_flow_active():
-            raise
-        fail(f"Не удалось получить сообщение типа: {ws_invoke_type}. Ошибка: {error}")
+    fail(f"Не удалось получить сообщение {ws_message_type} для ТУ {tu_id} за {attempts} попыток")
 
 
 async def connect_and_poll_subscribed_msg(
@@ -1255,27 +1263,58 @@ async def connect_and_poll_subscribed_msg(
     """
     ws_client.suppress_recv_logging = True
     try:
-        for attempt in range(1, retries + 1):
-            try:
-                with allure.step(
-                    f"Получение сообщения с контентом типа: {ws_message_type} - попытка {attempt} из {retries}"
-                ):
-                    await connect(ws_client, ws_invoke_type, ws_invoke_params)
-                    payload = await ws_client.receive_by_type(
-                        ws_message_type, timeout=TestConst.POLL_BY_TIMEOUT_SECONDS
-                    )
-                    return payload
-            except asyncio.TimeoutError:
-                await ws_client.reconnect()
-                continue
-            except Exception:
-                await ws_client.reconnect()
-                continue
+        async for payload in _receive_subscribed_messages(
+            ws_client,
+            ws_message_type,
+            ws_invoke_type,
+            ws_invoke_params,
+            attempts=retries,
+            per_attempt_timeout=TestConst.POLL_BY_TIMEOUT_SECONDS,
+        ):
+            return payload
         fail(f"Не удалось получить сообщение с контентом типа: {ws_message_type} за {retries} попыток")
-    except (asyncio.TimeoutError, OSError, ConnectionError, ConnectionResetError) as error:
-        fail(f"Не удалось получить сообщение типа: {ws_message_type}. Ошибка: {error}")
     finally:
         ws_client.suppress_recv_logging = False
+
+
+async def poll_input_signal_state(
+    ws_client: WebSocketClient,
+    sensor_ids: list[int],
+    flag_field: str,
+    expected_value: bool,
+    ws_invoke_params: Any,
+    *,
+    attempts: int = TestConst.SIGNAL_STATE_POLL_ATTEMPTS,
+    per_attempt_timeout: float = TestConst.POLL_BY_TIMEOUT_SECONDS,
+) -> tuple[Any, float]:
+    """Опрашивает InputSignalsContent, пока у всех sensor_ids поле flag_field не станет expected_value.
+
+    Возвращает подтверждающий parsed_payload и затраченное время (сек).
+    При недостижении состояния за attempts попыток завершается fail(...).
+    """
+    start = time.monotonic()
+    async for payload in _receive_subscribed_messages(
+        ws_client,
+        "InputSignalsContent",
+        "SubscribeInputSignalsRequest",
+        ws_invoke_params,
+        attempts=attempts,
+        per_attempt_timeout=per_attempt_timeout,
+    ):
+        parsed = ws_message_parser.parse_input_signals_info_msg(payload)
+        signals = getattr(parsed.replyContent, "inputSignals", []) or []
+        signals_by_id = {signal.id: signal for signal in signals if getattr(signal, "id", None) is not None}
+        if all(
+            sensor_id in signals_by_id
+            and bool(getattr(signals_by_id[sensor_id], flag_field, False)) == bool(expected_value)
+            for sensor_id in sensor_ids
+        ):
+            return parsed, time.monotonic() - start
+
+    fail(
+        f"Сигналы id={sensor_ids} не перешли в состояние {flag_field}={expected_value} "
+        f"за {attempts} попыток (лимит ~{attempts * per_attempt_timeout} сек)"
+    )
 
 
 async def connect_and_poll_subscribed_signal(
@@ -1289,72 +1328,46 @@ async def connect_and_poll_subscribed_signal(
     extract_signals: Callable[[ParsedPayloadType], List[InputSignalType]],
     *,
     max_messages: int = TestConst.SUBSCRIBE_MESSAGE_POLL_ATTEMPTS,
-    timeout: float = TestConst.BASIC_MESSAGE_TIMEOUT,
+    timeout: float = TestConst.POLL_BY_TIMEOUT_SECONDS,
 ) -> tuple[ParsedPayloadType, InputSignalType]:
     """
-    Подписывается один раз и читает до max_messages сообщений из потока,
-    пока не найдёт сигнал с нужным id.
+    Подписывается и читает до max_messages сообщений из потока, пока не найдёт сигнал
+    с нужным id. При таймауте/обрыве соединения переподключается и подписывается заново.
     """
-    await connect(ws_client, ws_invoke_type, ws_invoke_params)
-
     received_ids: Set[int] = set()
 
-    try:
-        for attempt in range(1, max_messages + 1):
-            with allure.step(
-                f"Получение сообщения с контентом типа: {ws_message_type} - попытка {attempt} из {max_messages}"
-            ):
-                payload = await ws_client.receive_by_type(ws_message_type, timeout=timeout)
+    async for payload in _receive_subscribed_messages(
+        ws_client,
+        ws_message_type,
+        ws_invoke_type,
+        ws_invoke_params,
+        attempts=max_messages,
+        per_attempt_timeout=timeout,
+    ):
+        parsed = parse_payload(payload)
+        signals = extract_signals(parsed) or []
 
-            parsed = parse_payload(payload)
-            signals = extract_signals(parsed) or []
+        for signal in signals:
+            signal_id = getattr(signal, "id", None)
+            if signal_id is not None:
+                received_ids.add(signal_id)
 
-            for signal in signals:
-                signal_id = getattr(signal, "id", None)
-                if signal_id is not None:
-                    received_ids.add(signal_id)
+        target_signal = find_object_by_field(signals, "id", sensor_id)
+        if target_signal is not None:
+            allure.attach(
+                f"Сигнал id={sensor_id} ({sensor_description}) найден\n"
+                f"Всего сигналов в сообщении: {len(signals)}\n"
+                f"Полученные id: {sorted(received_ids)}",
+                name=f"Результат поиска сигнала в {ws_message_type}",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+            return parsed, target_signal
 
-            target_signal = find_object_by_field(signals, "id", sensor_id)
-            if target_signal is not None:
-                allure.attach(
-                    f"Сигнал id={sensor_id} ({sensor_description}) найден на попытке {attempt} из {max_messages}\n"
-                    f"Всего сигналов в сообщении: {len(signals)}\n"
-                    f"Полученные id: {sorted(received_ids)}",
-                    name=f"Результат поиска сигнала в {ws_message_type}",
-                    attachment_type=allure.attachment_type.TEXT,
-                )
-                return parsed, target_signal
-
-        received_ids_text = ", ".join(str(signal_id) for signal_id in sorted(received_ids)) or "нет"
-        fail(
-            f"Информация по датчику {sensor_description} (id={sensor_id}) не пришла в ответе {ws_message_type} "
-            f"после {max_messages} попыток чтения из потока подписки. Полученные id: {received_ids_text}"
-        )
-    except (asyncio.TimeoutError, OSError, ConnectionError, ConnectionResetError) as error:
-        fail(
-            f"Не удалось получить сообщение типа: {ws_message_type} для датчика {sensor_description} "
-            f"(id={sensor_id}). Ошибка: {error}"
-        )
-
-
-async def connect_and_subscribe_msg(
-    ws_client: WebSocketClient,
-    ws_message_type: str,
-    ws_invoke_type: str,
-    ws_invoke_params: Any = None,
-    timeout: float = TestConst.BASIC_MESSAGE_TIMEOUT,
-) -> list:
-    """
-    Подключение типа subscribe к заданной подписке и получение сообщения с заданным типом контента
-    """
-    await connect(ws_client, ws_invoke_type, ws_invoke_params)
-    try:
-        with allure.step(f"Получение сообщения с контентом типа: {ws_message_type}"):
-            payload = await ws_client.receive_by_type(ws_message_type, timeout=timeout)
-
-        return payload
-    except (asyncio.TimeoutError, OSError, ConnectionError, ConnectionResetError) as error:
-        fail(f"Не удалось получить сообщение типа: {ws_invoke_type}. Ошибка: {error}")
+    received_ids_text = ", ".join(str(signal_id) for signal_id in sorted(received_ids)) or "нет"
+    fail(
+        f"Информация по датчику {sensor_description} (id={sensor_id}) не пришла в ответе {ws_message_type} "
+        f"после {max_messages} попыток чтения из потока подписки. Полученные id: {received_ids_text}"
+    )
 
 
 async def poll_balance_algorithm_diagnostic_areas(

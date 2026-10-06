@@ -6,6 +6,9 @@
 - Объём утечки 416.2 м³
 """
 
+# НАИБОЛЕЕ АКТУАЛЬНЫЙ: уникальный сценарий (UNSTATIONARY/CHANGED_IN_DECISION_MAKING,
+# 129 км, ДУ2).
+
 from constants.enums import (
     TU,
     AdminTU,

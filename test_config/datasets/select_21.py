@@ -6,6 +6,10 @@
 - Объём утечки 400 м³
 """
 
+# ЗАМЕНА (дубль): аналогичный сценарий (режим UNSTATIONARY + координата 75 км + ДУ2
+# совпадают, объём несуществен) покрыт набором select_17. Запускать вместо:
+#   pytest tests/test_smoke.py --suites=select_17
+
 from constants.enums import (
     TU,
     AdminTU,

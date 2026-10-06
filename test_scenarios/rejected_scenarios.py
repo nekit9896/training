@@ -57,23 +57,24 @@ async def rejection_input_signals(ws_client, cfg: IsRejectedConfig, rejection_ca
             lambda parsed: parsed.replyContent.inputSignals,
         )
 
-    with SoftAssertions() as soft_failures:
-        StepCheck(
-            f"Проверка отбраковки датчика {sensor.description} (id={sensor.id})", "isRejected", soft_failures
-        ).actual(target_signal.isRejected).expected(True).equal_to()
-
-        if rejection_case.expected_criteria_names:
-            raw_criteria = (
-                target_signal.rejection.get(TestConst.CRITERIA_NAMES_FIELD)
-                if isinstance(target_signal.rejection, dict)
-                else None
-            )
-            criteria = RejectionCriteria(raw_criteria) if raw_criteria is not None else None
+    with allure.step(f"Проверка результата отбраковки датчика {sensor.description} (id={sensor.id})"):
+        with SoftAssertions() as soft_failures:
             StepCheck(
-                f"Проверка rejection.criteriaNames для {sensor.description} (id={sensor.id})",
-                TestConst.CRITERIA_NAMES_FIELD,
-                soft_failures,
-            ).actual(criteria).expected(rejection_case.expected_criteria_names).equal_to()
+                f"Проверка отбраковки датчика {sensor.description} (id={sensor.id})", "isRejected", soft_failures
+            ).actual(target_signal.isRejected).expected(True).equal_to()
+
+            if rejection_case.expected_criteria_names:
+                raw_criteria = (
+                    target_signal.rejection.get(TestConst.CRITERIA_NAMES_FIELD)
+                    if isinstance(target_signal.rejection, dict)
+                    else None
+                )
+                criteria = RejectionCriteria(raw_criteria) if raw_criteria is not None else None
+                StepCheck(
+                    f"Проверка rejection.criteriaNames для {sensor.description} (id={sensor.id})",
+                    TestConst.CRITERIA_NAMES_FIELD,
+                    soft_failures,
+                ).actual(criteria).expected(rejection_case.expected_criteria_names).equal_to()
 
 
 async def rejection_journal(http_client, cfg: IsRejectedConfig, rejection_case: RejectionTestCase, imitator_start_time):
@@ -228,31 +229,32 @@ async def rejection_scheme_signals_state(ws_client, cfg: IsRejectedConfig, rejec
         ws_client.suppress_recv_logging = False
         parser.suppress_recv_logging = False
 
-    with SoftAssertions() as soft_failures:
-        StepCheck(f"Проверка isRejected для {sensor.description} (id={sensor.id})", "isRejected", soft_failures).actual(
-            target_signal.isRejected
-        ).expected(rejection_case.expected_is_rejected).equal_to()
+    with allure.step(f"Проверка результата отбраковки датчика {sensor.description} (id={sensor.id})"):
+        with SoftAssertions() as soft_failures:
+            StepCheck(f"Проверка isRejected для {sensor.description} (id={sensor.id})", "isRejected", soft_failures).actual(
+                target_signal.isRejected
+            ).expected(rejection_case.expected_is_rejected).equal_to()
 
-        StepCheck(f"Проверка isMasked для {sensor.description} (id={sensor.id})", "isMasked", soft_failures).actual(
-            target_signal.isMasked
-        ).expected(False).equal_to()
+            StepCheck(f"Проверка isMasked для {sensor.description} (id={sensor.id})", "isMasked", soft_failures).actual(
+                target_signal.isMasked
+            ).expected(False).equal_to()
 
-        StepCheck(f"Проверка isImitated для {sensor.description} (id={sensor.id})", "isImitated", soft_failures).actual(
-            target_signal.isImitated
-        ).expected(False).equal_to()
+            StepCheck(f"Проверка isImitated для {sensor.description} (id={sensor.id})", "isImitated", soft_failures).actual(
+                target_signal.isImitated
+            ).expected(False).equal_to()
 
-        if rejection_case.expected_criteria_names and target_signal.rejection is not None:
-            raw_criteria = (
-                target_signal.rejection.get(TestConst.CRITERIA_NAMES_FIELD)
-                if isinstance(target_signal.rejection, dict)
-                else None
-            )
-            criteria = RejectionCriteria(raw_criteria) if raw_criteria is not None else None
-            StepCheck(
-                f"Проверка rejection.criteriaNames для {sensor.description} (id={sensor.id})",
-                TestConst.CRITERIA_NAMES_FIELD,
-                soft_failures,
-            ).actual(criteria).expected(rejection_case.expected_criteria_names).equal_to()
+            if rejection_case.expected_criteria_names and target_signal.rejection is not None:
+                raw_criteria = (
+                    target_signal.rejection.get(TestConst.CRITERIA_NAMES_FIELD)
+                    if isinstance(target_signal.rejection, dict)
+                    else None
+                )
+                criteria = RejectionCriteria(raw_criteria) if raw_criteria is not None else None
+                StepCheck(
+                    f"Проверка rejection.criteriaNames для {sensor.description} (id={sensor.id})",
+                    TestConst.CRITERIA_NAMES_FIELD,
+                    soft_failures,
+                ).actual(criteria).expected(rejection_case.expected_criteria_names).equal_to()
 
 
 async def export_rejection_report(ws_client, http_client, cfg: IsRejectedConfig, imitator_start_time: datetime):

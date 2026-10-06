@@ -856,29 +856,50 @@ def pytest_runtest_teardown(item, nextitem):
         if cfg.get("vault_rejection_enabled"):
             reset_vault_process_empty_values_rejection()
             cfg["vault_rejection_enabled"] = False
-        if stand_manager := cfg["stand_manager"]:
-            try:
-                if cfg.get("suite_infra_ready"):
-                    stand_manager.stop_imitator_wrapper()
+        # Обёртка teardown в try-except для предотвращения влияния ошибок на статус тестов
+        try:
+            if stand_manager := cfg["stand_manager"]:
                 try:
-                    stand_manager.restore_signal_unit_conversion_rules()
-                except Exception:
-                    logger.exception("[ERROR] [TEARDOWN] Ошибка при восстановлении signal_unit_conversion_rules.json")
-                stand_manager.server_test_data_remover()
-            finally:
-                cfg["stand_manager"] = None
-        cfg["current_suite"] = None
-        cfg["suite_start_time"] = None
-        cfg["imitator_start_time"] = None
-        cfg["suite_infra_ready"] = False
+                    if cfg.get("suite_infra_ready"):
+                        stand_manager.stop_imitator_wrapper()
+                    try:
+                        stand_manager.restore_signal_unit_conversion_rules()
+                    except Exception:
+                        logger.exception(
+                            "[ERROR] [TEARDOWN] Ошибка при восстановлении signal_unit_conversion_rules.json"
+                        )
+                    stand_manager.server_test_data_remover()
+                finally:
+                    cfg["stand_manager"] = None
+                cfg["current_suite"] = None
+                cfg["suite_start_time"] = None
+                cfg["imitator_start_time"] = None
+                cfg["suite_infra_ready"] = False
 
-        # опционально дождаться завершения потока (если не daemon) — безопасный join
-        imitator_thread = cfg.get("imitator_thread")
-        if imitator_thread and not getattr(imitator_thread, "daemon", False):
+                # опционально дождаться завершения потока - безопасный join
+                imitator_thread = cfg.get("imitator_thread")
+                if imitator_thread and not getattr(imitator_thread, "daemon", False):
+                    try:
+                        imitator_thread.join(timeout=5)
+                    except RuntimeError:
+                        logger.exception("Ошибка при join() фона имитатора")
+        except Exception as teardown_error:
+            # Логирование ошибки teardown, но не прерывание pytest
+            # Ошибки teardown не должны влиять на статус тестов
+            logger.error(
+                "[TEARDOWN] [ERROR] Ошибка при teardown набора '%s': %s",
+                cfg.get("current_suite"),
+                teardown_error,
+                exc_info=True,
+            )
             try:
-                imitator_thread.join(timeout=5)
-            except RuntimeError:
-                logger.exception("Ошибка при join() фона имитатора")
+                allure.attach(
+                    f"[TEARDOWN] [ERROR] Остановка инфраструктуры завершилась с ошибкой: {teardown_error}",
+                    name="Ошибка teardown",
+                    attachment_type=allure.attachment_type.TEXT,
+                )
+            except Exception:
+                logger.debug("Не удалось прикрепить ошибку teardown к Allure", exc_info=True)
 
 
 @pytest_asyncio.fixture
