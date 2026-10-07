@@ -185,6 +185,7 @@ class WebSocketClientConstants(StandConstants):
     KEEPALIVE_POLL_INTERVAL_SECONDS: float = 5.0  # периодичность проверки соединения и stop-сигнала
     KEEPALIVE_QUEUE_CLEAN_INTERVAL_SECONDS: float = 300.0  # как часто чистить очередь входящих сообщений
     KEEPALIVE_STOP_JOIN_TIMEOUT_SECONDS: float = 5.0  # таймаут join() фонового потока при остановке
+    KEEPALIVE_HEARTBEAT_INTERVAL_SECONDS: float = 60.0  # период heartbeat-лога фоновой подписки
 
 
 class MockConstants:

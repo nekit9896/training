@@ -90,14 +90,30 @@ async def _keepalive_async(group_state: dict, stop_event: threading.Event) -> No
                     "[KEEPER] фоновая подписка запущена: %s",
                     WS_Const.KEEPALIVE_SUBSCRIPTION_REQUEST,
                 )
+                connected_at = time.monotonic()
                 last_clean = time.monotonic()
+                last_heartbeat = time.monotonic()
+                last_received = client.received_messages_count
                 while not stop_event.is_set():
                     await asyncio.sleep(WS_Const.KEEPALIVE_POLL_INTERVAL_SECONDS)
                     if stop_event.is_set():
                         break
-                    if time.monotonic() - last_clean >= WS_Const.KEEPALIVE_QUEUE_CLEAN_INTERVAL_SECONDS:
+                    now = time.monotonic()
+                    if now - last_clean >= WS_Const.KEEPALIVE_QUEUE_CLEAN_INTERVAL_SECONDS:
                         client.clear_queue()
-                        last_clean = time.monotonic()
+                        last_clean = now
+                    if now - last_heartbeat >= WS_Const.KEEPALIVE_HEARTBEAT_INTERVAL_SECONDS:
+                        received_now = client.received_messages_count
+                        logger.info(
+                            "[KEEPER] heartbeat: соединение активно=%s, аптайм=%.0fс, "
+                            "сообщений за минуту=%d (всего=%d)",
+                            client.is_connected,
+                            now - connected_at,
+                            received_now - last_received,
+                            received_now,
+                        )
+                        last_received = received_now
+                        last_heartbeat = now
                     if not client.is_connected:
                         logger.warning("[KEEPER] соединение потеряно, переподключаемся")
                         break

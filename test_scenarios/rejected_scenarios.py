@@ -231,17 +231,17 @@ async def rejection_scheme_signals_state(ws_client, cfg: IsRejectedConfig, rejec
 
     with allure.step(f"Проверка результата отбраковки датчика {sensor.description} (id={sensor.id})"):
         with SoftAssertions() as soft_failures:
-            StepCheck(f"Проверка isRejected для {sensor.description} (id={sensor.id})", "isRejected", soft_failures).actual(
-                target_signal.isRejected
-            ).expected(rejection_case.expected_is_rejected).equal_to()
+            StepCheck(
+                f"Проверка isRejected для {sensor.description} (id={sensor.id})", "isRejected", soft_failures
+            ).actual(target_signal.isRejected).expected(rejection_case.expected_is_rejected).equal_to()
 
             StepCheck(f"Проверка isMasked для {sensor.description} (id={sensor.id})", "isMasked", soft_failures).actual(
                 target_signal.isMasked
             ).expected(False).equal_to()
 
-            StepCheck(f"Проверка isImitated для {sensor.description} (id={sensor.id})", "isImitated", soft_failures).actual(
-                target_signal.isImitated
-            ).expected(False).equal_to()
+            StepCheck(
+                f"Проверка isImitated для {sensor.description} (id={sensor.id})", "isImitated", soft_failures
+            ).actual(target_signal.isImitated).expected(False).equal_to()
 
             if rejection_case.expected_criteria_names and target_signal.rejection is not None:
                 raw_criteria = (

@@ -40,6 +40,7 @@ class WebSocketClient:
         self._stop_event = asyncio.Event()
         self._invocation_id: Optional[str] = None
         self.suppress_recv_logging: bool = False
+        self.received_messages_count: int = 0
 
     @property
     def invocation_id(self):
@@ -167,6 +168,7 @@ class WebSocketClient:
 
             result_message = parse_message(chunk)
             await self.recv_queue.put(result_message)
+            self.received_messages_count += 1
             if not self.suppress_recv_logging:
                 str_message = str(result_message)
                 logger.info(
