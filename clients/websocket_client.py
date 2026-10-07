@@ -45,6 +45,21 @@ class WebSocketClient:
     def invocation_id(self):
         return self._invocation_id
 
+    @property
+    def is_connected(self) -> bool:
+        """
+        True, если wss-соединение установлено и приём сообщений работает.
+
+        Соединение считается живым, пока открыт сокет и фоновый приёмник
+        (_recv_task) не завершился. При обрыве связи _recv_loop возвращается,
+        и задача переходит в состояние done - это признак потери соединения.
+        """
+        if self._ws is None:
+            return False
+        if self._recv_task is None:
+            return False
+        return not self._recv_task.done()
+
     def clear_queue(self):
         """
         Очищает очередь путем пересоздания экземпляра класса очереди

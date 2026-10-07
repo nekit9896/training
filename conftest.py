@@ -32,6 +32,7 @@ from utils.helpers.pytest_skip_utils import (
     resolve_skip_reason,
 )
 from utils.helpers.vault_pytest_utils import configure_vault_for_suite, reset_vault_process_empty_values_rejection
+from utils.helpers.ws_keepalive import start_background_subscription, stop_background_subscription
 from utils.helpers.ws_message_parser import ws_message_parser as lds_ws_parser
 
 
@@ -113,6 +114,7 @@ def pytest_configure(config):
         "x_user_id": None,
         "auth_suite": None,
         "vault_rejection_enabled": False,
+        "keepalive": None,
     }
 
 
@@ -607,6 +609,7 @@ def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
         logger.debug("Не удалось прикрепить ошибку setup к Allure", exc_info=True)
 
     logger.info("[TEARDOWN] LDS Configurator очистка после ошибки setup набора")
+    stop_background_subscription(cfg)
     _run_lds_configurator_teardown_if_needed(cfg)
     if stand_manager := cfg.get("stand_manager"):
         try:
@@ -634,6 +637,7 @@ def pytest_runtest_setup(item):
 
     if current_test_suite != cfg["current_suite"]:
         # stop old
+        stop_background_subscription(cfg)
         if stand_manager := cfg["stand_manager"]:
             try:
                 stand_manager.stop_imitator_wrapper()
@@ -745,6 +749,11 @@ def pytest_runtest_setup(item):
         # Сохраняем время старта имитатора для расчёта интервалов утечек в тестах
         cfg["imitator_start_time"] = stand_manager.start_time
 
+        # Запускаем фоновую подписку-keeper консьюмера api-gateway после старта
+        # lds-core и до проверки включённого ТУ в BasicInfo/MainPage: пока в прогоне
+        # есть хотя бы один подписчик, консьюмер не выключается и не копит лаг в очереди.
+        start_background_subscription(cfg)
+
         if suite_config is not None and suite_config.use_lds_configurator:
             if suite_config.admin_tu is None:
                 _skip_current_suite_after_setup_failure(
@@ -853,6 +862,7 @@ def pytest_runtest_teardown(item, nextitem):
     next_suite = next_marker.args[0] if next_marker else None
 
     if next_suite != cfg["current_suite"]:
+        stop_background_subscription(cfg)
         if cfg.get("vault_rejection_enabled"):
             reset_vault_process_empty_values_rejection()
             cfg["vault_rejection_enabled"] = False
@@ -982,6 +992,7 @@ def pytest_sessionfinish(session, exitstatus):
     # 1) teardown стенда: LDS Configurator + остановка имитатора
     try:
         group_state = getattr(session.config, "group_state", {})
+        stop_background_subscription(group_state)
         if group_state.get("vault_rejection_enabled"):
             reset_vault_process_empty_values_rejection()
             group_state["vault_rejection_enabled"] = False

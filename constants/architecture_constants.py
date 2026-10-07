@@ -179,6 +179,12 @@ class WebSocketClientConstants(StandConstants):
     INVOCATION_ID_INDEX = 2
     SERVICE_NAME: str = StandConstants.MAIN_SUBDOMAIN
     FILTERING_TIMEOUT: int | float = 30.0
+    # ===== Фоновая подписка-keeper консьюмера api-gateway (ws_keepalive) =====
+    KEEPALIVE_SUBSCRIPTION_REQUEST: str = "subscribeAllLeaksInfoRequest"
+    KEEPALIVE_RECONNECT_INTERVAL_SECONDS: float = 5.0  # пауза перед повторной подпиской после обрыва
+    KEEPALIVE_POLL_INTERVAL_SECONDS: float = 5.0  # периодичность проверки соединения и stop-сигнала
+    KEEPALIVE_QUEUE_CLEAN_INTERVAL_SECONDS: float = 300.0  # как часто чистить очередь входящих сообщений
+    KEEPALIVE_STOP_JOIN_TIMEOUT_SECONDS: float = 5.0  # таймаут join() фонового потока при остановке
 
 
 class MockConstants:
