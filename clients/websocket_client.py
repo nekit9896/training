@@ -44,6 +44,7 @@ class WebSocketClient:
         self._invocation_id: Optional[str] = None
         self.suppress_recv_logging: bool = False
         self.received_messages_count: int = 0
+        self.sent_ping_count: int = 0
 
     @property
     def invocation_id(self):
@@ -116,7 +117,7 @@ class WebSocketClient:
         finish = time.monotonic() + WS_Const.HANDSHAKE_WAITING
         while time.monotonic() < finish:
             chunk = await self._ws.recv()
-            logger.debug(f"Ответ на handshake: {chunk}")
+            logger.info(f"Ответ на handshake: {chunk}")
             buf += chunk.encode() if isinstance(chunk, str) else chunk
             if WS_Const.RS in buf:
                 return
@@ -142,12 +143,18 @@ class WebSocketClient:
             params=params,
             timeout=WS_Const.NEGOTIATE_TIMEOUT_SECONDS,
         )
-        logger.info("[NEGOTIATE] POST %s -> %s", self._negotiate_url, response.status_code)
         response.raise_for_status()
-        connection_token = response.json().get("connectionToken")
+        data = response.json()
+        connection_token = data.get("connectionToken")
+        logger.info(
+            "[NEGOTIATE] POST %s -> %s (connectionId=%s, connectionToken=%s)",
+            WS_Const.NEGOTIATE_ENDPOINT,
+            response.status_code,
+            data.get("connectionId"),
+            connection_token,
+        )
         if not connection_token:
             raise RuntimeError("negotiate не вернул connectionToken")
-        logger.debug("Получен connectionToken по /negotiate")
         return connection_token
 
     async def _connect_loop(self, timeout: float = WS_Const.WS_CONNECT_TIMEOUT_SECONDS) -> None:
@@ -233,6 +240,7 @@ class WebSocketClient:
             return
         packet = encode_with_varint_prefix(msgpack.packb([WS_Const.PING_MESSAGE_TYPE], use_bin_type=True))
         await self._ws.send(packet)
+        self.sent_ping_count += 1
 
     async def _ping_loop(self) -> None:
         """Периодически шлёт SignalR Ping, пока соединение живо."""

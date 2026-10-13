@@ -191,6 +191,7 @@ class WebSocketClientConstants(StandConstants):
     SUBSCRIBE_SELF_DIAGNOSTIC_REQUEST: str = "SubscribeSelfDiagnosticInfoRequest"
     REST_PING_INTERVAL_SECONDS: float = 5.0  # периодичность REST /Ping с correlation-id
     WS_SESSION_SUPERVISOR_INTERVAL_SECONDS: float = 1.0  # периодичность проверки жизни соединения
+    WS_SESSION_HEARTBEAT_INTERVAL_SECONDS: float = 60.0  # периодичность heartbeat-лога сессии
 
 
 class MockConstants:

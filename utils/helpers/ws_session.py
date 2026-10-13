@@ -29,18 +29,24 @@ class WsSessionManager:
         self._correlation_id = str(uuid.uuid4())
         self._supervisor_task: asyncio.Task | None = None
         self._rest_ping_task: asyncio.Task | None = None
+        self._heartbeat_task: asyncio.Task | None = None
+        self._rest_ping_count = 0
+        self._last_received = 0
+        self._last_sent_ping = 0
+        self._last_rest_ping = 0
 
     async def start(self) -> None:
         """Подписывается на bundle и запускает фоновые задачи."""
         await self._subscribe_bundle()
         self._supervisor_task = asyncio.create_task(self._supervisor_loop())
         self._rest_ping_task = asyncio.create_task(self._rest_ping_loop())
+        self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
         logger.info("[WS_SESSION] сессия запущена (correlation_id=%s)", self._correlation_id)
 
     async def stop(self) -> None:
         """Останавливает фоновые задачи."""
         self._stop_event.set()
-        for task in (self._rest_ping_task, self._supervisor_task):
+        for task in (self._rest_ping_task, self._supervisor_task, self._heartbeat_task):
             if task is not None:
                 task.cancel()
                 try:
@@ -79,6 +85,12 @@ class WsSessionManager:
                 return
             generation = self._group_state.get("dataset_generation")
             if not self._client.is_connected or generation != self._generation:
+                logger.info(
+                    "[WS_SESSION] переподключение: is_connected=%s, generation %s -> %s",
+                    self._client.is_connected,
+                    self._generation,
+                    generation,
+                )
                 await self._reestablish(generation)
 
     async def _reestablish(self, new_generation: int | None) -> None:
@@ -96,6 +108,30 @@ class WsSessionManager:
             return
         self._generation = new_generation
         await self._subscribe_bundle()
+        logger.info("[WS_SESSION] соединение переподключено, bundle переподписан")
+
+    async def _heartbeat_loop(self) -> None:
+        """Раз в минуту логирует состояние сессии: соединение, очередь, активность."""
+        while not self._stop_event.is_set():
+            await asyncio.sleep(WS_Const.WS_SESSION_HEARTBEAT_INTERVAL_SECONDS)
+            if self._stop_event.is_set():
+                return
+            received = self._client.received_messages_count
+            sent_ping = self._client.sent_ping_count
+            rest_ping = self._rest_ping_count
+            logger.info(
+                "[WS_SESSION] heartbeat: активно=%s, очередь=%d, получено_за_минуту=%d (всего=%d), "
+                "signalr_ping=%d, rest_ping=%d",
+                self._client.is_connected,
+                self._client.recv_queue.qsize(),
+                received - self._last_received,
+                received,
+                sent_ping - self._last_sent_ping,
+                rest_ping - self._last_rest_ping,
+            )
+            self._last_received = received
+            self._last_sent_ping = sent_ping
+            self._last_rest_ping = rest_ping
 
     async def _rest_ping_loop(self) -> None:
         """Периодически пингует REST /Ping с correlation-id."""
@@ -117,11 +153,17 @@ class WsSessionManager:
             HttpConst.X_SECURITY_SIGNATURE_KEY: auth_token,
             HttpConst.X_TN_CORRELATION_ID_KEY: self._correlation_id,
         }
+        self._rest_ping_count += 1
         try:
             response = await asyncio.to_thread(requests.post, url, headers=headers, timeout=10)
             if not response.ok:
-                logger.warning("[REST_PING] %s -> %s: %s", url, response.status_code, response.text[:200])
+                logger.warning(
+                    "[REST_PING] %s -> %s: %s",
+                    StandConstants.PING_URL_PATH,
+                    response.status_code,
+                    response.text[:200],
+                )
             else:
-                logger.debug("[REST_PING] %s -> %s", url, response.status_code)
+                logger.info("[REST_PING] %s -> %s", StandConstants.PING_URL_PATH, response.status_code)
         except requests.RequestException as error:
-            logger.warning("[REST_PING] ошибка запроса %s: %s", url, error)
+            logger.warning("[REST_PING] ошибка запроса %s: %s", StandConstants.PING_URL_PATH, error)
