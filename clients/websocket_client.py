@@ -126,9 +126,9 @@ class WebSocketClient:
 
     async def negotiate(self) -> str:
         """
-        SignalR-negotiate: получает connectionToken для ws-подключения.
+        SignalR-negotiate: получает connectionId для ws-подключения.
 
-        connectionToken подставляется в параметр id= URL вебсокета. Без negotiate
+        connectionId подставляется в параметр id= URL вебсокета. Без negotiate
         api-gateway не регистрирует соединение как полноценного SignalR-клиента,
         поэтому он обязателен для корректного подключения.
         """
@@ -145,17 +145,17 @@ class WebSocketClient:
         )
         response.raise_for_status()
         data = response.json()
-        connection_token = data.get("connectionToken")
+        connection_id = data.get("connectionId")
         logger.info(
             "[NEGOTIATE] POST %s -> %s (connectionId=%s, connectionToken=%s)",
             WS_Const.NEGOTIATE_ENDPOINT,
             response.status_code,
-            data.get("connectionId"),
-            connection_token,
+            connection_id,
+            data.get("connectionToken"),
         )
-        if not connection_token:
-            raise RuntimeError("negotiate не вернул connectionToken")
-        return connection_token
+        if not connection_id:
+            raise RuntimeError("negotiate не вернул connectionId")
+        return connection_id
 
     async def _connect_loop(self, timeout: float = WS_Const.WS_CONNECT_TIMEOUT_SECONDS) -> None:
         """
@@ -169,10 +169,10 @@ class WebSocketClient:
         while not self._stop_event.is_set():
             attempt += 1
             try:
-                connection_token = await self.negotiate()
+                connection_id = await self.negotiate()
                 self.ws_request = (
                     f"{self._ws_url}/?token={self._access_token}"
-                    f"&xUserId={self._x_user_id}&id={connection_token}"
+                    f"&xUserId={self._x_user_id}&id={connection_id}"
                 )
                 logger.info(f"Попытка подключения по wss: {self._ws_url}/?token=...&xUserId=...&id=...")
                 self._ws = await websockets.connect(
