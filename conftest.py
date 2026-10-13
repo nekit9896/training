@@ -33,6 +33,7 @@ from utils.helpers.pytest_skip_utils import (
 )
 from utils.helpers.vault_pytest_utils import configure_vault_for_suite, reset_vault_process_empty_values_rejection
 from utils.helpers.ws_message_parser import ws_message_parser as lds_ws_parser
+from utils.helpers.ws_session import WsSessionManager
 
 
 def pytest_addoption(parser):
@@ -104,6 +105,7 @@ def pytest_configure(config):
         "is_target_tu_active": False,
         "use_lds_configurator": True,
         "resolved_tu_id": None,
+        "legacy_tu_id": None,
         "admin_tu_name": None,
         "pre_run_running_tus": None,
         "suite_infra_ready": False,
@@ -113,6 +115,7 @@ def pytest_configure(config):
         "x_user_id": None,
         "auth_suite": None,
         "vault_rejection_enabled": False,
+        "dataset_generation": 0,
     }
 
 
@@ -659,6 +662,7 @@ def pytest_runtest_setup(item):
         test_data_name = item.get_closest_marker("test_data_name").args[0]
         # legacy: id из enum TU для имитатора (tn{id}_tags.txt), не resolved_tu_id из Администрирования
         tu_id = item.get_closest_marker("tu_id").args[0]
+        cfg["legacy_tu_id"] = tu_id
         ost_name = item.get_closest_marker("ost_name").args[0]
 
         imitator_duration = compute_imitator_duration(item, current_test_suite)
@@ -744,6 +748,10 @@ def pytest_runtest_setup(item):
 
         # Сохраняем время старта имитатора для расчёта интервалов утечек в тестах
         cfg["imitator_start_time"] = stand_manager.start_time
+
+        # Сигнализируем ws-сессии о готовности нового датасета: координатор
+        # переподпишется на bundle с новым tu_id (resolved_tu_id уже установлен).
+        cfg["dataset_generation"] = cfg.get("dataset_generation", 0) + 1
 
         if suite_config is not None and suite_config.use_lds_configurator:
             if suite_config.admin_tu is None:
@@ -902,19 +910,28 @@ def pytest_runtest_teardown(item, nextitem):
                 logger.debug("Не удалось прикрепить ошибку teardown к Allure", exc_info=True)
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def ws_client(request):
     """
-    Фикстура для работы с websocket клиентом.
+    Фикстура постоянного ws-соединения на прогон (общая сессия, имитация фронта).
 
-    request - даёт доступ к request.config.group_state (общий кэш auth на dataset: stand_host, auth_token, x_user_id).
-    :return: Объект wss соединения
+    Один WebSocketClient на весь прогон: negotiate + SignalR Ping выполняются внутри
+    клиента, а bundle-подписки (MainPage + PlayerStatus + SelfDiagnostic) и периодический
+    REST /Ping поддерживаются менеджером сессии. Тесты переиспользуют это соединение.
+
+    request - даёт доступ к request.config.group_state (общий кэш auth на dataset).
+    На выходе: объект wss соединения
     """
     cfg = request.config.group_state
     ensure_auth_for_fixture(cfg)
-    ws_client = init_ws_stand_client(cfg)
-    async with ws_client as client:
-        yield client
+    client = init_ws_stand_client(cfg)
+    async with client:
+        manager = WsSessionManager(cfg, client)
+        await manager.start()
+        try:
+            yield client
+        finally:
+            await manager.stop()
 
 
 @pytest.fixture

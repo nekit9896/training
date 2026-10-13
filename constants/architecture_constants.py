@@ -142,6 +142,7 @@ class HTTPClientConstants(StandConstants):
     POST_METHOD: str = "post"
     X_SECURITY_SIGNATURE_KEY: str = 'x-security-signature'
     X_USER_ID_KEY: str = 'x-user-id'
+    X_TN_CORRELATION_ID_KEY: str = 'x-tn-correlation-id'
     TESTOPS_UPLOAD_ENDPOINT: str = "/upload"
     TESTOPS_ATTACHMENTS_LIST_ENDPOINT: str = "/test_cases/{test_case_id}/attachments"
     TESTOPS_LOAD_ATTACHMENT_ENDPOINT: str = "/test_cases/{test_case_id}/attachments/{attachment_id}?download=1"
@@ -161,6 +162,9 @@ class WebSocketClientConstants(StandConstants):
     HANDSHAKE_WAITING: float | int = 5.0
     HANDSHAKE_MESSAGE: str = "{\"protocol\":\"messagepack\",\"version\":1}"
     WS_HUBS: str = "/hubs/ldsClientHub"
+    NEGOTIATE_ENDPOINT: str = "/hubs/ldsClientHub/negotiate"
+    NEGOTIATE_VERSION: int = 1
+    NEGOTIATE_TIMEOUT_SECONDS: float = 10.0
     START_INVOCATION_ID: str = "1"
     DEFAULT_RECONNECT_INTERVAL: float | int = 5.0
     WS_CONNECT_TIMEOUT_SECONDS: float = 120.0
@@ -168,10 +172,12 @@ class WebSocketClientConstants(StandConstants):
     PING_INTERVAL: int = 3
     PING_TIMEOUT: int = 5
     CLOSE_TIMEOUT: int = 30
+    SIGNALR_PING_INTERVAL_SECONDS: float = 10.0  # периодичность SignalR Ping [6]
     DEFAULT_SIGNALR_MESSAGE_TYPE: int = 1  # invocation
     STREAM_INVOCATION_MESSAGE_TYPE: int = 4  # StreamInvocation
     STREAM_ITEM_MESSAGE_TYPE: int = 2  # StreamItem
     COMPLETION_MESSAGE_TYPE: int = 3  # Completion
+    PING_MESSAGE_TYPE: int = 6  # Ping (SignalR keepalive)
     # Текст ошибки Completion при неуспешном streaming (SignalR CompletionWithDetail)
     COMPLETION_ERROR_MESSAGE_INDEX: int = 4
     DEFAULT_SIGNALR_MAP_HEADERS: dict = {}
@@ -179,6 +185,13 @@ class WebSocketClientConstants(StandConstants):
     INVOCATION_ID_INDEX = 2
     SERVICE_NAME: str = StandConstants.MAIN_SUBDOMAIN
     FILTERING_TIMEOUT: int | float = 30.0
+    # ===== Постоянная ws-сессия (имитация фронта, ws_session) =====
+    SUBSCRIBE_MAIN_PAGE_INFO_REQUEST: str = "subscribeMainPageInfoRequest"
+    SUBSCRIBE_PLAYER_STATUS_REQUEST: str = "SubscribePlayerStatusInfoRequest"
+    SUBSCRIBE_SELF_DIAGNOSTIC_REQUEST: str = "SubscribeSelfDiagnosticInfoRequest"
+    REST_PING_INTERVAL_SECONDS: float = 5.0  # периодичность REST /Ping с correlation-id
+    WS_SESSION_SUPERVISOR_INTERVAL_SECONDS: float = 1.0  # периодичность проверки жизни соединения
+    WS_SESSION_HEARTBEAT_INTERVAL_SECONDS: float = 60.0  # периодичность heartbeat-лога сессии
 
 
 class MockConstants:

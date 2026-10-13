@@ -4,6 +4,7 @@ import time
 from typing import Any, Callable, List, Optional
 
 import msgpack
+import requests
 import websockets
 from websockets import InvalidStatus
 
@@ -31,19 +32,38 @@ class WebSocketClient:
         self._x_user_id = x_user_id
         self._reconnect_interval = reconnect_interval
         self._ws_url = f"wss://{host.rstrip('/')}{WS_Const.WS_HUBS}"
+        self._negotiate_url = f"https://{host.rstrip('/')}{WS_Const.NEGOTIATE_ENDPOINT}"
         self._buffer = b""
         self._next_id = WS_Const.START_INVOCATION_ID
 
         self._ws: websockets.ClientConnection | None = None
         self.recv_queue: asyncio.Queue[Any] = asyncio.Queue()
         self._recv_task: asyncio.Task | None = None
+        self._ping_task: asyncio.Task | None = None
         self._stop_event = asyncio.Event()
         self._invocation_id: Optional[str] = None
         self.suppress_recv_logging: bool = False
+        self.received_messages_count: int = 0
+        self.sent_ping_count: int = 0
 
     @property
     def invocation_id(self):
         return self._invocation_id
+
+    @property
+    def is_connected(self) -> bool:
+        """
+        True, если wss-соединение установлено и приём сообщений работает.
+
+        Соединение считается живым, пока открыт сокет и фоновый приёмник
+        (_recv_task) не завершился. При обрыве связи _recv_loop возвращается,
+        и задача переходит в состояние done - это признак потери соединения.
+        """
+        if self._ws is None:
+            return False
+        if self._recv_task is None:
+            return False
+        return not self._recv_task.done()
 
     def clear_queue(self):
         """
@@ -57,12 +77,28 @@ class WebSocketClient:
                 logger.info(f"Очередь сообщений очищена: {message_empty}")
                 break
 
+    def update_credentials(self, access_token: str, x_user_id: str) -> None:
+        """
+        Обновляет креды для последующего reconnect/negotiate.
+
+        Нужно при смене датасета: токен и x_user_id обновляются в group_state,
+        а соединение переиспользуется (пересоздаётся через reconnect).
+        """
+        self._access_token = access_token
+        self._x_user_id = x_user_id
+
     async def __aenter__(self):
         await self._connect_loop()
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
         self._stop_event.set()
+        if self._ping_task:
+            self._ping_task.cancel()
+            try:
+                await self._ping_task
+            except asyncio.CancelledError:
+                pass
         if self._ws:
             await self._ws.close()
         if self._recv_task:
@@ -81,12 +117,45 @@ class WebSocketClient:
         finish = time.monotonic() + WS_Const.HANDSHAKE_WAITING
         while time.monotonic() < finish:
             chunk = await self._ws.recv()
-            logger.debug(f"Ответ на handshake: {chunk}")
+            logger.info(f"Ответ на handshake: {chunk}")
             buf += chunk.encode() if isinstance(chunk, str) else chunk
             if WS_Const.RS in buf:
                 return
 
         raise TimeoutError("Handshake timeout: не получили сообщение с разделителем RS за указанное время")
+
+    async def negotiate(self) -> str:
+        """
+        SignalR-negotiate: получает connectionId для ws-подключения.
+
+        connectionId подставляется в параметр id= URL вебсокета. Без negotiate
+        api-gateway не регистрирует соединение как полноценного SignalR-клиента,
+        поэтому он обязателен для корректного подключения.
+        """
+        params = {
+            "token": self._access_token,
+            "xUserId": self._x_user_id,
+            "negotiateVersion": WS_Const.NEGOTIATE_VERSION,
+        }
+        response = await asyncio.to_thread(
+            requests.post,
+            self._negotiate_url,
+            params=params,
+            timeout=WS_Const.NEGOTIATE_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        data = response.json()
+        connection_id = data.get("connectionId")
+        logger.info(
+            "[NEGOTIATE] POST %s -> %s (connectionId=%s, connectionToken=%s)",
+            WS_Const.NEGOTIATE_ENDPOINT,
+            response.status_code,
+            connection_id,
+            data.get("connectionToken"),
+        )
+        if not connection_id:
+            raise RuntimeError("negotiate не вернул connectionId")
+        return connection_id
 
     async def _connect_loop(self, timeout: float = WS_Const.WS_CONNECT_TIMEOUT_SECONDS) -> None:
         """
@@ -100,8 +169,12 @@ class WebSocketClient:
         while not self._stop_event.is_set():
             attempt += 1
             try:
-                self.ws_request = f"{self._ws_url}/?token={self._access_token}&xUserId={self._x_user_id}"
-                logger.info(f"Попытка подключения по wss: {self._ws_url}/?token=...&xUserId=...")
+                connection_id = await self.negotiate()
+                self.ws_request = (
+                    f"{self._ws_url}/?token={self._access_token}"
+                    f"&xUserId={self._x_user_id}&id={connection_id}"
+                )
+                logger.info(f"Попытка подключения по wss: {self._ws_url}/?token=...&xUserId=...&id=...")
                 self._ws = await websockets.connect(
                     self.ws_request,
                     ping_interval=WS_Const.PING_INTERVAL,
@@ -110,8 +183,9 @@ class WebSocketClient:
                 )
                 # Handshake
                 await self._handshake()
-                # Запускаем приём в фоне
+                # Запускаем приём и SignalR keepalive в фоне
                 self._recv_task = asyncio.create_task(self._recv_loop())
+                self._ping_task = asyncio.create_task(self._ping_loop())
                 logger.info("Websocket connected")
                 return
             except transient_errors as exc:
@@ -152,12 +226,32 @@ class WebSocketClient:
 
             result_message = parse_message(chunk)
             await self.recv_queue.put(result_message)
+            self.received_messages_count += 1
             if not self.suppress_recv_logging:
                 str_message = str(result_message)
                 logger.info(
                     f"Обработанное сообщение от api-gateway: {str_message[:200]}... полное сообщение в attach",
                 )
             continue
+
+    async def send_ping(self) -> None:
+        """Отправляет SignalR Ping [6] для прикладного keepalive."""
+        if not self._ws:
+            return
+        packet = encode_with_varint_prefix(msgpack.packb([WS_Const.PING_MESSAGE_TYPE], use_bin_type=True))
+        await self._ws.send(packet)
+        self.sent_ping_count += 1
+
+    async def _ping_loop(self) -> None:
+        """Периодически шлёт SignalR Ping, пока соединение живо."""
+        while not self._stop_event.is_set():
+            await asyncio.sleep(WS_Const.SIGNALR_PING_INTERVAL_SECONDS)
+            if self._stop_event.is_set() or self._ws is None:
+                return
+            try:
+                await self.send_ping()
+            except (websockets.ConnectionClosed, OSError):
+                return
 
     async def invoke(self, target: str, args: list) -> None:
         """
@@ -261,6 +355,14 @@ class WebSocketClient:
         Переподключение websocket соединения
         """
         try:
+            if self._ping_task:
+                self._ping_task.cancel()
+                try:
+                    await self._ping_task
+                except asyncio.CancelledError:
+                    pass
+                self._ping_task = None
+
             if self._recv_task:
                 try:
                     self._recv_task.cancel()
