@@ -76,6 +76,16 @@ class WebSocketClient:
                 logger.info(f"Очередь сообщений очищена: {message_empty}")
                 break
 
+    def update_credentials(self, access_token: str, x_user_id: str) -> None:
+        """
+        Обновляет креды для последующего reconnect/negotiate.
+
+        Нужно при смене датасета: токен и x_user_id обновляются в group_state,
+        а соединение переиспользуется (пересоздаётся через reconnect).
+        """
+        self._access_token = access_token
+        self._x_user_id = x_user_id
+
     async def __aenter__(self):
         await self._connect_loop()
         return self
@@ -132,6 +142,7 @@ class WebSocketClient:
             params=params,
             timeout=WS_Const.NEGOTIATE_TIMEOUT_SECONDS,
         )
+        logger.info("[NEGOTIATE] POST %s -> %s", self._negotiate_url, response.status_code)
         response.raise_for_status()
         connection_token = response.json().get("connectionToken")
         if not connection_token:

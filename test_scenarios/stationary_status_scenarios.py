@@ -194,6 +194,7 @@ async def stationary_status_in_output_signals(ws_client, cfg: BaseSuiteConfig, t
                 'tuId': cfg.tu_id,
                 'additionalProperties': None,
             },
+            content_filter=t_utils.output_signals_controlled_sites_filter(controlled_sites),
         )
         parsed_output_signals = parser.parse_output_signals_info_msg(output_signals_payload)
     with allure.step("Извлечение и подготовка данных для проверки"):

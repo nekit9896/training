@@ -142,6 +142,7 @@ class HTTPClientConstants(StandConstants):
     POST_METHOD: str = "post"
     X_SECURITY_SIGNATURE_KEY: str = 'x-security-signature'
     X_USER_ID_KEY: str = 'x-user-id'
+    X_TN_CORRELATION_ID_KEY: str = 'x-tn-correlation-id'
     TESTOPS_UPLOAD_ENDPOINT: str = "/upload"
     TESTOPS_ATTACHMENTS_LIST_ENDPOINT: str = "/test_cases/{test_case_id}/attachments"
     TESTOPS_LOAD_ATTACHMENT_ENDPOINT: str = "/test_cases/{test_case_id}/attachments/{attachment_id}?download=1"
@@ -184,13 +185,12 @@ class WebSocketClientConstants(StandConstants):
     INVOCATION_ID_INDEX = 2
     SERVICE_NAME: str = StandConstants.MAIN_SUBDOMAIN
     FILTERING_TIMEOUT: int | float = 30.0
-    # ===== Фоновая подписка-keeper консьюмера api-gateway (ws_keepalive) =====
-    KEEPALIVE_SUBSCRIPTION_REQUEST: str = "subscribeAllLeaksInfoRequest"
-    KEEPALIVE_RECONNECT_INTERVAL_SECONDS: float = 5.0  # пауза перед повторной подпиской после обрыва
-    KEEPALIVE_POLL_INTERVAL_SECONDS: float = 5.0  # периодичность проверки соединения и stop-сигнала
-    KEEPALIVE_QUEUE_CLEAN_INTERVAL_SECONDS: float = 300.0  # как часто чистить очередь входящих сообщений
-    KEEPALIVE_STOP_JOIN_TIMEOUT_SECONDS: float = 5.0  # таймаут join() фонового потока при остановке
-    KEEPALIVE_HEARTBEAT_INTERVAL_SECONDS: float = 60.0  # период heartbeat-лога фоновой подписки
+    # ===== Постоянная ws-сессия (имитация фронта, ws_session) =====
+    SUBSCRIBE_MAIN_PAGE_INFO_REQUEST: str = "subscribeMainPageInfoRequest"
+    SUBSCRIBE_PLAYER_STATUS_REQUEST: str = "SubscribePlayerStatusInfoRequest"
+    SUBSCRIBE_SELF_DIAGNOSTIC_REQUEST: str = "SubscribeSelfDiagnosticInfoRequest"
+    REST_PING_INTERVAL_SECONDS: float = 5.0  # периодичность REST /Ping с correlation-id
+    WS_SESSION_SUPERVISOR_INTERVAL_SECONDS: float = 1.0  # периодичность проверки жизни соединения
 
 
 class MockConstants:

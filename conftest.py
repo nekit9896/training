@@ -32,8 +32,8 @@ from utils.helpers.pytest_skip_utils import (
     resolve_skip_reason,
 )
 from utils.helpers.vault_pytest_utils import configure_vault_for_suite, reset_vault_process_empty_values_rejection
-from utils.helpers.ws_keepalive import start_background_subscription, stop_background_subscription
 from utils.helpers.ws_message_parser import ws_message_parser as lds_ws_parser
+from utils.helpers.ws_session import WsSessionManager
 
 
 def pytest_addoption(parser):
@@ -105,6 +105,7 @@ def pytest_configure(config):
         "is_target_tu_active": False,
         "use_lds_configurator": True,
         "resolved_tu_id": None,
+        "legacy_tu_id": None,
         "admin_tu_name": None,
         "pre_run_running_tus": None,
         "suite_infra_ready": False,
@@ -114,7 +115,7 @@ def pytest_configure(config):
         "x_user_id": None,
         "auth_suite": None,
         "vault_rejection_enabled": False,
-        "keepalive": None,
+        "dataset_generation": 0,
     }
 
 
@@ -609,7 +610,6 @@ def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
         logger.debug("Не удалось прикрепить ошибку setup к Allure", exc_info=True)
 
     logger.info("[TEARDOWN] LDS Configurator очистка после ошибки setup набора")
-    stop_background_subscription(cfg)
     _run_lds_configurator_teardown_if_needed(cfg)
     if stand_manager := cfg.get("stand_manager"):
         try:
@@ -637,7 +637,6 @@ def pytest_runtest_setup(item):
 
     if current_test_suite != cfg["current_suite"]:
         # stop old
-        stop_background_subscription(cfg)
         if stand_manager := cfg["stand_manager"]:
             try:
                 stand_manager.stop_imitator_wrapper()
@@ -663,6 +662,7 @@ def pytest_runtest_setup(item):
         test_data_name = item.get_closest_marker("test_data_name").args[0]
         # legacy: id из enum TU для имитатора (tn{id}_tags.txt), не resolved_tu_id из Администрирования
         tu_id = item.get_closest_marker("tu_id").args[0]
+        cfg["legacy_tu_id"] = tu_id
         ost_name = item.get_closest_marker("ost_name").args[0]
 
         imitator_duration = compute_imitator_duration(item, current_test_suite)
@@ -749,10 +749,9 @@ def pytest_runtest_setup(item):
         # Сохраняем время старта имитатора для расчёта интервалов утечек в тестах
         cfg["imitator_start_time"] = stand_manager.start_time
 
-        # Запускаем фоновую подписку-keeper консьюмера api-gateway после старта
-        # lds-core и до проверки включённого ТУ в BasicInfo/MainPage: пока в прогоне
-        # есть хотя бы один подписчик, консьюмер не выключается и не копит лаг в очереди.
-        start_background_subscription(cfg)
+        # Сигнализируем ws-сессии о готовности нового датасета: координатор
+        # переподпишется на bundle с новым tu_id (resolved_tu_id уже установлен).
+        cfg["dataset_generation"] = cfg.get("dataset_generation", 0) + 1
 
         if suite_config is not None and suite_config.use_lds_configurator:
             if suite_config.admin_tu is None:
@@ -862,7 +861,6 @@ def pytest_runtest_teardown(item, nextitem):
     next_suite = next_marker.args[0] if next_marker else None
 
     if next_suite != cfg["current_suite"]:
-        stop_background_subscription(cfg)
         if cfg.get("vault_rejection_enabled"):
             reset_vault_process_empty_values_rejection()
             cfg["vault_rejection_enabled"] = False
@@ -912,19 +910,28 @@ def pytest_runtest_teardown(item, nextitem):
                 logger.debug("Не удалось прикрепить ошибку teardown к Allure", exc_info=True)
 
 
-@pytest_asyncio.fixture
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def ws_client(request):
     """
-    Фикстура для работы с websocket клиентом.
+    Фикстура постоянного ws-соединения на прогон (общая сессия, имитация фронта).
 
-    request - даёт доступ к request.config.group_state (общий кэш auth на dataset: stand_host, auth_token, x_user_id).
-    :return: Объект wss соединения
+    Один WebSocketClient на весь прогон: negotiate + SignalR Ping выполняются внутри
+    клиента, а bundle-подписки (MainPage + PlayerStatus + SelfDiagnostic) и периодический
+    REST /Ping поддерживаются менеджером сессии. Тесты переиспользуют это соединение.
+
+    request - даёт доступ к request.config.group_state (общий кэш auth на dataset).
+    На выходе: объект wss соединения
     """
     cfg = request.config.group_state
     ensure_auth_for_fixture(cfg)
-    ws_client = init_ws_stand_client(cfg)
-    async with ws_client as client:
-        yield client
+    client = init_ws_stand_client(cfg)
+    async with client:
+        manager = WsSessionManager(cfg, client)
+        await manager.start()
+        try:
+            yield client
+        finally:
+            await manager.stop()
 
 
 @pytest.fixture
@@ -992,7 +999,6 @@ def pytest_sessionfinish(session, exitstatus):
     # 1) teardown стенда: LDS Configurator + остановка имитатора
     try:
         group_state = getattr(session.config, "group_state", {})
-        stop_background_subscription(group_state)
         if group_state.get("vault_rejection_enabled"):
             reset_vault_process_empty_values_rejection()
             group_state["vault_rejection_enabled"] = False

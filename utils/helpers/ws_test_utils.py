@@ -1195,30 +1195,29 @@ async def _receive_subscribed_messages(
     *,
     attempts: int,
     per_attempt_timeout: float,
+    content_filter: Optional[Callable[[list], bool]] = None,
 ) -> AsyncIterator[list]:
     """
-    Генератор сообщений подписки: подписывается и последовательно отдаёт сообщения
-    нужного типа. При таймауте или обрыве соединения переподключается и подписывается
-    заново, продолжая попытки до attempts. После исчерпания попыток генератор просто
-    завершается — итоговую ошибку формирует вызывающая функция.
+    Генератор сообщений подписки: очищает очередь от протухших сообщений,
+    подписывается и отдаёт сообщения нужного типа БЕЗ реконнекта (соединение
+    общее на весь прогон). Читает в течение attempts * per_attempt_timeout секунд,
+    затем завершается - итоговую ошибку формирует вызывающая функция.
+
+    content_filter (опционально) отбрасывает сообщения нужного типа, не
+    относящиеся к текущей подписке (например, по tuId/sensor id), чтобы подписка
+    с более раннего сценария не влияла на ответы новой подписки.
     """
-    needs_subscribe = True
-    for attempt in range(1, attempts + 1):
+    ws_client.clear_queue()
+    await connect(ws_client, ws_invoke_type, ws_invoke_params)
+    deadline = time.monotonic() + attempts * per_attempt_timeout
+    while time.monotonic() < deadline:
+        remaining = deadline - time.monotonic()
         try:
-            if needs_subscribe:
-                await connect(ws_client, ws_invoke_type, ws_invoke_params)
-                needs_subscribe = False
-            with allure.step(
-                f"Получение сообщения с контентом типа: {ws_message_type} - попытка {attempt} из {attempts}"
-            ):
-                message = await ws_client.receive_by_type(ws_message_type, timeout=per_attempt_timeout)
+            with allure.step(f"Получение сообщения с контентом типа: {ws_message_type}"):
+                message = await ws_client.receive_by_type(ws_message_type, timeout=remaining)
         except asyncio.TimeoutError:
-            await ws_client.reconnect()
-            needs_subscribe = True
-            continue
-        except Exception:
-            await ws_client.reconnect()
-            needs_subscribe = True
+            break
+        if content_filter is not None and not content_filter(message):
             continue
         yield message
 
@@ -1229,26 +1228,26 @@ async def connect_and_get_parsed_msg_by_tu_id(
     ws_message_type: str,
     ws_invoke_type: str,
     ws_invoke_params: Any = None,
-    attempts: int = TestConst.SUBSCRIBE_MESSAGE_POLL_ATTEMPTS,
+    timeout_seconds: float = TestConst.SUBSCRIBE_MESSAGE_TIMEOUT_SECONDS,
 ) -> SubscribeAllLeaksInfoReply:
     """
     Подписывается и ищет allLeaksInfo сообщение для конкретного ТУ.
-    Читает сообщения нужного типа с ретраями и реконнектом, фильтруя по tuId.
+    Читает сообщения нужного типа (без реконнекта), фильтруя по tuId.
     """
     async for payload in _receive_subscribed_messages(
         ws_client,
         ws_message_type,
         ws_invoke_type,
         ws_invoke_params,
-        attempts=attempts,
-        per_attempt_timeout=TestConst.POLL_BY_TIMEOUT_SECONDS,
+        attempts=1,
+        per_attempt_timeout=timeout_seconds,
     ):
         parsed_payload = ws_message_parser.parse_all_leaks_info_msg(payload)
         #  Ищет сообщение с нужным ТУ
         if parsed_payload.replyContent.tuId == tu_id:
             return parsed_payload
 
-    fail(f"Не удалось получить сообщение {ws_message_type} для ТУ {tu_id} за {attempts} попыток")
+    fail(f"Не удалось получить сообщение {ws_message_type} для ТУ {tu_id} за {timeout_seconds} сек")
 
 
 async def connect_and_poll_subscribed_msg(
@@ -1256,10 +1255,12 @@ async def connect_and_poll_subscribed_msg(
     ws_message_type: str,
     ws_invoke_type: str,
     ws_invoke_params: Any = None,
-    retries: int = TestConst.SUBSCRIBE_MESSAGE_POLL_ATTEMPTS,
+    timeout_seconds: float = TestConst.SUBSCRIBE_MESSAGE_TIMEOUT_SECONDS,
+    content_filter: Optional[Callable[[list], bool]] = None,
 ) -> list:
     """
-    Подписывается и ищет нужное сообщение в потоке, с повторным переподключением ws клиента
+    Подписывается и ищет нужное сообщение в потоке (без реконнекта - соединение общее).
+    content_filter позволяет отсечь сообщения, не относящиеся к данной подписке.
     """
     ws_client.suppress_recv_logging = True
     try:
@@ -1268,13 +1269,57 @@ async def connect_and_poll_subscribed_msg(
             ws_message_type,
             ws_invoke_type,
             ws_invoke_params,
-            attempts=retries,
-            per_attempt_timeout=TestConst.POLL_BY_TIMEOUT_SECONDS,
+            attempts=1,
+            per_attempt_timeout=timeout_seconds,
+            content_filter=content_filter,
         ):
             return payload
-        fail(f"Не удалось получить сообщение с контентом типа: {ws_message_type} за {retries} попыток")
+        fail(f"Не удалось получить сообщение с контентом типа: {ws_message_type} за {timeout_seconds} сек")
     finally:
         ws_client.suppress_recv_logging = False
+
+
+def output_signals_linear_part_filter(linear_part_id: int) -> Callable[[list], bool]:
+    """
+    Фильтр сообщений OutputSignalsInfo: оставляет только те, что содержат
+    linearPartSignals с указанным linearPartId. Нужен, чтобы подписка с более
+    раннего сценария (другой linearPartId) не подмешивала чужие данные в общую
+    очередь при повторной подписке того же типа.
+    """
+    def _filter(msg: list) -> bool:
+        try:
+            parsed = ws_message_parser.parse_output_signals_info_msg(msg)
+        except Exception:
+            return False
+        linear_parts = getattr(parsed.replyContent, "linearPartSignals", []) or []
+        return any(getattr(lp, "id", None) == linear_part_id for lp in linear_parts)
+
+    return _filter
+
+
+def output_signals_controlled_sites_filter(controlled_sites: list) -> Callable[[list], bool]:
+    """
+    Фильтр сообщений OutputSignalsInfo: оставляет только те, что содержат
+    controlledSiteSignals с одним из ожидаемых (controlledSiteId, segmentId).
+    """
+    expected_keys = {
+        (cs.get("controlledSiteId"), cs.get("segmentId"))
+        for cs in controlled_sites
+        if isinstance(cs, dict)
+    }
+
+    def _filter(msg: list) -> bool:
+        try:
+            parsed = ws_message_parser.parse_output_signals_info_msg(msg)
+        except Exception:
+            return False
+        site_signals = getattr(parsed.replyContent, "controlledSiteSignals", []) or []
+        return any(
+            (getattr(s, "controlledSiteId", None), getattr(s, "segmentId", None)) in expected_keys
+            for s in site_signals
+        )
+
+    return _filter
 
 
 async def poll_input_signal_state(

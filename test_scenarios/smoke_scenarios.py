@@ -1124,6 +1124,7 @@ async def mask_du_on_mini_scheme(ws_client, http_client, cfg: SmokeSuiteConfig):
                     'tuId': cfg.tu_id,
                     'additionalProperties': None,
                 },
+                content_filter=t_utils.output_signals_linear_part_filter(linear_part_id),
             )
             parsed_payload = parser.parse_output_signals_info_msg(payload)
         with allure.step("Извлечение и подготовка данных для проверки маскирования ДУ ЭФ Выходные сигналы"):
@@ -1285,6 +1286,7 @@ async def unmask_du_on_mini_scheme(ws_client, http_client, cfg: SmokeSuiteConfig
                     'tuId': cfg.tu_id,
                     'additionalProperties': None,
                 },
+                content_filter=t_utils.output_signals_linear_part_filter(linear_part_id),
             )
             parsed_payload = parser.parse_output_signals_info_msg(payload)
         with allure.step("Извлечение и подготовка данных для проверки снятия маскирования ДУ ЭФ Выходные сигналы"):
@@ -2228,6 +2230,7 @@ async def output_signals(ws_client, http_client, cfg: SmokeSuiteConfig, leak: Le
                     'tuId': cfg.tu_id,
                     'additionalProperties': None,
                 },
+                content_filter=t_utils.output_signals_linear_part_filter(linear_part_id),
             )
             parsed_payload = parser.parse_output_signals_info_msg(payload)
         with allure.step("Извлечение и подготовка данных Выходных сигналов для проверки"):
@@ -2314,6 +2317,7 @@ async def balance_algorithm_leak_waiting(ws_client, cfg: SmokeSuiteConfig, leak:
     with allure.step(
         f"Подписка и сбор BalanceAlgorithmResults раз в {poll_interval} с, в течение {total_wait} с после начала утечки"
     ):
+        ws_client.clear_queue()
         await t_utils.connect(
             ws_client,
             "SubscribeBalanceAlgorithmResultsRequest",
@@ -2596,6 +2600,7 @@ async def leak_is_complete_in_output_signals(ws_client, http_client, cfg: SmokeS
                     'tuId': cfg.tu_id,
                     'additionalProperties': None,
                 },
+                content_filter=t_utils.output_signals_linear_part_filter(linear_part_id),
             )
             parsed_payload = parser.parse_output_signals_info_msg(payload)
 
