@@ -70,6 +70,13 @@ class WebSocketClient:
         """connectionToken из negotiate: передаётся в wss URL как параметр id="""
         return self._connection_token
 
+    @property
+    def is_connected(self) -> bool:
+        """True, если wss-соединение установлено и приём сообщений активен."""
+        if self._ws is None:
+            return False
+        return self._recv_task is not None and not self._recv_task.done()
+
     def set_disconnected_handler(self, handler: Optional[Callable[[], None]]) -> None:
         """
         Регистрирует уведомление о потере соединения.
@@ -91,11 +98,39 @@ class WebSocketClient:
                 logger.info(f"Очередь сообщений очищена: {message_empty}")
                 break
 
+    def drain_messages(self) -> List[Any]:
+        """
+        Забирает все сообщения из очереди без блокирующего ожидания.
+
+        Единый API с фасадом постоянного соединения: хелперы сценариев вычитывают поток
+        одним способом независимо от того, разовое соединение или постоянное.
+        """
+        messages: List[Any] = []
+        while not self.recv_queue.empty():
+            try:
+                messages.append(self.recv_queue.get_nowait())
+            except asyncio.QueueEmpty:
+                break
+        return messages
+
     async def __aenter__(self):
-        await self._connect_loop()
+        await self.connect()
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
+        await self.close()
+
+    async def connect(self) -> None:
+        """
+        Устанавливает соединение: negotiate -> wss по connectionToken -> handshake -> фоновые задачи.
+
+        Публичный метод нужен владельцу постоянного соединения: он управляет жизненным циклом
+        соединения сам и не использует контекстный менеджер.
+        """
+        await self._connect_loop()
+
+    async def close(self) -> None:
+        """Закрывает соединение, фоновые задачи и http-сессию negotiate."""
         self._log_connection_summary()
         self._stop_event.set()
         await self._cancel_task(self._ping_task)
@@ -163,19 +198,26 @@ class WebSocketClient:
                         f"WSS hub не готов за {WS_Const.WS_CONNECT_TIMEOUT_SECONDS} с " f"(попыток: {attempt}): {exc}"
                     ) from exc
                 status_info = ""
+                pause = self._reconnect_interval
                 if isinstance(exc, InvalidStatus):
                     response = getattr(exc, "response", None)
                     if response is not None:
                         status_info = f", HTTP {response.status_code}"
+                        if response.status_code == WS_Const.NOT_FOUND_STATUS_CODE:
+                            # 404 означает, что балансировщик увёл handshake не на тот узел
+                            # api-gateway, где negotiate зарегистрировал connectionToken.
+                            # Следующая попытка снова делает negotiate и получает новый токен,
+                            # поэтому долгая пауза только теряет время прогона.
+                            pause = WS_Const.LB_MISS_RETRY_INTERVAL_S
                 logger.warning(
                     "WSS подключение не установлено (попытка %s%s): %s. " "Повтор через %s с, осталось %.0f с",
                     attempt,
                     status_info,
                     exc,
-                    self._reconnect_interval,
+                    pause,
                     remaining,
                 )
-                await asyncio.sleep(self._reconnect_interval)
+                await asyncio.sleep(pause)
 
     async def _recv_loop(self) -> None:
         """

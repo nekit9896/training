@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import time
+from typing import Any, Optional
 
 import pytest
 import requests
@@ -16,12 +17,17 @@ from clients.http_client import StandHttpClient
 from clients.keycloak_clients import KeycloakAuthError, KeycloakClient
 from clients.testops_client import logger
 from clients.websocket_client import WebSocketClient
+from clients.ws_connection_manager import WsConnectionManager
 from constants.architecture_constants import EnvKeyConstants as EnvConst
 from constants.architecture_constants import HTTPClientConstants as HttpConst
+from constants.architecture_constants import PersistentConnectionConstants as PersistConst
 from constants.architecture_constants import WebSocketClientConstants as WSCliConst
 
 # Один KeycloakClient на pytest-сессию; TTL токена проверяется внутри клиента.
 _keycloak_client: KeycloakClient | None = None
+
+# Ключ постоянного ws-соединения в group_state (жизненный цикл - набор данных).
+WS_MANAGER_STATE_KEY: str = "ws_manager"
 
 
 def get_instance() -> str:
@@ -215,3 +221,67 @@ def init_ws_stand_client(group_state: dict) -> WebSocketClient:
         group_state["auth_token"],
         group_state["x_user_id"],
     )
+
+
+def build_subscription_bundle(tu_id: int) -> list[tuple[str, Any]]:
+    """
+    Bundle подписок постоянного соединения - повторяет набор фронта после авторизации.
+
+    Эти подписки вместе с negotiate дают api-gateway понять, что есть подписанный клиент,
+    и держать консьюмеры для чтения core и layer builder на всё время набора данных.
+    """
+    main_page_args = {
+        PersistConst.TU_IDS_KEY: [tu_id],
+        PersistConst.ADDITIONAL_PROPERTIES_KEY: None,
+    }
+    return [
+        (PersistConst.SUBSCRIBE_PLAYER_STATUS_INFO_REQUEST, PersistConst.EMPTY_SUBSCRIBE_ARGS),
+        (PersistConst.SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST, PersistConst.EMPTY_SUBSCRIBE_ARGS),
+        (PersistConst.SUBSCRIBE_SELF_DIAGNOSTIC_INFO_REQUEST, PersistConst.EMPTY_SUBSCRIBE_ARGS),
+        (PersistConst.SUBSCRIBE_MAIN_PAGE_INFO_REQUEST, dict(main_page_args)),
+        (PersistConst.SUBSCRIBE_MAIN_PAGE_SIGNALS_INFO_REQUEST, dict(main_page_args)),
+    ]
+
+
+def start_ws_connection_manager(group_state: dict, tu_id: int) -> WsConnectionManager:
+    """
+    Создаёт и запускает постоянное соединение набора данных (один раз на dataset).
+
+    Ошибка запуска не пробрасывается в pytest: прогон должен продолжаться, а соединение
+    поднимет supervisor внутри менеджера с экспоненциальным backoff.
+    """
+    _require_auth(group_state, require_x_user_id=True)
+    existing = group_state.get(WS_MANAGER_STATE_KEY)
+    if existing is not None:
+        return existing
+
+    manager = WsConnectionManager(
+        host=group_state["stand_host"],
+        access_token=group_state["auth_token"],
+        x_user_id=group_state["x_user_id"],
+        bundle=build_subscription_bundle(tu_id),
+    )
+    group_state[WS_MANAGER_STATE_KEY] = manager
+    try:
+        manager.start()
+        logger.info("[WS_MANAGER] Постоянное соединение набора запущено (tuId=%s)", tu_id)
+    except BaseException as error:
+        logger.warning("[WS_MANAGER] [ALERT] Не удалось запустить постоянное соединение: %s", error)
+    return manager
+
+
+def get_ws_connection_manager(group_state: dict) -> Optional[WsConnectionManager]:
+    """Возвращает запущенное постоянное соединение набора либо None."""
+    return group_state.get(WS_MANAGER_STATE_KEY)
+
+
+def close_ws_connection_manager(group_state: dict) -> None:
+    """Останавливает постоянное соединение набора. Идемпотентно: повторный вызов безопасен."""
+    manager = group_state.pop(WS_MANAGER_STATE_KEY, None)
+    if manager is None:
+        return
+    try:
+        manager.stop()
+        logger.info("[WS_MANAGER] Постоянное соединение набора остановлено")
+    except BaseException as error:
+        logger.warning("[WS_MANAGER] [ALERT] Ошибка при остановке постоянного соединения: %s", error)

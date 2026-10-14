@@ -693,14 +693,13 @@ def _attach_ws_reply_parse_failure(
 
 
 def _drain_recv_queue(ws_client: WebSocketClient) -> List[Any]:
-    """Забирает все сообщения из очереди ws без блокирующего receive_by_..."""
-    messages: List[Any] = []
-    while not ws_client.recv_queue.empty():
-        try:
-            messages.append(ws_client.recv_queue.get_nowait())
-        except asyncio.QueueEmpty:
-            break
-    return messages
+    """
+    Забирает все сообщения из очереди ws без блокирующего receive_by_...
+
+    Вычитывание делегируется клиенту: у постоянного соединения очереди принадлежат event loop
+    фонового потока, и прямое обращение к asyncio.Queue из потока теста небезопасно.
+    """
+    return ws_client.drain_messages()
 
 
 def _find_valid_report_export_notification(
@@ -1389,11 +1388,7 @@ async def poll_balance_algorithm_diagnostic_areas(
             await asyncio.sleep(poll_interval)
 
             latest_msg = None
-            while not ws_client.recv_queue.empty():
-                try:
-                    msg = ws_client.recv_queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    break
+            for msg in ws_client.drain_messages():
                 if isinstance(msg, list) and is_desired_type(msg, "BalanceAlgorithmResultsContent"):
                     latest_msg = msg
 

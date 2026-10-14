@@ -20,10 +20,13 @@ from test_scenarios import lds_configurator_scenarios
 from utils.helpers import lds_configurator_utils as lds_cfg_utils
 from utils.helpers.pytest_auth import (
     clear_suite_auth,
+    close_ws_connection_manager,
     ensure_auth_for_fixture,
     ensure_suite_auth,
+    get_ws_connection_manager,
     init_http_stand_client,
     init_ws_stand_client,
+    start_ws_connection_manager,
 )
 from utils.helpers.pytest_skip_utils import (
     decorate_skipped_test_in_allure,
@@ -100,6 +103,7 @@ def pytest_configure(config):
         "current_suite": None,
         "suite_start_time": None,
         "stand_manager": None,
+        "ws_manager": None,  # постоянное ws-соединение набора данных (WsConnectionManager)
         "imitator_start_time": None,  # datetime объект времени старта имитатора для расчёта интервалов утечек
         "is_target_tu_active": False,
         "use_lds_configurator": True,
@@ -596,6 +600,27 @@ def compute_imitator_duration(item, current_test_suite: str) -> float:
         )
 
 
+def _start_persistent_ws_connection(cfg: dict, marker_tu_id: int) -> None:
+    """
+    Поднимает постоянное соединение набора до старта имитатора.
+
+    Соединение должно существовать с нулевой минуты прогона: именно negotiate и живые пинги
+    заставляют api-gateway держать консьюмеры core и layer builder, иначе сообщения копятся
+    и приходят в тесты с опозданием. Ошибка не прерывает прогон - соединение поднимет
+    supervisor менеджера, а в отчёте остаётся ALERT.
+    """
+    tu_id = cfg.get("resolved_tu_id") or marker_tu_id
+    try:
+        start_ws_connection_manager(cfg, int(tu_id))
+    except BaseException as error:
+        message = f"[WS_MANAGER] [ALERT] Не удалось поднять постоянное соединение: {error}"
+        logger.warning(message)
+        try:
+            allure.attach(message, name="ALERT", attachment_type=allure.attachment_type.TEXT)
+        except Exception:
+            logger.debug("Не удалось прикрепить ALERT постоянного соединения к Allure")
+
+
 def _skip_current_suite_after_setup_failure(cfg: dict, message: str) -> None:
     """
     Пропускает текущий набор после ошибки setup: cleanup частичной инфраструктуры и pytest.skip.
@@ -634,6 +659,8 @@ def pytest_runtest_setup(item):
 
     if current_test_suite != cfg["current_suite"]:
         # stop old
+        # Постоянное соединение закрывается до сброса auth: ему нужны текущие token и x-user-id
+        close_ws_connection_manager(cfg)
         if stand_manager := cfg["stand_manager"]:
             try:
                 stand_manager.stop_imitator_wrapper()
@@ -725,6 +752,8 @@ def pytest_runtest_setup(item):
                 _run_lds_admin_setup(suite_config, cfg)
             except BaseException as error:
                 _skip_current_suite_after_setup_failure(cfg, f"[SETUP] [ERROR] LDS Configurator admin setup: {error}")
+
+        _start_persistent_ws_connection(cfg, tu_id)
 
         imitator_thread = threading.Thread(
             target=stand_manager.start_imitator, name=f"imitator->{current_test_suite}", daemon=True
@@ -853,6 +882,7 @@ def pytest_runtest_teardown(item, nextitem):
     next_suite = next_marker.args[0] if next_marker else None
 
     if next_suite != cfg["current_suite"]:
+        close_ws_connection_manager(cfg)
         if cfg.get("vault_rejection_enabled"):
             reset_vault_process_empty_values_rejection()
             cfg["vault_rejection_enabled"] = False
@@ -902,19 +932,41 @@ def pytest_runtest_teardown(item, nextitem):
                 logger.debug("Не удалось прикрепить ошибку teardown к Allure", exc_info=True)
 
 
-@pytest_asyncio.fixture
-async def ws_client(request):
+@pytest.fixture
+def ws_client(request):
     """
-    Фикстура для работы с websocket клиентом.
+    Фикстура постоянного ws-соединения набора данных.
 
-    request - даёт доступ к request.config.group_state (общий кэш auth на dataset: stand_host, auth_token, x_user_id).
-    :return: Объект wss соединения
+    Соединение одно на набор и живёт в фоновом потоке менеджера, поэтому пинги и вычитывание
+    сообщений не прерываются ни между тестами, ни во время offset-ожидания. Тест получает фасад,
+    привязанный к своей области видимости (scope): watermark scope сдвигается на каждую подписку,
+    поэтому контент подписок прошлых тестов в проверки текущего попасть не может, а по
+    завершении теста очереди scope уничтожаются.
+
+    request - даёт доступ к request.config.group_state (общий кэш auth на dataset).
+    :return: фасад постоянного wss соединения для текущего теста
     """
     cfg = request.config.group_state
     ensure_auth_for_fixture(cfg)
-    ws_client = init_ws_stand_client(cfg)
-    async with ws_client as client:
-        yield client
+    manager = get_ws_connection_manager(cfg)
+    if manager is None:
+        manager = start_ws_connection_manager(cfg, _resolve_bundle_tu_id(request, cfg))
+    scope = manager.open_scope(request.node.nodeid)
+    try:
+        yield manager.client_for(scope)
+    finally:
+        manager.close_scope(scope)
+
+
+def _resolve_bundle_tu_id(request, cfg: dict) -> int:
+    """tuId для bundle-подписок: из Администрирования, иначе из маркера набора данных."""
+    resolved_tu_id = cfg.get("resolved_tu_id")
+    if resolved_tu_id:
+        return int(resolved_tu_id)
+    tu_id_marker = request.node.get_closest_marker("tu_id")
+    if tu_id_marker is None:
+        pytest.fail("Не удалось определить tuId для bundle-подписок постоянного соединения")
+    return int(tu_id_marker.args[0])
 
 
 @pytest.fixture
@@ -982,6 +1034,7 @@ def pytest_sessionfinish(session, exitstatus):
     # 1) teardown стенда: LDS Configurator + остановка имитатора
     try:
         group_state = getattr(session.config, "group_state", {})
+        close_ws_connection_manager(group_state)
         if group_state.get("vault_rejection_enabled"):
             reset_vault_process_empty_values_rejection()
             group_state["vault_rejection_enabled"] = False

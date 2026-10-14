@@ -196,11 +196,50 @@ class WebSocketClientConstants(StandConstants):
     PING_MESSAGE_TYPE: int = 6
     CLOSE_MESSAGE_TYPE: int = 7
     SIGNALR_PING_INTERVAL_S: float = 15.0
+    # 404 на wss-handshake означает, что балансировщик увёл подключение не на тот узел
+    # api-gateway, где negotiate зарегистрировал connectionToken. Пауза короче обычной,
+    # потому что повторный negotiate всё равно выдаёт новый токен.
+    NOT_FOUND_STATUS_CODE: int = 404
+    LB_MISS_RETRY_INTERVAL_S: float = 1.0
     DEFAULT_SIGNALR_MAP_HEADERS: dict = {}
     EVENT_TYPE_INDEX = 3
     INVOCATION_ID_INDEX = 2
     SERVICE_NAME: str = StandConstants.MAIN_SUBDOMAIN
     FILTERING_TIMEOUT: int | float = 30.0
+
+
+class PersistentConnectionConstants:
+    """
+    Константы постоянного (фонового) соединения с хабом.
+
+    Постоянное соединение повторяет поведение фронта: после negotiate держит bundle подписок
+    и шлёт пинги (ws и rest раз в 15 с). Благодаря этому api-gateway непрерывно вычитывает
+    сообщения core и layer builder, а не копит их до подключения очередного теста.
+    """
+
+    # ===== Bundle подписок, который фронт отправляет сразу после handshake =====
+    SUBSCRIBE_PLAYER_STATUS_INFO_REQUEST: str = "SubscribePlayerStatusInfoRequest"
+    SUBSCRIBE_REPORTS_DATA_EXPORTED_REQUEST: str = "SubscribeReportsDataExportedRequest"
+    SUBSCRIBE_SELF_DIAGNOSTIC_INFO_REQUEST: str = "SubscribeSelfDiagnosticInfoRequest"
+    SUBSCRIBE_MAIN_PAGE_INFO_REQUEST: str = "subscribeMainPageInfoRequest"
+    SUBSCRIBE_MAIN_PAGE_SIGNALS_INFO_REQUEST: str = "subscribeMainPageSignalsInfoRequest"
+    EMPTY_SUBSCRIBE_ARGS: list = []
+    TU_IDS_KEY: str = "tuIds"
+    ADDITIONAL_PROPERTIES_KEY: str = "additionalProperties"
+
+    # ===== Тайминги и лимиты фонового соединения =====
+    LOOP_START_TIMEOUT_S: float = 10.0
+    START_TIMEOUT_S: float = 180.0
+    STOP_TIMEOUT_S: float = 30.0
+    CALL_TIMEOUT_S: float = 300.0
+    RECONNECT_BACKOFF_S: float = 5.0
+    RECONNECT_MAX_BACKOFF_S: float = 60.0
+    CONNECTION_CHECK_INTERVAL_S: float = 5.0
+    CALL_CONNECTION_WAIT_S: float = 60.0
+    HEALTH_LOG_INTERVAL_S: float = 60.0
+    DISPATCH_IDLE_TIMEOUT_S: float = 1.0
+    RECEIVE_POLL_INTERVAL_S: float = 0.2
+    SCOPE_QUEUE_MAXSIZE: int = 500
 
 
 class MockConstants:
