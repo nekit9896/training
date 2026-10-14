@@ -7,6 +7,7 @@ import msgpack
 import websockets
 from websockets import InvalidStatus
 
+from clients.signalr_negotiator import SignalRNegotiator
 from constants.architecture_constants import WebSocketClientConstants as WS_Const
 from utils.msgpack_utils.message_filters import is_desired_invocation_id, is_desired_type
 from utils.msgpack_utils.msgpack_utils import encode_with_varint_prefix, parse_message
@@ -32,18 +33,58 @@ class WebSocketClient:
         self._reconnect_interval = reconnect_interval
         self._ws_url = f"wss://{host.rstrip('/')}{WS_Const.WS_HUBS}"
         self._buffer = b""
-        self._next_id = WS_Const.START_INVOCATION_ID
+        self._next_id: int = WS_Const.START_INVOCATION_ID
 
         self._ws: websockets.ClientConnection | None = None
         self.recv_queue: asyncio.Queue[Any] = asyncio.Queue()
         self._recv_task: asyncio.Task | None = None
+        self._ping_task: asyncio.Task | None = None
         self._stop_event = asyncio.Event()
         self._invocation_id: Optional[str] = None
         self.suppress_recv_logging: bool = False
 
+        # Negotiate обязателен перед wss: без connectionToken api-gateway не поднимает консьюмеры
+        self._negotiator = SignalRNegotiator(host, access_token)
+        self._connection_id: Optional[str] = None
+        self._connection_token: Optional[str] = None
+        self._on_disconnected: Optional[Callable[[], None]] = None
+
+        # Счётчики для мониторинга соединения: рост принятых сообщений и пинги означают,
+        # что клиент подписан и соединение живо
+        self.ws_pings_sent: int = 0
+        self.ws_pings_failed: int = 0
+        self.messages_received: int = 0
+        self.reconnect_count: int = 0
+
     @property
     def invocation_id(self):
         return self._invocation_id
+
+    @property
+    def connection_id(self) -> Optional[str]:
+        """connectionId из negotiate: используется для диагностики соединения в логах."""
+        return self._connection_id
+
+    @property
+    def connection_token(self) -> Optional[str]:
+        """connectionToken из negotiate: передаётся в wss URL как параметр id="""
+        return self._connection_token
+
+    @property
+    def is_connected(self) -> bool:
+        """True, если wss-соединение установлено и приём сообщений активен."""
+        if self._ws is None:
+            return False
+        return self._recv_task is not None and not self._recv_task.done()
+
+    def set_disconnected_handler(self, handler: Optional[Callable[[], None]]) -> None:
+        """
+        Регистрирует уведомление о потере соединения.
+
+        В момент обрыва тест может ничего не читать из очереди и о разрыве не узнает,
+        а авто-реконнект надо поднять немедленно, иначе api-gateway перестанет вычитывать сообщения подписок.
+        """
+        self._on_disconnected = handler
 
     def clear_queue(self):
         """
@@ -57,16 +98,48 @@ class WebSocketClient:
                 logger.info(f"Очередь сообщений очищена: {message_empty}")
                 break
 
+    def drain_messages(self) -> List[Any]:
+        """
+        Забирает все сообщения из очереди без блокирующего ожидания.
+
+        Единый API с фасадом постоянного соединения: хелперы сценариев вычитывают поток
+        одним способом независимо от того, разовое соединение или постоянное.
+        """
+        messages: List[Any] = []
+        while not self.recv_queue.empty():
+            try:
+                messages.append(self.recv_queue.get_nowait())
+            except asyncio.QueueEmpty:
+                break
+        return messages
+
     async def __aenter__(self):
-        await self._connect_loop()
+        await self.connect()
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
+        await self.close()
+
+    async def connect(self) -> None:
+        """
+        Устанавливает соединение: negotiate -> wss по connectionToken -> handshake -> фоновые задачи.
+
+        Публичный метод нужен владельцу постоянного соединения: он управляет жизненным циклом
+        соединения сам и не использует контекстный менеджер.
+        """
+        await self._connect_loop()
+
+    async def close(self) -> None:
+        """Закрывает соединение, фоновые задачи и http-сессию negotiate."""
+        self._log_connection_summary()
         self._stop_event.set()
+        await self._cancel_task(self._ping_task)
+        self._ping_task = None
+        await self._cancel_task(self._recv_task)
+        self._recv_task = None
         if self._ws:
             await self._ws.close()
-        if self._recv_task:
-            await self._recv_task
+        self._negotiator.close()
 
         # TODO: дергать ручку завершения сессии в LDS-4083
 
@@ -100,8 +173,11 @@ class WebSocketClient:
         while not self._stop_event.is_set():
             attempt += 1
             try:
-                self.ws_request = f"{self._ws_url}/?token={self._access_token}&xUserId={self._x_user_id}"
-                logger.info(f"Попытка подключения по wss: {self._ws_url}/?token=...&xUserId=...")
+                # Negotiate выполняется на каждую попытку подключения: connectionToken одноразовый
+                # и выдаётся под конкретное соединение
+                connection_token = await asyncio.to_thread(self._negotiate)
+                self.ws_request = self._build_ws_request_url(connection_token)
+                logger.info(f"Попытка подключения по wss: {self._ws_url}/?token=...&xUserId=...&id=...")
                 self._ws = await websockets.connect(
                     self.ws_request,
                     ping_interval=WS_Const.PING_INTERVAL,
@@ -110,9 +186,10 @@ class WebSocketClient:
                 )
                 # Handshake
                 await self._handshake()
-                # Запускаем приём в фоне
+                # Запускаем приём сообщений и SignalR keep-alive в фоне
                 self._recv_task = asyncio.create_task(self._recv_loop())
-                logger.info("Websocket connected")
+                self._ping_task = asyncio.create_task(self._ping_loop())
+                logger.info(f"Websocket connected (connectionId={self._connection_id})")
                 return
             except transient_errors as exc:
                 remaining = deadline - time.monotonic()
@@ -121,19 +198,26 @@ class WebSocketClient:
                         f"WSS hub не готов за {WS_Const.WS_CONNECT_TIMEOUT_SECONDS} с " f"(попыток: {attempt}): {exc}"
                     ) from exc
                 status_info = ""
+                pause = self._reconnect_interval
                 if isinstance(exc, InvalidStatus):
                     response = getattr(exc, "response", None)
                     if response is not None:
                         status_info = f", HTTP {response.status_code}"
+                        if response.status_code == WS_Const.NOT_FOUND_STATUS_CODE:
+                            # 404 означает, что балансировщик увёл handshake не на тот узел
+                            # api-gateway, где negotiate зарегистрировал connectionToken.
+                            # Следующая попытка снова делает negotiate и получает новый токен,
+                            # поэтому долгая пауза только теряет время прогона.
+                            pause = WS_Const.LB_MISS_RETRY_INTERVAL_S
                 logger.warning(
                     "WSS подключение не установлено (попытка %s%s): %s. " "Повтор через %s с, осталось %.0f с",
                     attempt,
                     status_info,
                     exc,
-                    self._reconnect_interval,
+                    pause,
                     remaining,
                 )
-                await asyncio.sleep(self._reconnect_interval)
+                await asyncio.sleep(pause)
 
     async def _recv_loop(self) -> None:
         """
@@ -148,9 +232,17 @@ class WebSocketClient:
                     logger.debug(f"Сырые биты до обработки: {chunk[:100]}")
             except websockets.ConnectionClosed as e:
                 logger.warning(f"WebSocket соединение разорвано: {e}")
+                self._notify_disconnected()
                 return
 
             result_message = parse_message(chunk)
+            # Служебные SignalR-сообщения (ping/close) не относятся к подпискам: если класть их
+            # в очередь, они разбавляют батчи, которые сценарии вычитывают при накоплении
+            if self._is_service_signalr_message(result_message):
+                logger.debug(f"Пропущено служебное сообщение SignalR: {result_message}")
+                continue
+
+            self.messages_received += 1
             await self.recv_queue.put(result_message)
             if not self.suppress_recv_logging:
                 str_message = str(result_message)
@@ -158,6 +250,103 @@ class WebSocketClient:
                     f"Обработанное сообщение от api-gateway: {str_message[:200]}... полное сообщение в attach",
                 )
             continue
+
+    def _negotiate(self) -> str:
+        """
+        Выполняет negotiate и возвращает connectionToken для параметра id=.
+
+        Вызов синхронный и выполняется через asyncio.to_thread, чтобы не блокировать
+        event loop: на постоянном соединении в этом же loop живут приём сообщений и пинги.
+        """
+        result = self._negotiator.negotiate(self._x_user_id)
+        self._connection_id = result.connection_id
+        self._connection_token = result.connection_token
+        return result.connection_token
+
+    def _build_ws_request_url(self, connection_token: str) -> str:
+        """
+        Собирает wss URL как у фронта: token, xUserId и id=connectionToken.
+
+        Параметр id= связывает wss-соединение с записью negotiate, по которой api-gateway
+        держит консьюмеры core и layer builder для подписанного клиента.
+        """
+        return (
+            f"{self._ws_url}/?token={self._access_token}&xUserId={self._x_user_id}"
+            f"&{WS_Const.WS_ID_QUERY_PARAM}={connection_token}"
+        )
+
+    async def _ping_loop(self) -> None:
+        """
+        Отправляет SignalR Ping ([6]) раз в SIGNALR_PING_INTERVAL_S.
+
+        Сервер SignalR ждёт от клиента любое сообщение в пределах ClientTimeoutInterval.
+        Protocol-level ping вебсокета (ping_interval) для этого не засчитывается, поэтому без [6]
+        сервер считает клиента мёртвым, рвёт соединение и перестаёт вычитывать сообщения подписок.
+        """
+        assert self._ws is not None
+        packet = encode_with_varint_prefix(msgpack.packb([WS_Const.PING_MESSAGE_TYPE], use_bin_type=True))
+
+        while not self._stop_event.is_set():
+            try:
+                await asyncio.sleep(WS_Const.SIGNALR_PING_INTERVAL_S)
+                if self._stop_event.is_set() or not self._ws:
+                    return
+                await self._ws.send(packet)
+                self.ws_pings_sent += 1
+                logger.debug("Отправлен SignalR ping [6]")
+            except (websockets.WebSocketException, OSError) as error:
+                # Прогон не роняем: фиксируем ошибку и сообщаем владельцу, он поднимет реконнект
+                self.ws_pings_failed += 1
+                logger.warning(f"Не удалось отправить SignalR ping [6]: {error}")
+                self._notify_disconnected()
+                return
+
+    @staticmethod
+    def _is_service_signalr_message(message: Any) -> bool:
+        """True для служебных сообщений SignalR (Ping/Close) - в очередь подписок они не попадают."""
+        if not isinstance(message, list) or not message:
+            return False
+        message_type = message[WS_Const.SIGNALR_MESSAGE_TYPE_INDEX]
+        return message_type in (WS_Const.PING_MESSAGE_TYPE, WS_Const.CLOSE_MESSAGE_TYPE)
+
+    def _notify_disconnected(self) -> None:
+        """Уведомляет о разрыве; ошибка обработчика не должна ронять прогон."""
+        if self._on_disconnected is None:
+            return
+        try:
+            self._on_disconnected()
+        except Exception as error:
+            logger.warning(f"Обработчик разрыва соединения завершился с ошибкой: {error}")
+
+    def _log_connection_summary(self) -> None:
+        """
+        Выводит итоги работы соединения: пинги, принятые сообщения, размер очереди.
+
+        Смысл мониторинга: отправленные пинги вместе с растущим числом принятых сообщений
+        означают, что клиент подписан и соединение активно, то есть api-gateway вычитывает
+        сообщения подписок, а не копит их.
+        """
+        logger.info(
+            "[WS_HEALTH] connectionId=%s pings_sent=%s pings_failed=%s messages_received=%s "
+            "queue_size=%s reconnects=%s",
+            self._connection_id,
+            self.ws_pings_sent,
+            self.ws_pings_failed,
+            self.messages_received,
+            self.recv_queue.qsize(),
+            self.reconnect_count,
+        )
+
+    @staticmethod
+    async def _cancel_task(task: Optional[asyncio.Task]) -> None:
+        """Отменяет фоновую задачу и дожидается завершения, не пробрасывая CancelledError."""
+        if task is None:
+            return
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
     async def invoke(self, target: str, args: list) -> None:
         """
@@ -261,18 +450,16 @@ class WebSocketClient:
         Переподключение websocket соединения
         """
         try:
-            if self._recv_task:
-                try:
-                    self._recv_task.cancel()
-                    await self._recv_task
-                except asyncio.CancelledError:
-                    pass
-                self._recv_task = None
+            await self._cancel_task(self._ping_task)
+            self._ping_task = None
+            await self._cancel_task(self._recv_task)
+            self._recv_task = None
 
             if self._ws:
                 await self._ws.close()
                 self._ws = None
             await self._connect_loop(WS_Const.WS_RECONNECT_TIMEOUT_SECONDS)
+            self.reconnect_count += 1
             return self
         except (asyncio.TimeoutError, ConnectionError, ConnectionResetError, OSError) as error:
             raise RuntimeError(f"Ошибка при попытке переподключения {error}")

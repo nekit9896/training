@@ -1,0 +1,495 @@
+[INFO] 2026-10-14 11:44:15.884000 keycloak_clients.py Успешно получен access token
+[ERROR] 2026-10-14 11:44:18.240000 http_client.py [HTTP_CLIENT] [ERROR] При выполнении запроса. METHOD: post URL: https://web-app...ru/lds-api-gateway/apigateway/Ping ERROR_TEXT:502 Server Error: Bad Gateway for url: https://web-app...ru/lds-api-gateway/apigateway/Ping
+[WARNING] 2026-10-14 11:44:18.240000 pytest_auth.py [1/12] /Ping: 502 Server Error: Bad Gateway for url: https://web-app...ru/lds-api-gateway/apigateway/Ping. Повтор через 5.0 сек.
+[INFO] 2026-10-14 11:44:24.015000 pytest_auth.py [AUTH] [OK] Получен x-user-id
+[INFO] 2026-10-14 11:44:24.015000 pytest_auth.py [AUTH] Инициализация auth для dataset 'Real_73_tn3_39km_56'
+[INFO] 2026-10-14 11:44:25.042000 lds_configurator_scenarios.py [SETUP] Получение ТУ 'ТН-3-Автотест-DATA-ABSENCE-FALSE' из Администрирования
+[INFO] 2026-10-14 11:44:25.042000 lds_configurator_utils.py [LDS_CONFIGURATOR] Запрос списка ТУ в Администрировании - попытка 1 из 10
+[INFO] 2026-10-14 11:44:25.930000 lds_configurator_utils.py [LDS_CONFIGURATOR] Поиск ТУ 'ТН-3-Автотест-DATA-ABSENCE-FALSE' по точному совпадению tuName в GetBasicInfoAdminResponse
+[INFO] 2026-10-14 11:44:25.930000 lds_configurator_utils.py [LDS_CONFIGURATOR] Проверка: в ответе есть список ТУ
+[INFO] 2026-10-14 11:44:25.930000 lds_configurator_utils.py [LDS_CONFIGURATOR] Валидация параметров ТУ 'ТН-3-Автотест-DATA-ABSENCE-FALSE' (tuId=3)
+[INFO] 2026-10-14 11:44:25.930000 lds_configurator_utils.py [LDS_CONFIGURATOR] Проверка: tuId и mnId заполнены
+[INFO] 2026-10-14 11:44:25.930000 lds_configurator_utils.py [LDS_CONFIGURATOR] Проверка: статус СОУ известен Администрированию
+[INFO] 2026-10-14 11:44:25.930000 lds_configurator_scenarios.py [SETUP] Найден целевой ТУ: tuId=3, tuName='ТН-3-Автотест-DATA-ABSENCE-FALSE', status=STOPPED (1) (СОУ выключена)
+[INFO] 2026-10-14 11:44:25.930000 lds_configurator_scenarios.py [SETUP] Список включённых ТУ на стенде: 0 шт. []
+[INFO] 2026-10-14 11:44:25.930000 lds_configurator_scenarios.py [SETUP] Холодный запуск СОУ (LaunchLdsRequest) для tuId=3
+[INFO] 2026-10-14 11:44:25.930000 lds_configurator_utils.py [LDS_CONFIGURATOR] Команда /configurator/LaunchLds для tuId=3
+[INFO] 2026-10-14 11:44:27.252000 lds_configurator_utils.py [LDS_CONFIGURATOR] Проверка: /configurator/LaunchLds завершился успешно (response.status_code=200)
+[INFO] 2026-10-14 11:44:27.252000 lds_configurator_scenarios.py [SETUP] Ожидание включения СОУ в Администрировании
+[INFO] 2026-10-14 11:44:27.253000 lds_configurator_utils.py [LDS_CONFIGURATOR] Ожидание статуса 'СОУ включена' в Администрировании (tuId=3, таймаут 120 с)
+[INFO] 2026-10-14 11:44:27.393000 lds_configurator_scenarios.py [SETUP] Подтверждение наличия времени запуска (GetTusInformation)
+[INFO] 2026-10-14 11:44:27.393000 lds_configurator_utils.py [LDS_CONFIGURATOR] Запрос GetTusInformation для tuId=3
+[INFO] 2026-10-14 11:44:27.649000 lds_configurator_utils.py [LDS_CONFIGURATOR] Проверка: в ответе есть информация о запуске ТУ
+[INFO] 2026-10-14 11:44:27.649000 lds_configurator_utils.py [LDS_CONFIGURATOR] Проверка (GetTusInformation): Наличие времени запуска launchedAt: 2026-10-14 08:44:26.151624+00:00 для tuId=3
+[INFO] 2026-10-14 11:44:27.650000 lds_configurator_scenarios.py [LDS_CONFIGURATOR] [SETUP] [OK] Запуск СОУ через Администрирование до старта имитатора. Успех!
+[INFO] 2026-10-14 11:44:27.651000 subprocess_client.py [POPEN] выполняю команду: ssh [MASKED]@10.7.49.209 "dotnet /data/imitator/lds-flow-playground-csv-latest/TN.LDS.Flow.Playground.Application.dll  --rules="/data/imitator/autotest_data/test_case_id_14_20261014T114141/rules.txt" --source="/data/imitator/autotest_data/test_case_id_14_20261014T114141/data" --sourceType="inflow" --sourceTagTypes="/data/imitator/autotest_data/test_case_id_14_20261014T114141/tags.txt" --startTime="20261014T114321" --stopTime="20261014T124421" --speed=1 --opcua="opc.tcp://VDC01-DISPLDS08.TN.TNGRP.RU:10521" --ns=2 --target="CHTNTEST4:""
+[INFO] 2026-10-14 11:44:27.652000 imitator_manager.py [IMITATOR] [OK] Имитатор запущен успешно
+[INFO] 2026-10-14 11:44:32.657000 subprocess_client.py [RUN] Выполняю команду: ssh [MASKED]@10.7.49.209 "docker start lds-core-node1 lds-core-node2 lds-core-node3"
+[INFO] 2026-10-14 11:44:35.916000 subprocess_client.py [RUN] [OK] Команда выполнена успешно: docker start lds-core-node1 lds-core-node2 lds-core-node3
+[INFO] 2026-10-14 11:44:35.917000 subprocess_client.py [RUN] Выполняю команду: ssh [MASKED]@10.7.49.209 "docker inspect -f '{{.State.Status}}' lds-core-node1"
+[INFO] 2026-10-14 11:44:36.435000 subprocess_client.py [RUN] [OK] Команда выполнена успешно: docker inspect -f '{{.State.Status}}' lds-core-node1
+[INFO] 2026-10-14 11:44:36.436000 docker_manager.py Статус контейнера: lds-core-node1 соответствует ожидаемому статусу: running
+[INFO] 2026-10-14 11:44:36.436000 subprocess_client.py [RUN] Выполняю команду: ssh [MASKED]@10.7.49.209 "docker inspect -f '{{.State.Status}}' lds-core-node2"
+[INFO] 2026-10-14 11:44:36.947000 subprocess_client.py [RUN] [OK] Команда выполнена успешно: docker inspect -f '{{.State.Status}}' lds-core-node2
+[INFO] 2026-10-14 11:44:36.947000 docker_manager.py Статус контейнера: lds-core-node2 соответствует ожидаемому статусу: running
+[INFO] 2026-10-14 11:44:36.948000 subprocess_client.py [RUN] Выполняю команду: ssh [MASKED]@10.7.49.209 "docker inspect -f '{{.State.Status}}' lds-core-node3"
+[INFO] 2026-10-14 11:44:37.435000 subprocess_client.py [RUN] [OK] Команда выполнена успешно: docker inspect -f '{{.State.Status}}' lds-core-node3
+[INFO] 2026-10-14 11:44:37.435000 docker_manager.py Статус контейнера: lds-core-node3 соответствует ожидаемому статусу: running
+[INFO] 2026-10-14 11:44:37.436000 docker_manager.py [CONTAINERS] [OK] У всех контейнеров группы: lds-core Статус: running ожидаемый
+[INFO] 2026-10-14 11:44:37.439000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 11:44:38.093000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=TqGDTIH2h4MZzi2dGZvcDA
+[INFO] 2026-10-14 11:44:38.093000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 11:44:38.453000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 119 с
+[INFO] 2026-10-14 11:44:43.459000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 11:44:43.670000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=1HOnvo45EXALSDehMdz3Mw
+[INFO] 2026-10-14 11:44:43.671000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 11:44:44.089000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 113 с
+[INFO] 2026-10-14 11:44:49.096000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 11:44:49.333000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=OreetiR3BX0KT5sCrGUXeg
+[INFO] 2026-10-14 11:44:49.334000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 11:44:49.636000 websocket_client.py Websocket connected (connectionId=OreetiR3BX0KT5sCrGUXeg)
+[INFO] 2026-10-14 11:44:49.636000 lds_configurator_scenarios.py [SETUP] Получение актуального статуса СОУ для tuId=3
+[INFO] 2026-10-14 11:44:49.636000 lds_configurator_utils.py [LDS_CONFIGURATOR] Запрос списка ТУ в Администрировании - попытка 1 из 10
+[INFO] 2026-10-14 11:44:49.927000 lds_configurator_scenarios.py [SETUP] Admin=RUNNING, запас времени 300 с, ожидание появления ТУ в BasicInfo (до 299 с)
+[INFO] 2026-10-14 11:44:49.927000 lds_configurator_utils.py [LDS_CONFIGURATOR] Ожидание появления ТУ в BasicInfo (tuId=3, tuName='ТН-3-Автотест-DATA-ABSENCE-FALSE', таймаут 299 с)
+[INFO] 2026-10-14 11:44:50.070000 lds_configurator_scenarios.py [SETUP] Ожидание появления ТУ в Состоянии МТ (остаток запаса времени 299 с)
+[INFO] 2026-10-14 11:44:50.070000 lds_configurator_utils.py [LDS_CONFIGURATOR] Ожидание появления ТУ в Состоянии МТ (tuId=3, таймаут 299 с)
+[INFO] 2026-10-14 11:44:50.070000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'subscribeMainPageInfoRequest', [{'tuIds': [3], 'additionalProperties': None}]]
+[INFO] 2026-10-14 11:45:35.074000 lds_configurator_scenarios.py [SETUP] Сверка статуса СОУ: Администрирование vs Состояние МТ
+[INFO] 2026-10-14 11:45:35.074000 lds_configurator_utils.py [LDS_CONFIGURATOR] Сверка статуса СОУ: Администрирование vs Состояние МТ (tuId=3, 'ТН-3-Автотест-DATA-ABSENCE-FALSE')
+[INFO] 2026-10-14 11:45:35.075000 lds_configurator_utils.py [LDS_CONFIGURATOR] Проверка согласованности статусов Администрирования и Состояния МТ
+[INFO] 2026-10-14 11:45:35.075000 lds_configurator_scenarios.py [LDS_CONFIGURATOR] [SETUP] [OK] Проверка готовности стенда после запуска lds-core. Успех!
+[INFO] 2026-10-14 11:45:35.075000 websocket_client.py [WS_HEALTH] connectionId=OreetiR3BX0KT5sCrGUXeg pings_sent=2 pings_failed=0 messages_received=21 queue_size=0 reconnects=0
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 11:49:32.663000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/configurator/GetBasicInfo
+PASSED
+tests/test_smoke.py::TestSuiteScenarios::test_journal_info[Real_73_tn3_39km_56]
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 11:49:32.946000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/journals/GetMessages
+PASSED
+tests/test_smoke.py::TestSuiteScenarios::test_lds_status_initialization[Real_73_tn3_39km_56]
+-------------------------------- live log setup --------------------------------
+[INFO] 2026-10-14 11:49:34.495000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 11:49:34.820000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=zZKWR317dvAaAv1HE8vIqw
+[INFO] 2026-10-14 11:49:34.820000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 11:49:35.164000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 119 с
+[INFO] 2026-10-14 11:49:40.169000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 11:49:40.394000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=ZHoD-s77YCg8flmL6FPKeg
+[INFO] 2026-10-14 11:49:40.395000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 11:49:40.636000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 114 с
+[INFO] 2026-10-14 11:49:45.642000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 11:49:45.822000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=9Fp97ifm9zSteyA4cZ99Kg
+[INFO] 2026-10-14 11:49:45.823000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 11:49:46.089000 websocket_client.py Websocket connected (connectionId=9Fp97ifm9zSteyA4cZ99Kg)
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 11:49:46.090000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'SubscribeCommonSchemeRequest', [{'tuId': 3, 'additionalProperties': None}]]
+PASSED
+------------------------------ live log teardown -------------------------------
+[INFO] 2026-10-14 11:49:48.296000 websocket_client.py [WS_HEALTH] connectionId=9Fp97ifm9zSteyA4cZ99Kg pings_sent=0 pings_failed=0 messages_received=2 queue_size=0 reconnects=0
+tests/test_smoke.py::TestSuiteScenarios::test_lds_status_init_in_journal[Real_73_tn3_39km_56]
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 11:49:49.930000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/journals/GetMessages
+PASSED
+tests/test_smoke.py::TestSuiteScenarios::test_stationary_status_common_scheme[Real_73_tn3_39km_56]
+-------------------------------- live log setup --------------------------------
+[INFO] 2026-10-14 11:50:32.659000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 11:50:32.967000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=cH0xcElet_geeLgbd-hFhg
+[INFO] 2026-10-14 11:50:32.968000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 11:50:33.218000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 119 с
+[INFO] 2026-10-14 11:50:38.224000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 11:50:38.442000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=Yycuiy44jgOo5VIH9kRHFQ
+[INFO] 2026-10-14 11:50:38.442000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 11:50:38.718000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 114 с
+[INFO] 2026-10-14 11:50:43.720000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 11:50:43.985000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=KJu-QXSHkEZ9HY2xWSppTg
+[INFO] 2026-10-14 11:50:43.986000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 11:50:44.357000 websocket_client.py Websocket connected (connectionId=KJu-QXSHkEZ9HY2xWSppTg)
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 11:50:44.359000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'SubscribeCommonSchemeRequest', [{'tuId': 3, 'additionalProperties': None}]]
+PASSED
+------------------------------ live log teardown -------------------------------
+[INFO] 2026-10-14 11:50:45.266000 websocket_client.py [WS_HEALTH] connectionId=KJu-QXSHkEZ9HY2xWSppTg pings_sent=0 pings_failed=0 messages_received=2 queue_size=0 reconnects=0
+tests/test_smoke.py::TestSuiteScenarios::test_stationary_status_main_page_info[Real_73_tn3_39km_56]
+-------------------------------- live log setup --------------------------------
+[INFO] 2026-10-14 11:50:46.899000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 11:50:47.148000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=HrPkN0lueoongC1mQnWTYw
+[INFO] 2026-10-14 11:50:47.148000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 11:50:47.395000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 120 с
+[INFO] 2026-10-14 11:50:52.397000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 11:50:52.621000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=jOScSqBeXQqFYvVRwNkf3Q
+[INFO] 2026-10-14 11:50:52.621000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 11:50:52.922000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 114 с
+[INFO] 2026-10-14 11:50:57.924000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 11:50:58.164000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=zgzTvjjp_2e4jveP3v3XZg
+[INFO] 2026-10-14 11:50:58.164000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 11:50:58.428000 websocket_client.py Websocket connected (connectionId=zgzTvjjp_2e4jveP3v3XZg)
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 11:50:58.429000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'subscribeMainPageInfoRequest', [{'tuIds': [3], 'additionalProperties': None}]]
+PASSED
+------------------------------ live log teardown -------------------------------
+[INFO] 2026-10-14 11:51:07.609000 websocket_client.py [WS_HEALTH] connectionId=zgzTvjjp_2e4jveP3v3XZg pings_sent=0 pings_failed=0 messages_received=2 queue_size=0 reconnects=0
+tests/test_smoke.py::TestSuiteScenarios::test_stationary_status_in_output_signals[Real_73_tn3_39km_56] SKIPPED
+tests/test_smoke.py::TestSuiteScenarios::test_stationary_status_journal[Real_73_tn3_39km_56] SKIPPED
+tests/test_smoke.py::TestSuiteScenarios::test_mask_signal[Real_73_tn3_39km_56]
+-------------------------------- live log setup --------------------------------
+[INFO] 2026-10-14 11:52:32.662000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 11:52:32.913000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=OzGWzu9j614Y4_FcN7xmVw
+[INFO] 2026-10-14 11:52:32.914000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 11:52:33.156000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 120 с
+[INFO] 2026-10-14 11:52:38.161000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 11:52:38.367000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=vH2kxkaNduw26NQWTyGrAg
+[INFO] 2026-10-14 11:52:38.368000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 11:52:38.652000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 114 с
+[INFO] 2026-10-14 11:52:43.658000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 11:52:43.877000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=DucWZTl2axp1lakLuTQbCA
+[INFO] 2026-10-14 11:52:43.877000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 11:52:44.181000 websocket_client.py Websocket connected (connectionId=DucWZTl2axp1lakLuTQbCA)
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 11:52:44.184000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/layerbuilder/MaskSignal
+[INFO] 2026-10-14 11:52:45.382000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/layerbuilder/MaskSignal
+[INFO] 2026-10-14 11:52:45.489000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'SubscribeInputSignalsRequest', [{'signalIds': [31573, 30146], 'tuId': 3, 'additionalProperties': None}]]
+[INFO] 2026-10-14 11:52:45.729000 websocket_client.py Обработанное сообщение от api-gateway: [3, {}, '1', 3, {'replyStatus': 200, 'replyErrors': None}]... полное сообщение в attach
+[INFO] 2026-10-14 11:52:46.156000 websocket_client.py Обработанное сообщение от api-gateway: [1, {}, None, 'InputSignalsContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 3, 'inputSignals': [[3, {'id': 31573, 'quality': 1, 'isRejected': False, 'isMasked': True, 'isI... полное сообщение в attach
+[INFO] 2026-10-14 11:52:46.158000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/layerbuilder/UnmaskSignal
+[INFO] 2026-10-14 11:52:46.302000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/layerbuilder/UnmaskSignal
+[INFO] 2026-10-14 11:52:46.410000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '2', 'SubscribeInputSignalsRequest', [{'signalIds': [31573, 30146], 'tuId': 3, 'additionalProperties': None}]]
+[INFO] 2026-10-14 11:52:46.426000 websocket_client.py Обработанное сообщение от api-gateway: [3, {}, '2', 3, {'replyStatus': 200, 'replyErrors': None}]... полное сообщение в attach
+[INFO] 2026-10-14 11:52:46.903000 websocket_client.py Обработанное сообщение от api-gateway: [1, {}, None, 'InputSignalsContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 3, 'inputSignals': [[3, {'id': 31573, 'quality': 1, 'isRejected': False, 'isMasked': False, 'is... полное сообщение в attach
+PASSED
+------------------------------ live log teardown -------------------------------
+[INFO] 2026-10-14 11:52:46.906000 websocket_client.py [WS_HEALTH] connectionId=DucWZTl2axp1lakLuTQbCA pings_sent=0 pings_failed=0 messages_received=4 queue_size=0 reconnects=0
+tests/test_smoke.py::TestSuiteScenarios::test_mask_info_in_journal[Real_73_tn3_39km_56] PASSED
+tests/test_smoke.py::TestSuiteScenarios::test_diagnostics_of_signals_after_initialization[Real_73_tn3_39km_56] SKIPPED
+tests/test_smoke.py::TestSuiteScenarios::test_lds_status_initialization_out[Real_73_tn3_39km_56]
+-------------------------------- live log setup --------------------------------
+[INFO] 2026-10-14 12:14:32.769000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:14:33.157000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=eodwrpYjnV3CaL6oDRn68g
+[INFO] 2026-10-14 12:14:33.158000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:14:33.496000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 119 с
+[INFO] 2026-10-14 12:14:38.502000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:14:38.690000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=o7v4IPNrShElMZ9OzIK-uw
+[INFO] 2026-10-14 12:14:38.691000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:14:39.005000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 114 с
+[INFO] 2026-10-14 12:14:44.011000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:14:44.190000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=82t3JWlozcVoTOtBXAT0Gw
+[INFO] 2026-10-14 12:14:44.190000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 12:14:44.393000 websocket_client.py Websocket connected (connectionId=82t3JWlozcVoTOtBXAT0Gw)
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 12:14:44.396000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'SubscribeCommonSchemeRequest', [{'tuId': 3, 'additionalProperties': None}]]
+PASSED
+------------------------------ live log teardown -------------------------------
+[INFO] 2026-10-14 12:14:45.082000 websocket_client.py [WS_HEALTH] connectionId=82t3JWlozcVoTOtBXAT0Gw pings_sent=0 pings_failed=0 messages_received=2 queue_size=0 reconnects=0
+tests/test_smoke.py::TestSuiteScenarios::test_lds_status_init_out_in_journal[Real_73_tn3_39km_56]
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 12:15:32.709000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/journals/GetMessages
+PASSED
+tests/test_smoke.py::TestLeakScenarios::test_balance_algorithm_leak_waiting[Real_73_tn3_39km_56]
+-------------------------------- live log setup --------------------------------
+[INFO] 2026-10-14 12:27:32.710000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:27:33.084000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=KkmwUor95Gb8PW8TihqqCg
+[INFO] 2026-10-14 12:27:33.085000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:27:33.417000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 119 с
+[INFO] 2026-10-14 12:27:38.423000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:27:38.645000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=mA1aoElfCYuMyNqQYmHZ7w
+[INFO] 2026-10-14 12:27:38.645000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:27:39.037000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 114 с
+[INFO] 2026-10-14 12:27:44.040000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:27:44.243000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=Foh24SwOTZVxCiyESctSYQ
+[INFO] 2026-10-14 12:27:44.243000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 12:27:44.455000 websocket_client.py Websocket connected (connectionId=Foh24SwOTZVxCiyESctSYQ)
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 12:27:44.459000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'SubscribeBalanceAlgorithmResultsRequest', [{'tuId': 3, 'additionalProperties': None}]]
+PASSED
+------------------------------ live log teardown -------------------------------
+[INFO] 2026-10-14 12:31:29.555000 websocket_client.py [WS_HEALTH] connectionId=Foh24SwOTZVxCiyESctSYQ pings_sent=15 pings_failed=0 messages_received=226 queue_size=0 reconnects=0
+tests/test_smoke.py::TestLeakScenarios::test_possible_leak_in_journal[Real_73_tn3_39km_56]
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 12:32:32.701000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/journals/GetMessages
+PASSED
+tests/test_smoke.py::TestLeakScenarios::test_all_leaks_info[Real_73_tn3_39km_56]
+-------------------------------- live log setup --------------------------------
+[INFO] 2026-10-14 12:38:32.696000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:38:33.045000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=rIH960n8GC6dLGxWSJM2rA
+[INFO] 2026-10-14 12:38:33.046000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:38:33.357000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 119 с
+[INFO] 2026-10-14 12:38:38.363000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:38:38.585000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=Nc_Aq-kfvAqkMPQ3AYNWLw
+[INFO] 2026-10-14 12:38:38.585000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:38:38.894000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 114 с
+[INFO] 2026-10-14 12:38:43.900000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:38:44.117000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=SGq989avbDqDOzsGYmMQWQ
+[INFO] 2026-10-14 12:38:44.117000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 12:38:44.363000 websocket_client.py Websocket connected (connectionId=SGq989avbDqDOzsGYmMQWQ)
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 12:38:44.367000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'subscribeAllLeaksInfoRequest', [[]]]
+[INFO] 2026-10-14 12:38:44.427000 websocket_client.py Обработанное сообщение от api-gateway: [3, {}, '1', 3, {'replyStatus': 200, 'replyErrors': None}]... полное сообщение в attach
+[INFO] 2026-10-14 12:38:45.110000 websocket_client.py Обработанное сообщение от api-gateway: [1, {}, None, 'AllLeaksInfoContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 3, 'tuName': 'ТН-3-Автотест-DATA-ABSENCE-FALSE', 'leaksInfo': [{'diagnosticAreaName': 'Т-Н-3.НП... полное сообщение в attach
+PASSED
+------------------------------ live log teardown -------------------------------
+[INFO] 2026-10-14 12:38:45.114000 websocket_client.py [WS_HEALTH] connectionId=SGq989avbDqDOzsGYmMQWQ pings_sent=0 pings_failed=0 messages_received=2 queue_size=0 reconnects=0
+tests/test_smoke.py::TestLeakScenarios::test_leaks_content[Real_73_tn3_39km_56]
+-------------------------------- live log setup --------------------------------
+[INFO] 2026-10-14 12:38:46.908000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:38:47.158000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=U64fJ3Uy-iQcCsouoySEBg
+[INFO] 2026-10-14 12:38:47.158000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:38:47.373000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 120 с
+[INFO] 2026-10-14 12:38:52.379000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:38:52.585000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=wUmxhI8ul5sp5HMeMcExpg
+[INFO] 2026-10-14 12:38:52.586000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:38:52.859000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 114 с
+[INFO] 2026-10-14 12:38:57.865000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:38:58.109000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=89W7RP5tbPUjo31uQZEs_w
+[INFO] 2026-10-14 12:38:58.110000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 12:38:58.327000 websocket_client.py Websocket connected (connectionId=89W7RP5tbPUjo31uQZEs_w)
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 12:38:58.329000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'SubscribeLeaksRequest', [{'tuId': 3}]]
+PASSED
+------------------------------ live log teardown -------------------------------
+[INFO] 2026-10-14 12:39:08.110000 websocket_client.py [WS_HEALTH] connectionId=89W7RP5tbPUjo31uQZEs_w pings_sent=0 pings_failed=0 messages_received=2 queue_size=0 reconnects=0
+tests/test_smoke.py::TestLeakScenarios::test_leak_info_in_journal[Real_73_tn3_39km_56]
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 12:39:09.901000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/journals/GetMessages
+PASSED
+tests/test_smoke.py::TestLeakScenarios::test_tu_leaks_info[Real_73_tn3_39km_56]
+-------------------------------- live log setup --------------------------------
+[INFO] 2026-10-14 12:39:10.384000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:39:10.719000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=8f0PmPw63f7LTg6yU2i8gQ
+[INFO] 2026-10-14 12:39:10.719000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:39:10.962000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 119 с
+[INFO] 2026-10-14 12:39:15.968000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:39:16.156000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=dLJbvUa81jxGAcXb5Y1QuA
+[INFO] 2026-10-14 12:39:16.157000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:39:16.383000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 114 с
+[INFO] 2026-10-14 12:39:21.389000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:39:21.605000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=QaE1Rtc5T26_So2wRf1OMg
+[INFO] 2026-10-14 12:39:21.605000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 12:39:21.823000 websocket_client.py Websocket connected (connectionId=QaE1Rtc5T26_So2wRf1OMg)
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 12:39:21.825000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'subscribeTuLeaksInfoRequest', [{'tuId': 3}]]
+PASSED
+------------------------------ live log teardown -------------------------------
+[INFO] 2026-10-14 12:39:31.092000 websocket_client.py [WS_HEALTH] connectionId=QaE1Rtc5T26_So2wRf1OMg pings_sent=0 pings_failed=0 messages_received=2 queue_size=0 reconnects=0
+tests/test_smoke.py::TestLeakScenarios::test_balance_algorithm_leak_detected[Real_73_tn3_39km_56]
+-------------------------------- live log setup --------------------------------
+[INFO] 2026-10-14 12:39:32.901000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:39:33.144000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=V8epPFeOT4SoTMdAOAB9JQ
+[INFO] 2026-10-14 12:39:33.145000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:39:33.362000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 120 с
+[INFO] 2026-10-14 12:39:38.368000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:39:38.587000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=LW4o1UAdyhOmCvR1GbgNnw
+[INFO] 2026-10-14 12:39:38.587000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:39:38.851000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 114 с
+[INFO] 2026-10-14 12:39:43.857000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:39:44.102000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=iwCQZvzPWjSx0Q3o-jt7QA
+[INFO] 2026-10-14 12:39:44.102000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 12:39:44.323000 websocket_client.py Websocket connected (connectionId=iwCQZvzPWjSx0Q3o-jt7QA)
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 12:39:44.324000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'SubscribeBalanceAlgorithmResultsRequest', [{'tuId': 3, 'additionalProperties': None}]]
+PASSED
+------------------------------ live log teardown -------------------------------
+[INFO] 2026-10-14 12:39:54.030000 websocket_client.py [WS_HEALTH] connectionId=iwCQZvzPWjSx0Q3o-jt7QA pings_sent=0 pings_failed=0 messages_received=2 queue_size=0 reconnects=0
+tests/test_smoke.py::TestLeakScenarios::test_lds_status_during_leak[Real_73_tn3_39km_56]
+-------------------------------- live log setup --------------------------------
+[INFO] 2026-10-14 12:39:55.901000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:39:56.141000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=Q61W27UN4w0RLqAzLQd-SA
+[INFO] 2026-10-14 12:39:56.142000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:39:56.374000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 120 с
+[INFO] 2026-10-14 12:40:01.380000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:40:01.608000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=JYxgNvSCqZJM5VCum9_Z1Q
+[INFO] 2026-10-14 12:40:01.609000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:40:01.877000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 114 с
+[INFO] 2026-10-14 12:40:06.883000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:40:07.090000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=8IfUs7cXgKhslK9IBTnC-A
+[INFO] 2026-10-14 12:40:07.091000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 12:40:07.298000 websocket_client.py Websocket connected (connectionId=8IfUs7cXgKhslK9IBTnC-A)
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 12:40:07.301000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'SubscribeCommonSchemeRequest', [{'tuId': 3, 'additionalProperties': None}]]
+PASSED
+------------------------------ live log teardown -------------------------------
+[INFO] 2026-10-14 12:40:17.122000 websocket_client.py [WS_HEALTH] connectionId=8IfUs7cXgKhslK9IBTnC-A pings_sent=0 pings_failed=0 messages_received=2 queue_size=0 reconnects=0
+tests/test_smoke.py::TestLeakScenarios::test_acknowledge_leak_info[Real_73_tn3_39km_56]
+-------------------------------- live log setup --------------------------------
+[INFO] 2026-10-14 12:40:18.905000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:40:19.148000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=AYymqCPPVvWaZ09fYIs0qQ
+[INFO] 2026-10-14 12:40:19.148000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:40:19.393000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 120 с
+[INFO] 2026-10-14 12:40:24.399000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:40:24.625000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=eKDicVUNFGH01ZbWH8MKiw
+[INFO] 2026-10-14 12:40:24.626000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:40:24.867000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 114 с
+[INFO] 2026-10-14 12:40:29.873000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:40:30.064000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=MHKRBM6TU77GUhJex0UKdQ
+[INFO] 2026-10-14 12:40:30.065000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 12:40:30.307000 websocket_client.py Websocket connected (connectionId=MHKRBM6TU77GUhJex0UKdQ)
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 12:40:30.309000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'subscribeTuLeaksInfoRequest', [{'tuId': 3}]]
+[INFO] 2026-10-14 12:40:40.017000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/core/AcknowledgeLeak
+[INFO] 2026-10-14 12:40:51.197000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '2', 'subscribeAllLeaksInfoRequest', [[]]]
+[INFO] 2026-10-14 12:40:51.199000 websocket_client.py Обработанное сообщение от api-gateway: [1, {}, None, 'TuLeaksInfoContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 3, 'leaksInfo': [{'ldsStatus': 4, 'isMasked': False, 'id': '01a139c2-7215-7529-b076-8af2ecdfe508... полное сообщение в attach
+[INFO] 2026-10-14 12:40:51.200000 websocket_client.py Обработанное сообщение от api-gateway: [1, {}, None, 'TuLeaksInfoContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 3, 'leaksInfo': [{'ldsStatus': 4, 'isMasked': False, 'id': '01a139c2-7215-7529-b076-8af2ecdfe508... полное сообщение в attach
+[INFO] 2026-10-14 12:40:51.200000 websocket_client.py Обработанное сообщение от api-gateway: [1, {}, None, 'TuLeaksInfoContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 3, 'leaksInfo': [{'ldsStatus': 4, 'isMasked': False, 'id': '01a139c2-7215-7529-b076-8af2ecdfe508... полное сообщение в attach
+[INFO] 2026-10-14 12:40:51.200000 websocket_client.py Обработанное сообщение от api-gateway: [1, {}, None, 'TuLeaksInfoContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 3, 'leaksInfo': [{'ldsStatus': 4, 'isMasked': False, 'id': '01a139c2-7215-7529-b076-8af2ecdfe508... полное сообщение в attach
+[INFO] 2026-10-14 12:40:51.200000 websocket_client.py Обработанное сообщение от api-gateway: [1, {}, None, 'TuLeaksInfoContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 3, 'leaksInfo': [{'ldsStatus': 4, 'isMasked': False, 'id': '01a139c2-7215-7529-b076-8af2ecdfe508... полное сообщение в attach
+[INFO] 2026-10-14 12:40:51.200000 websocket_client.py Обработанное сообщение от api-gateway: [1, {}, None, 'TuLeaksInfoContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 3, 'leaksInfo': [{'ldsStatus': 4, 'isMasked': False, 'id': '01a139c2-7215-7529-b076-8af2ecdfe508... полное сообщение в attach
+[INFO] 2026-10-14 12:40:51.201000 websocket_client.py Обработанное сообщение от api-gateway: [1, {}, None, 'TuLeaksInfoContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 3, 'leaksInfo': [{'ldsStatus': 4, 'isMasked': False, 'id': '01a139c2-7215-7529-b076-8af2ecdfe508... полное сообщение в attach
+[INFO] 2026-10-14 12:40:51.201000 websocket_client.py Обработанное сообщение от api-gateway: [1, {}, None, 'TuLeaksInfoContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 3, 'leaksInfo': [{'ldsStatus': 4, 'isMasked': False, 'id': '01a139c2-7215-7529-b076-8af2ecdfe508... полное сообщение в attach
+[INFO] 2026-10-14 12:40:51.201000 websocket_client.py Обработанное сообщение от api-gateway: [1, {}, None, 'TuLeaksInfoContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 3, 'leaksInfo': [{'ldsStatus': 4, 'isMasked': False, 'id': '01a139c2-7215-7529-b076-8af2ecdfe508... полное сообщение в attach
+[INFO] 2026-10-14 12:40:51.201000 websocket_client.py Обработанное сообщение от api-gateway: [1, {}, None, 'TuLeaksInfoContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 3, 'leaksInfo': [{'ldsStatus': 4, 'isMasked': False, 'id': '01a139c2-7215-7529-b076-8af2ecdfe508... полное сообщение в attach
+[INFO] 2026-10-14 12:40:51.201000 websocket_client.py Обработанное сообщение от api-gateway: [1, {}, None, 'TuLeaksInfoContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 3, 'leaksInfo': [{'ldsStatus': 4, 'isMasked': False, 'id': '01a139c2-7215-7529-b076-8af2ecdfe508... полное сообщение в attach
+[INFO] 2026-10-14 12:40:51.211000 websocket_client.py Обработанное сообщение от api-gateway: [3, {}, '2', 3, {'replyStatus': 200, 'replyErrors': None}]... полное сообщение в attach
+[INFO] 2026-10-14 12:40:52.014000 websocket_client.py Обработанное сообщение от api-gateway: [1, {}, None, 'AllLeaksInfoContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 3, 'tuName': 'ТН-3-Автотест-DATA-ABSENCE-FALSE', 'leaksInfo': []}}], []]... полное сообщение в attach
+PASSED
+------------------------------ live log teardown -------------------------------
+[INFO] 2026-10-14 12:40:52.017000 websocket_client.py Обработанное сообщение от api-gateway: [1, {}, None, 'TuLeaksInfoContent', [{'replyStatus': 200, 'replyErrors': None, 'replyContent': {'tuId': 3, 'leaksInfo': [{'ldsStatus': 4, 'isMasked': False, 'id': '01a139c2-7215-7529-b076-8af2ecdfe508... полное сообщение в attach
+[INFO] 2026-10-14 12:40:52.018000 websocket_client.py [WS_HEALTH] connectionId=MHKRBM6TU77GUhJex0UKdQ pings_sent=1 pings_failed=0 messages_received=16 queue_size=1 reconnects=0
+tests/test_smoke.py::TestLeakScenarios::test_leak_is_confirm_on_main_page[Real_73_tn3_39km_56]
+-------------------------------- live log setup --------------------------------
+[INFO] 2026-10-14 12:40:53.903000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:40:54.193000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=IpHttG0vAXabIpS_-Z2WKw
+[INFO] 2026-10-14 12:40:54.193000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:40:54.424000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 119 с
+[INFO] 2026-10-14 12:40:59.430000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:40:59.647000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=EGT077YYl3Yb0Z71moz2mQ
+[INFO] 2026-10-14 12:40:59.647000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:40:59.866000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 114 с
+[INFO] 2026-10-14 12:41:04.872000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:41:05.102000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=0okq6qk2xfgtU3cD5khKJw
+[INFO] 2026-10-14 12:41:05.103000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 12:41:05.324000 websocket_client.py Websocket connected (connectionId=0okq6qk2xfgtU3cD5khKJw)
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 12:41:05.326000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'subscribeMainPageInfoRequest', [{'tuIds': [3], 'additionalProperties': None}]]
+PASSED
+------------------------------ live log teardown -------------------------------
+[INFO] 2026-10-14 12:41:15.046000 websocket_client.py [WS_HEALTH] connectionId=0okq6qk2xfgtU3cD5khKJw pings_sent=0 pings_failed=0 messages_received=2 queue_size=0 reconnects=0
+tests/test_smoke.py::TestLeakScenarios::test_acknowledge_leak_in_journal[Real_73_tn3_39km_56]
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 12:41:16.900000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/journals/GetMessages
+PASSED
+tests/test_smoke.py::TestLeakScenarios::test_output_signals[Real_73_tn3_39km_56]
+-------------------------------- live log setup --------------------------------
+[INFO] 2026-10-14 12:41:17.414000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:41:17.655000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=wTGWhKuhJb7jE87JJi72CQ
+[INFO] 2026-10-14 12:41:17.656000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:41:17.967000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 119 с
+[INFO] 2026-10-14 12:41:22.973000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:41:23.182000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=lhEQntFSK1ucep8lKpQgSw
+[INFO] 2026-10-14 12:41:23.183000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:41:23.400000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 114 с
+[INFO] 2026-10-14 12:41:28.406000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:41:28.608000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=KdTwckTJk8bolOD_blHiEA
+[INFO] 2026-10-14 12:41:28.609000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 12:41:28.819000 websocket_client.py Websocket connected (connectionId=KdTwckTJk8bolOD_blHiEA)
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 12:41:28.821000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/apigateway/GetOutputSignals
+[INFO] 2026-10-14 12:41:29.072000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'SubscribeOutputSignalsRequest', [{'objects': {'linearParts': [{'linearPartId': 407}], 'controlledSites': []}, 'signalTypes': 1023, 'tuId': 3, 'additionalProperties': None}]]
+PASSED
+------------------------------ live log teardown -------------------------------
+[INFO] 2026-10-14 12:41:38.100000 websocket_client.py [WS_HEALTH] connectionId=KdTwckTJk8bolOD_blHiEA pings_sent=0 pings_failed=0 messages_received=2 queue_size=0 reconnects=0
+tests/test_smoke.py::TestLeakScenarios::test_export_leaks_report[Real_73_tn3_39km_56]
+-------------------------------- live log setup --------------------------------
+[INFO] 2026-10-14 12:41:39.934000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:41:40.177000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=ypjrOGLHHDRf_Z2ed-Ji8w
+[INFO] 2026-10-14 12:41:40.177000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:41:40.402000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 120 с
+[INFO] 2026-10-14 12:41:45.408000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:41:45.592000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=YSpxUCcJuGptF8e4SeIQDg
+[INFO] 2026-10-14 12:41:45.593000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:41:45.827000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 114 с
+[INFO] 2026-10-14 12:41:50.832000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:41:51.045000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=CdjCryf98yq-w_GBGvDrpg
+[INFO] 2026-10-14 12:41:51.046000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 12:41:51.257000 websocket_client.py Websocket connected (connectionId=CdjCryf98yq-w_GBGvDrpg)
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 12:41:51.260000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'SubscribeReportsDataExportedRequest', [[]]]
+[INFO] 2026-10-14 12:41:51.260000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/reports/ExportReports
+[INFO] 2026-10-14 12:42:02.454000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/journals/GetExportedDataList
+[INFO] 2026-10-14 12:42:03.297000 websocket_client.py Streaming-сообщение подготовлено к отправке: [4, {}, '2', 'DownloadExportedDataRequest', [{'exportedDataId': 283, 'exportedDataType': 'LeaksReport', 'additionalProperties': None, 'timeOffset': 3}]]
+PASSED
+------------------------------ live log teardown -------------------------------
+[INFO] 2026-10-14 12:42:04.395000 websocket_client.py [WS_HEALTH] connectionId=CdjCryf98yq-w_GBGvDrpg pings_sent=0 pings_failed=0 messages_received=6 queue_size=0 reconnects=0
+tests/test_smoke.py::TestSuiteScenarios::test_export_lds_status_report[Real_73_tn3_39km_56]
+-------------------------------- live log setup --------------------------------
+[INFO] 2026-10-14 12:42:32.686000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:42:32.965000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=xhecPIGUW6h1RSvIDG0eBg
+[INFO] 2026-10-14 12:42:32.966000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:42:33.234000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 119 с
+[INFO] 2026-10-14 12:42:38.239000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:42:38.444000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=vN3s1WLC7APID_gJdsBisQ
+[INFO] 2026-10-14 12:42:38.445000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:42:38.720000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 114 с
+[INFO] 2026-10-14 12:42:43.725000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:42:43.908000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=1rvLltqZux6UKrmkxKA-eA
+[INFO] 2026-10-14 12:42:43.908000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 12:42:44.155000 websocket_client.py Websocket connected (connectionId=1rvLltqZux6UKrmkxKA-eA)
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 12:42:44.158000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'SubscribeReportsDataExportedRequest', [[]]]
+[INFO] 2026-10-14 12:42:44.158000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/reports/ExportReports
+[INFO] 2026-10-14 12:42:55.338000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/journals/GetExportedDataList
+[INFO] 2026-10-14 12:42:56.118000 websocket_client.py Streaming-сообщение подготовлено к отправке: [4, {}, '2', 'DownloadExportedDataRequest', [{'exportedDataId': 494, 'exportedDataType': 'LdsStateReport', 'additionalProperties': None, 'timeOffset': 3}]]
+PASSED
+------------------------------ live log teardown -------------------------------
+[INFO] 2026-10-14 12:42:57.136000 websocket_client.py [WS_HEALTH] connectionId=1rvLltqZux6UKrmkxKA-eA pings_sent=0 pings_failed=0 messages_received=6 queue_size=0 reconnects=0
+tests/test_smoke.py::TestSuiteScenarios::test_export_mt_mode_report[Real_73_tn3_39km_56]
+-------------------------------- live log setup --------------------------------
+[INFO] 2026-10-14 12:43:32.693000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:43:37.062000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=pnTazR1n7W2vAUeY8DsbMg
+[INFO] 2026-10-14 12:43:37.064000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:43:37.307000 websocket_client.py WSS подключение не установлено (попытка 1, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 115 с
+[INFO] 2026-10-14 12:43:42.313000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:43:42.601000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=SlxKWfwmTUaUI1HWsv5INQ
+[INFO] 2026-10-14 12:43:42.602000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[WARNING] 2026-10-14 12:43:42.998000 websocket_client.py WSS подключение не установлено (попытка 2, HTTP 404): server rejected WebSocket connection: HTTP 404. Повтор через 5.0 с, осталось 110 с
+[INFO] 2026-10-14 12:43:48.003000 signalr_negotiator.py [NEGOTIATE] Попытка 1 из 3: https://web-app...ru/lds-api-gateway/hubs/ldsClientHub/negotiate?token=***&xUserId=fc13d94e-baf7-4148-9950-ef5034481da3&negotiateVersion=1
+[INFO] 2026-10-14 12:43:48.252000 signalr_negotiator.py [NEGOTIATE] [OK] Получен connectionId=qxEDcYChdQGTjSEPfBW3zg
+[INFO] 2026-10-14 12:43:48.253000 websocket_client.py Попытка подключения по wss: wss://web-app...ru/lds-api-gateway/hubs/ldsClientHub/?token=...&xUserId=...&id=...
+[INFO] 2026-10-14 12:43:48.450000 websocket_client.py Websocket connected (connectionId=qxEDcYChdQGTjSEPfBW3zg)
+-------------------------------- live log call ---------------------------------
+[INFO] 2026-10-14 12:43:48.452000 websocket_client.py Сообщение подготовлено к отправке: [1, {}, '1', 'SubscribeReportsDataExportedRequest', [[]]]
+[INFO] 2026-10-14 12:43:48.453000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/reports/ExportReports
+[INFO] 2026-10-14 12:43:59.751000 http_client.py [HTTP_CLIENT] Выполняю запрос: METHOD: post URL: https://web-app...ru/lds-api-gateway/journals/GetExportedDataList
+[INFO] 2026-10-14 12:44:00.268000 websocket_client.py Streaming-сообщение подготовлено к отправке: [4, {}, '2', 'DownloadExportedDataRequest', [{'exportedDataId': 495, 'exportedDataType': 'MnStateReport', 'additionalProperties': None, 'timeOffset': 3}]]
+PASSED
+------------------------------ live log teardown -------------------------------
+[INFO] 2026-10-14 12:44:00.789000 websocket_client.py [WS_HEALTH] connectionId=qxEDcYChdQGTjSEPfBW3zg pings_sent=0 pings_failed=0 messages_received=6 queue_size=0 reconnects=0
+[INFO] 2026-10-14 12:44:01.897000 stand_setup_manager.py [TEARDOWN] [OK] OPC SSH-туннель закрыт
+[INFO] 2026-10-14 12:44:01.898000 stand_setup_manager.py [TEARDOWN] [INFO] Запуск graceful termination имитатора
+[INFO] 2026-10-14 12:44:01.898000 subprocess_client.py [RUN] Выполняю команду: ssh [MASKED]@10.7.49.209 "pgrep -f Playground"
+[INFO] 2026-10-14 12:44:02.525000 subprocess_client.py [RUN] [OK] Команда выполнена успешно: pgrep -f Playground
+[WARNING] 2026-10-14 12:44:02.525000 imitator_manager.py [IMITATOR] [WARNING] Имитатор не остановлен! PID: 3282103
+[INFO] 2026-10-14 12:44:02.525000 subprocess_client.py [RUN] Выполняю команду: ssh [MASKED]@10.7.49.209 "pkill -f Playground"
+[INFO] 2026-10-14 12:44:03.063000 subprocess_client.py [RUN] [OK] Команда выполнена успешно: pkill -f Playground
+[INFO] 2026-10-14 12:44:03.063000 imitator_manager.py [IMITATOR] [OK] Имитатор остановлен успешно
+[INFO] 2026-10-14 12:44:03.063000 subprocess_client.py [RUN] Выполняю команду: ssh [MASKED]@10.7.49.209 "pgrep -f Playground"
+[INFO] 2026-10-14 12:44:03.551000 subprocess_client.py [RUN] [OK] Команда выполнена успешно: pgrep -f Playground
+[INFO] 2026-10-14 12:44:03.551000 imitator_manager.py [IMITATOR] [OK] Имитатор остановлен успешно
+[INFO] 2026-10-14 12:44:03.552000 stand_setup_manager.py [TEARDOWN] [OK] Имитатор остановлен
+[INFO] 2026-10-14 12:44:03.552000 signal_unit_conversion_manager.py [TEARDOWN] [SKIP] signal_unit_conversion_rules.json не изменялся
+[INFO] 2026-10-14 12:44:03.552000 subprocess_client.py [RUN] Выполняю команду: ssh [MASKED]@10.7.49.209 "rm -rf /data/imitator/autotest_data/test_case_id_14_20261014T114141"
+[INFO] 2026-10-14 12:44:04.300000 subprocess_client.py [RUN] [OK] Команда выполнена успешно: rm -rf /data/imitator/autotest_data/test_case_id_14_20261014T114141
+[INFO] 2026-10-14 12:44:04.300000 subprocess_client.py [RUN] Выполняю команду: ssh [MASKED]@10.7.49.209 "if [ -d '/data/imitator/autotest_data/test_case_id_14_20261014T114141/data' ] && [ -f '/data/imitator/autotest_data/test_case_id_14_20261014T114141/rules.txt' ] && [ -f '
+[INFO] 2026-10-14 12:44:04.732000 subprocess_client.py [RUN] [OK] Команда выполнена успешно: if [ -d '/data/imitator/autotest_data/test_case_id_14_20261014T114141/data' ] && [ -f '/data/imitator/autotest_data/test_case_id_14_20261014T114141/rules.txt' ] && [ -f '/data/imitator/autotest_data/t
+[INFO] 2026-10-14 12:44:04.732000 imitator_data_uploader.py [DATA UPLOADER] [OK] Тестовые данные успешно удалены с удаленного сервера: 10.7.49.209
+---------------------------- live log sessionfinish ----------------------------
+[INFO] 2026-10-14 12:44:04.741000 lds_configurator_scenarios.py [TEARDOWN] Проверка статуса СОУ (tuId=3, «ТН-3-Автотест-DATA-ABSENCE-FALSE»)
+[INFO] 2026-10-14 12:44:04.741000 lds_configurator_utils.py [LDS_CONFIGURATOR] Запрос списка ТУ в Администрировании - попытка 1 из 10
+[INFO] 2026-10-14 12:44:04.978000 lds_configurator_scenarios.py [TEARDOWN] Остановка СОУ (StopLdsRequest) для tuId=3
+[INFO] 2026-10-14 12:44:04.978000 lds_configurator_utils.py [LDS_CONFIGURATOR] Команда /configurator/StopLds для tuId=3
+[INFO] 2026-10-14 12:44:05.191000 lds_configurator_utils.py [LDS_CONFIGURATOR] Проверка: /configurator/StopLds завершился успешно (response.status_code=200)
+[INFO] 2026-10-14 12:44:05.191000 lds_configurator_scenarios.py [TEARDOWN] Ожидание выключения СОУ в Администрировании
+[INFO] 2026-10-14 12:44:05.191000 lds_configurator_utils.py [LDS_CONFIGURATOR] Ожидание статуса 'СОУ выключена' в Администрировании (tuId=3, таймаут 120 с)
+[INFO] 2026-10-14 12:44:05.372000 lds_configurator_scenarios.py [LDS_CONFIGURATOR] [TEARDOWN] [OK] Восстановление ТУ. Успех!
+[INFO] 2026-10-14 12:44:05.375000 testops_client.py [TEARDOWN] [OK] Создан файл environment.properties в <_io.TextIOWrapper name='/builds/lds/lds-autotests/allure-results/environment.properties' mode='w' encoding='utf-8'>
+[INFO] 2026-10-14 12:44:05.477000 testops_client.py [TEARDOWN] [OK] Allure-results архивирован в /builds/lds/lds-autotests/allure-results.tar.gz
+[INFO] 2026-10-14 12:44:05.477000 conftest.py [INFO] [TEARDOWN] Uploading Allure results to TestOps
+[INFO] 2026-10-14 12:44:22.978000 testops_client.py [TEARDOWN] [OK] UPLOAD MESSAGE: Файлы успешно загружены
+=============================== warnings summary ===============================
+tests/test_smoke.py::TestSuiteScenarios::test_lds_status_init_in_journal[Real_73_tn3_39km_56]
+  tests/test_smoke.py:187: PytestWarning: The test <Function test_lds_status_init_in_journal[Real_73_tn3_39km_56]> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+    @pytest.mark.asyncio
+tests/test_smoke.py::TestSuiteScenarios::test_mask_info_in_journal[Real_73_tn3_39km_56]
+  /builds/lds/lds-autotests/tests/test_smoke.py:416: RuntimeWarning: coroutine 'mask_info_in_journal' was never awaited
+    scenarios.mask_info_in_journal(http_client, config, imitator_start_time)
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=== 25 passed, 3 skipped, 1026 deselected, 2 warnings in 3762.56s (1:02:42) ====

@@ -189,6 +189,25 @@ class StandHttpClient(HttpClient):
         response = self.make_session_request(Http_const.POST_METHOD, full_url, data=json_payload)
         return response
 
+    def ping(self, correlation_id: str) -> Optional[requests.Response]:
+        """
+        Периодический REST Ping к api-gateway (как у фронта после negotiate).
+
+        Заголовок x-tn-correlation-id позволяет gateway связать пинг с конкретным обращением.
+        Логирование и attach подавлены: пинг выполняется раз в 15 секунд и не должен наполнять
+        отчёт одинаковыми вложениями.
+        """
+        full_url = self.generate_full_url(self._stand_url, Http_const.PING_URL_PATH)
+        headers = {Http_const.X_TN_CORRELATION_ID_KEY: correlation_id}
+        previous_suppression = self.suppress_recv_logging
+        self.suppress_recv_logging = True
+        try:
+            return self.make_session_request(
+                Http_const.POST_METHOD, full_url, data=json.dumps({}), headers=headers
+            )
+        finally:
+            self.suppress_recv_logging = previous_suppression
+
     def _add_token_to_headers(self) -> dict:
         """
         Добавляет token в headers запроса

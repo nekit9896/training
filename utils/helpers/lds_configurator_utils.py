@@ -202,13 +202,7 @@ def _tu_id_in_main_page_message(msg: Any, tu_id: int) -> bool:
 
 def _drain_recv_queue(ws_client: WebSocketClient) -> list[Any]:
     """Забирает все сообщения из очереди WS без блокирующего ожидания."""
-    messages: list[Any] = []
-    while not ws_client.recv_queue.empty():
-        try:
-            messages.append(ws_client.recv_queue.get_nowait())
-        except asyncio.QueueEmpty:
-            break
-    return messages
+    return ws_client.drain_messages()
 
 
 async def is_tu_present_on_main_page(
