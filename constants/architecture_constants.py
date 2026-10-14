@@ -142,6 +142,9 @@ class HTTPClientConstants(StandConstants):
     POST_METHOD: str = "post"
     X_SECURITY_SIGNATURE_KEY: str = 'x-security-signature'
     X_USER_ID_KEY: str = 'x-user-id'
+    # Заголовок корреляции периодического REST Ping (фронт шлёт его после negotiate)
+    X_TN_CORRELATION_ID_KEY: str = 'x-tn-correlation-id'
+    REST_PING_INTERVAL_S: float = 15.0
     TESTOPS_UPLOAD_ENDPOINT: str = "/upload"
     TESTOPS_ATTACHMENTS_LIST_ENDPOINT: str = "/test_cases/{test_case_id}/attachments"
     TESTOPS_LOAD_ATTACHMENT_ENDPOINT: str = "/test_cases/{test_case_id}/attachments/{attachment_id}?download=1"
@@ -161,7 +164,22 @@ class WebSocketClientConstants(StandConstants):
     HANDSHAKE_WAITING: float | int = 5.0
     HANDSHAKE_MESSAGE: str = "{\"protocol\":\"messagepack\",\"version\":1}"
     WS_HUBS: str = "/hubs/ldsClientHub"
-    START_INVOCATION_ID: str = "1"
+    NEGOTIATE_URL_PATH: str = f"{WS_HUBS}/negotiate"
+    NEGOTIATE_VERSION: int = 1
+    NEGOTIATE_QUERY_TEMPLATE: str = "?token={token}&xUserId={x_user_id}&negotiateVersion={negotiate_version}"
+    NEGOTIATE_TIMEOUT_S: float = 20.0
+    NEGOTIATE_MAX_RETRIES: int = 3
+    NEGOTIATE_RETRY_BACKOFF_S: float = 2.0
+    CONNECTION_ID_KEY: str = "connectionId"
+    CONNECTION_TOKEN_KEY: str = "connectionToken"
+    AVAILABLE_TRANSPORTS_KEY: str = "availableTransports"
+    TRANSPORT_KEY: str = "transport"
+    WEBSOCKETS_TRANSPORT: str = "WebSockets"
+    WS_ID_QUERY_PARAM: str = "id"
+    MASKED_TOKEN: str = "***"
+    # Индекс типа сообщения SignalR в распакованном списке ([6] - ping, [7] - close)
+    SIGNALR_MESSAGE_TYPE_INDEX: int = 0
+    START_INVOCATION_ID: int = 1
     DEFAULT_RECONNECT_INTERVAL: float | int = 5.0
     WS_CONNECT_TIMEOUT_SECONDS: float = 120.0
     WS_RECONNECT_TIMEOUT_SECONDS: float = 20.0
@@ -174,6 +192,10 @@ class WebSocketClientConstants(StandConstants):
     COMPLETION_MESSAGE_TYPE: int = 3  # Completion
     # Текст ошибки Completion при неуспешном streaming (SignalR CompletionWithDetail)
     COMPLETION_ERROR_MESSAGE_INDEX: int = 4
+    # SignalR Ping/Close на уровне приложения.
+    PING_MESSAGE_TYPE: int = 6
+    CLOSE_MESSAGE_TYPE: int = 7
+    SIGNALR_PING_INTERVAL_S: float = 15.0
     DEFAULT_SIGNALR_MAP_HEADERS: dict = {}
     EVENT_TYPE_INDEX = 3
     INVOCATION_ID_INDEX = 2
